@@ -26,23 +26,28 @@ def send_message():
         all_chats.append({'role': 'user', 'content': message})
 
         response = openai.chat.completions.create(model="gpt-4o-mini",
-        messages=all_chats,max_tokens=150)
+        messages=all_chats,max_tokens=300)
         content = response.choices[0].message.content
         print(content)
         all_chats.append({'role': 'assistant', 'content': content})
-        content = content.strip().split("\n")    
-        if len(content) < 14:
+        content = content.strip().split("\n")   
+        content = [i.strip(",- ") for i in content]
+
+        first_row = [idx for idx in range(len(content)) if 'age:' in content[idx].lower()]
+
+        if len(first_row) == 0:
             other_content = "\n".join(content)
-        else:           
-            other_content = "\n".join(content[:-14])
+            info_content = ""
+        else:
+            other_content = "\n".join(content[:first_row[0]])
+            info_content = "\n".join(content[first_row[0]:])
+
         chat_box.config(state=tk.NORMAL)  # Enable writing to text box
         chat_box.insert(tk.END, "LLM: " + other_content + "\n")
         chat_box.config(state=tk.DISABLED)  # Disable text box to prevent user edits
 
 
-        if len(content) >= 14:
-            info_content = "\n".join(content[-14:])
-
+        if len(info_content) > 0:
             fill_form_with_extracted_info(extract_information(info_content))
 
 def extract_information(conversation):
@@ -135,11 +140,13 @@ def fill_form_with_extracted_info(extracted_info):
     ]
     
     for i in range(len(insert_buttons)):
-        insert_buttons[i].delete(0,tk.END)
-        insert_buttons[i].insert(0,extracted_info.get(insert_strings[i],""))
+        if extracted_info.get(insert_strings[i],"") != "":
+            insert_buttons[i].delete(0,tk.END)
+            insert_buttons[i].insert(0,extracted_info.get(insert_strings[i],""))
 
     for i in range(len(set_buttons)):
-        set_buttons[i].set(extracted_info.get(set_strings[i],""))
+        if extracted_info.get(set_strings[i],"") != "":
+            set_buttons[i].set(extracted_info.get(set_strings[i],""))
 
 def chat_based_prompt():
     whole_prompt = """You are a highly knowledgeable, patient, and helpful assistant that specializes in collecting user information and evaluating eligibility for various social and financial benefits. Your goal is to guide the user through the process, ensuring they provide clear and accurate answers. 

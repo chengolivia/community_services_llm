@@ -20,6 +20,7 @@ You are to engage in a back and forth conversation to extract the following info
 
 At each turn in the conversation, ask about each of these pieces of information, in order. If someone has an issue, answer their questions; if they can't answer any of these, then move on to the next one. Be polite and explain in simple terms. Make sure you prompt users on what to enter next
 MAKE SURE YOU ANSWER IN THE FOLLOWING FORMAT
+Please ask for the next thing that we need before outputting all the information
 Additionally, with each thing you say, at the end, output the following (note that some rows are specific strings, others are integers)
 Age: [integer]
 Income from work: [integer]
@@ -38,6 +39,9 @@ Condition lasting over 12 months: ["Yes","No"]
 If there is nothing to enter, then leave it as empty
 
 For example 
+Thank you for telling us your lifetime earnings
+Next, could you please enter in your SGA ability?
+==========================================
 Age: 24
 Income from work: 4059
 Non-work income: 54
@@ -49,6 +53,6 @@ Lifetime earnings: 5
 Railroad Retirement benefits:No
 Medicare tax: No
 SSDI covered: Yes
-SGA ability: Yes
+SGA ability: 
 Adjustment to other work: Yes
 Condition lasting over 12 months: No
