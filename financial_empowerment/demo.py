@@ -3,12 +3,47 @@ from tkinter import ttk, messagebox
 import openai
 
 
-openai.api_key = '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'
+# openai.api_key = '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'
+openai.api_key = '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'
 
 system_prompt = "You are a highly knowledgeable, patient, and helpful assistant that specializes in collecting user information and evaluating eligibility \
                 for various social and financial benefits. Your goal is to guide the user through the process, ensuring they provide clear and accurate answers. \
                 Be polite and professional in your responses. If a user’s input is unclear or incomplete, ask follow-up questions to gather the necessary details. \
                 Always provide additional explanations or examples if the user appears confused. If a question involves complex terms, offer simple definitions to ensure the user understands"
+
+chat_prompt = open("chat_prompt.txt").read()
+
+all_chats = [{"role": "system", "content": system_prompt}, {"role": "system", "content": chat_prompt}]
+
+
+def send_message():
+    message = entry_box.get()
+    if message:
+        chat_box.config(state=tk.NORMAL)  # Enable writing to text box
+        chat_box.insert(tk.END, "You: " + message + "\n")
+        chat_box.config(state=tk.DISABLED)  # Disable text box to prevent user edits
+        entry_box.delete(0, tk.END)  # Clear the entry box
+        all_chats.append({'role': 'user', 'content': message})
+
+        response = openai.chat.completions.create(model="gpt-4o-mini",
+        messages=all_chats,max_tokens=150)
+        content = response.choices[0].message.content
+        print(content)
+        all_chats.append({'role': 'assistant', 'content': content})
+        content = content.strip().split("\n")    
+        if len(content) < 14:
+            other_content = "\n".join(content)
+        else:           
+            other_content = "\n".join(content[:-14])
+        chat_box.config(state=tk.NORMAL)  # Enable writing to text box
+        chat_box.insert(tk.END, "LLM: " + other_content + "\n")
+        chat_box.config(state=tk.DISABLED)  # Disable text box to prevent user edits
+
+
+        if len(content) >= 14:
+            info_content = "\n".join(content[-14:])
+
+            fill_form_with_extracted_info(extract_information(info_content))
 
 def extract_information(conversation):
     prompt = f"""
@@ -33,6 +68,7 @@ def extract_information(conversation):
     {conversation}
     
     Please output the extracted information in the following format:
+    If there is nothing to enter, then leave it as empty
     Age: [age]
     Income from work: [income]
     Non-work income: [non_work_income]
@@ -49,8 +85,8 @@ def extract_information(conversation):
     Condition lasting over 12 months: [ssdi_duration]
     """
     
-    response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",  # The chat-based model
+    response = openai.chat.completions.create(
+    model="gpt-4o-mini",  # The chat-based model
     messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": prompt}
@@ -60,31 +96,89 @@ def extract_information(conversation):
     
     # Parsing the LLM response and extracting information
     extracted_info = {}
-    lines = response['choices'][0]['message']['content'].strip().split("\n")
+    lines = response.choices[0].message.content.strip().split("\n")
     for line in lines:
         if ": " in line:
             key, value = line.split(": ")
-            extracted_info[key.strip().lower().replace(" ", "_")] = value.strip()
-    
+            extracted_info[key.strip().lower().replace(" ", "_")] = value.strip().replace("$","").replace(",","")
+    print(extracted_info)
     return extracted_info
 
 # Function to fill the form with extracted data
 def fill_form_with_extracted_info(extracted_info):
-    age_entry.insert(0, extracted_info.get("age", ""))
-    income_entry.insert(0, extracted_info.get("income_from_work", ""))
-    non_work_income_entry.insert(0, extracted_info.get("non_work_income", ""))
-    marital_status_var.set(extracted_info.get("marital_status", ""))
-    resources_entry.insert(0, extracted_info.get("resources", ""))
-    disability_var.set(extracted_info.get("disability_status", ""))
-    years_worked_entry.insert(0, extracted_info.get("years_worked", ""))
-    lifetime_earnings_entry.insert(0, extracted_info.get("lifetime_earnings", ""))
-    railroad_var.set(extracted_info.get("railroad_retirement_benefits", ""))
-    gov_employee_var.set(extracted_info.get("medicare_tax", ""))
-    ssdi_covered_var.set(extracted_info.get("ssdi_covered", ""))
-    ssdi_sga_var.set(extracted_info.get("sga_ability", ""))
-    ssdi_adjustment_var.set(extracted_info.get("adjustment_to_other_work", ""))
-    ssdi_duration_var.set(extracted_info.get("condition_lasting_over_12_months", ""))
+    insert_buttons = [age_entry,
+        income_entry,
+        non_work_income_entry,
+        resources_entry,
+        years_worked_entry,
+        lifetime_earnings_entry]
+    insert_strings = [
+        "age","income_from_work","non-work_income","resources",
+        "years_worked","lifetime_earnings"
+    ]
+    
+    set_buttons = [
+        marital_status_var,
+        disability_var,
+        railroad_var,
+        gov_employee_var,
+        ssdi_covered_var,
+        ssdi_sga_var,
+        ssdi_adjustment_var,
+        ssdi_duration_var
+    ]
 
+    set_strings = [
+        "marital_status","disability_status","railroad_retirement_benefits",
+        "medicare_tax","ssdi_covered","sga_ability","adjustment_to_other_work",
+        "condition_lasting_over_12_months"
+    ]
+    
+    for i in range(len(insert_buttons)):
+        insert_buttons[i].delete(0,tk.END)
+        insert_buttons[i].insert(0,extracted_info.get(insert_strings[i],""))
+
+    for i in range(len(set_buttons)):
+        set_buttons[i].set(extracted_info.get(set_strings[i],""))
+
+def chat_based_prompt():
+    whole_prompt = """You are a highly knowledgeable, patient, and helpful assistant that specializes in collecting user information and evaluating eligibility for various social and financial benefits. Your goal is to guide the user through the process, ensuring they provide clear and accurate answers. 
+    Be polite and professional in your responses. If a user’s input is unclear or incomplete, ask follow-up questions to gather the necessary details. Always provide additional explanations or examples if the user appears confused. If a question involves complex terms, offer simple definitions to ensure the user understands
+
+    You are to engage in a back and forth conversation to extract the following information: 
+        
+        1. Age
+        2. Income from work (monthly)
+        3. Non-work income (monthly)
+        4. Marital status
+        5. Resources (e.g., savings, investments)
+        6. Disability status (Yes/No)
+        7. Total years of work
+        8. Lifetime earnings
+        9. Railroad Retirement Board benefits (Yes/No)
+        10. Government employee who paid Medicare tax (Yes/No)
+        11. Covered by Social Security Disability Insurance (SSDI) (Yes/No)
+        12. Ability to perform substantial gainful activity (SGA) (Yes/No)
+        13. Ability to adjust to other work (Yes/No)
+        14. Condition lasting or expected to last more than 12 months (Yes/No)
+
+    At each turn in the conversation, ask about each of these pieces of information, in order. If someone has an issue, answer their questions; if they can't answer any of these, then move on to the next one. Be polite and explain in simple terms. 
+    Additionally, with each thing you say, at the end, output the following: 
+    Age: [age]
+    Income from work: [income]
+    Non-work income: [non_work_income]
+    Marital status: [marital_status]
+    Resources: [resources]
+    Disability status: [disability_status]
+    Years worked: [years_worked]
+    Lifetime earnings: [lifetime_earnings]
+    Railroad Retirement benefits: [railroad_benefits]
+    Medicare tax: [gov_employee_medicare_tax]
+    SSDI covered: [ssdi_covered]
+    SGA ability: [ssdi_sga]
+    Adjustment to other work: [ssdi_adjustment]
+    Condition lasting over 12 months: [ssdi_duration]
+    If there is nothing to enter, then leave it as empty"""
 
 def analyze_data():
     try:
@@ -316,8 +410,21 @@ ssdi_duration_dropdown.grid(row=27, column=0, padx=10, pady=5)
 analyze_button = tk.Button(scrollable_frame, text="Analyze", command=analyze_data)
 analyze_button.grid(row=28, column=0, pady=20)
 
+chat_box = tk.Text(root, height=20, width=50, state=tk.DISABLED)
+chat_box.pack(pady=10)
+
+# Create an entry widget for input
+entry_box = tk.Entry(root, width=40)
+entry_box.pack(pady=5, side=tk.LEFT)
+
+# Create a send button
+send_button = tk.Button(root, text="Send", command=send_message)
+send_button.pack(pady=5, side=tk.LEFT)
+
+
 for i in range(29):
     scrollable_frame.rowconfigure(i, weight=1)
 scrollable_frame.columnconfigure(0, weight=1)
 
 root.mainloop()
+
