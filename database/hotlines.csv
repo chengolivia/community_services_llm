@@ -1,12 +1,12 @@
-Service,Phone Number
-Cumberland CARES,800-236-2448
-COP2COP - Peer Support,866-267-2267
-Cumberland Co. Crisis Center,856-455-5555
-Division of Mental Health & Addictions Services (DMHAS),800-382-6717
-NJ 2nd Floor Youth Helpline,888-222-2228
-Reach NJ (Addiction Resource),866-824-2331
-Suicide Prevention Hotline (NJ Hopeline),9-8-8
-The Peer Recovery Warmline,877-292-5588
-VET2VET – Peer Support,866-838-7654
-NJ Addiction Hotline (IME),844-276-2777
-EMERGENCY,9-1-1
+Service,Phone_Number,Description,County,Category
+Cumberland CARES,800-236-2448,"Support services for crisis and counseling",Cumberland,"Mental Health"
+COP2COP - Peer Support,866-267-2267,"Peer support for law enforcement officers",All,"Mental Health"
+Cumberland Co. Crisis Center,856-455-5555,"Crisis intervention and mental health services",Cumberland,"Mental Health"
+Division of Mental Health & Addictions Services (DMHAS),800-382-6717,"State-level services for mental health and addiction",All,"Mental Health, Addiction"
+NJ 2nd Floor Youth Helpline,888-222-2228,"Helpline for youth seeking support",All,"Youth Support"
+Reach NJ (Addiction Resource),866-824-2331,"Addiction recovery and support services",All,"Addiction"
+Suicide Prevention Hotline (NJ Hopeline),9-8-8,"24/7 suicide prevention hotline",All,"Mental Health"
+The Peer Recovery Warmline,877-292-5588,"Peer support for mental health recovery",All,"Mental Health"
+VET2VET – Peer Support,866-838-7654,"Peer support for veterans",All,"Mental Health, Veteran Support"
+NJ Addiction Hotline (IME),844-276-2777,"Addiction treatment and recovery helpline",All,"Addiction"
+EMERGENCY,9-1-1,"Emergency services",All,"General"
