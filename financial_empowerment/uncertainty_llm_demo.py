@@ -18,9 +18,16 @@ def extract_text_from_pdf(pdf_file_path):
             text += page.extract_text()
     return text
 
+extract_sys_prompt = "You are an assistant that extracts relevant personal and financial information from user inputs. \
+                      Your task is to present the information in a structured format without making any assumptions or judgments about the data.\
+                      Focus on identifying key informations."
+
 # LLM API call to extract eligibility information from user input
 def call_llm_extract(user_input, pdf_text):
-    prompt = f"Extract the relevant personal information from the following user input and present it in a structured format. Pay attention to the attributes that are mention in the text :{pdf_text} Here is just an example of the structure. You may extract additional attributes if you see fit: \n" \
+    prompt = f"Extract the relevant personal information from the following user input and present it in a structured format. \
+        Pay attention to the attributes or requirements that are mentioned in the text :{pdf_text}. These extracted information will \
+         be used to determine if the user is eligible for certain government benefit. Here is just an example of the structure. \
+            You should extract additional attributes or personal information if you see fit: \n" \
              f"Age: [extracted value]\n" \
              f"Monthly Income: [extracted value]\n" \
              f"Resources: [extracted value]\n" \
@@ -29,15 +36,17 @@ def call_llm_extract(user_input, pdf_text):
              f"Here is the user input: {user_input}"
     
     response = openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "system", "content": extract_sys_prompt},
             {"role": "user", "content": prompt}
         ]
     )
     extracted_info = response['choices'][0]['message']['content'].strip()
     return extracted_info
 
+update_sys_prompt = "You are an assistant that updates previously extracted personal and financial information based on user corrections. \
+                    Your task is to update only the specific information the user mentions and retain the rest of the information as it was. "
 
 # LLM API call to update the extracted information
 def call_llm_update(original_info, update_request, pdf_text):
@@ -46,31 +55,38 @@ def call_llm_update(original_info, update_request, pdf_text):
              f"User update request: {update_request} \n" \
              f"Please update the original information based on the request and present it in a structured format."
     response = openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "system", "content": update_sys_prompt},
             {"role": "user", "content": prompt}
         ]
     )
     updated_info = response['choices'][0]['message']['content'].strip()
     return updated_info
 
+check_sys_prompt = "You are an assistant that evaluates eligibility for various government benefits based on the user’s personal and financial information. \
+                   Your task is to assess user eligibility for different benefits. For each benefit, clearly explain the reasoning behind the classification, \
+                    specifying which requirements are met and which are not. If some information is missing or uncertain, indicate how this impacts eligibility. \
+                    Ensure the reasoning is easy to understand but provides enough detail for the user to know why they fall into a specific category."
+
 # LLM API call to check eligibility for benefits based on extracted information
 def call_llm_check_eligibility(extracted_info, pdf_text):
     prompt = f"Please read the following text extracted from a pdf file :{pdf_text} containing benefits and eligibility criteria. \n" \
              f"Based on the extracted user information: {extracted_info}, \n" \
-             f"Determine if the user is 100% eligible, likely eligible, maybe eligible, or not eligible for any benefits. Provide the reasoning for each in the following structure:\n" \
+             f"Determine if the user is 100% eligible, likely eligible, maybe eligible, or not eligible for any benefits. \
+                Pay close attention to eligiblity details and user information. make sure that your answer is accurate\
+                Provide the reasoning for each in the following structure:\n" \
              f"- 100% eligible:\n[List of benefits]\n" \
              f"- Likely eligible:\n[List of benefits and missing requirements]\n" \
              f"Reason: [Explanation of the missing requirement(s)]\n" \
              f"- Maybe eligible:\n[List of benefits and partially met requirements]\n" \
              f"Reason: [Explanation of partially met requirements]\n" \
              f"- Not eligible:\n[List of benefits and unmet requirements]\n" \
-             f"Reason: [Explanation of unmet requirements]."
+             f"Reason: [Explanation of unmet requirements]." 
     response = openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "system", "content": check_sys_prompt},
             {"role": "user", "content": prompt}
         ]
     )
