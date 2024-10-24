@@ -44,7 +44,6 @@ def format_gpt(entry):
     entry = entry.strip() 
     entry = entry.split("\n")
     entry = ['"{}"'.format(i.strip()) for i in entry if len(i) == 0 or i[0] != '"']
-    print(entry)
     entry = entry[:7]
 
     if entry[-1].lower().replace('"','').strip() not in wellness_dimensions:
