@@ -45,7 +45,7 @@ def analyze_situation(situation, csv_file_path):
     response = call_chatgpt_api(system_prompt,prompt)
     return response
 
-def analyze_situation_rag(situation, csv_file_path):
+def analyze_situation_rag(situation, csv_file_path,k=3):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt using a RAG to whittle down the number of things
     
@@ -83,13 +83,16 @@ def analyze_situation_rag(situation, csv_file_path):
     query_inputs = question_tokenizer(situation, return_tensors='pt', padding=True, truncation=True)
     query_embedding = question_model(**query_inputs).pooler_output.detach().numpy()
 
+    print("k is {}".format(k))
+
     # Search FAISS index to find the most relevant hotlines
-    _, I = index.search(query_embedding, k=3)  # Retrieve top 3 hotlines
+    _, I = index.search(query_embedding, k=k)  # Retrieve top 3 hotlines
     retrieved_hotlines = [documents[i] for i in I[0]]
+    print("Retrieved hotlines {}".format(len(retrieved_hotlines)))
 
     retrieved_text = "\n".join(retrieved_hotlines)
     system_prompt = "You are a helpful assistant recommending hotline services."
-    prompt = f"The user is experiencing: {situation}\nHere are some suggested hotlines:\n{retrieved_text}\nPlease explain why these hotlines are appropriate for the user's situation."
+    prompt = f"The user is experiencing: {situation}\nHere are some suggested hotlines:\n{retrieved_text}\nPlease explain why these hotlines are appropriate for the user's situation. The only thing to put in bold (**) is the name of the place."
 
     response = call_chatgpt_api(system_prompt,prompt)
     return response
