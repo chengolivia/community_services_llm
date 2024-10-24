@@ -1,42 +1,10 @@
 import tkinter as tk
 from tkinter import scrolledtext
-import pandas as pd
-import openai
+from extract_resources import analyze_situation
 
-openai.api_key = 'sk-vcluRbh8_Y_LTW4rYNJZ_OIe0AG5iZOKBaj99sEmn0T3BlbkFJmyNWqmOrh3BkZ-YrMHcyuzUgCU26oHqPNhGTPo3LAA'
-
-system_prompt = "You are a helpful assistant that recommends appropriate hotline services based on the given situation. You will analyze the list of available hotlines and select the most suitable one for each user query, providing the hotline name, phone number, and a reason for the choice."
-
-def create_prompt(situation, hotlines_df):
-    services = ", ".join(hotlines_df["Service"].tolist())
-    prompt = f"""
-    I have a list of hotline services: {services}. Based on the situation "{situation}", which hotlines should I call? 
-    Return a few appropriate hotline names, number, and why they are the appropriate choices for this situation. Make sure you provide more than one hotline if they can help even just a little.
-    """
-    return prompt
-
-def call_chatgpt_api(prompt):
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",  
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.7,
-        max_tokens=500
-    )
-    return response['choices'][0]['message']['content'].strip()
-
-def analyze_situation(situation, csv_file_path):
-    hotlines_df = pd.read_csv(csv_file_path)
-    prompt = create_prompt(situation, hotlines_df)   
-    response = call_chatgpt_api(prompt)
-    return response
-
-# Function to handle button click and update the output
 def handle_analyze():
     situation = situation_input.get("1.0", tk.END).strip()  # Get the input situation
-    csv_file_path = "enhanced_hotlines.csv"
+    csv_file_path = "data/enhanced_hotlines.csv"
     if situation:
         response = analyze_situation(situation, csv_file_path)
         result_output.delete("1.0", tk.END)  # Clear previous output
