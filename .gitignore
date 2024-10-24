@@ -1,0 +1,5 @@
+database/__pycache__
+database/secrets.py
+.DS_Store
+database/.ipynb_checkpoints
+database/.DS_Store
