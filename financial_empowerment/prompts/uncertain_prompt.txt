@@ -1,0 +1,8 @@
+Extract the relevant personal information from the following user input and present it in a structured format. Pay attention to the attributes or requirements that are mentioned in the text :{}. These extracted information will be used to determine if the user is eligible for certain government benefit. Here is just an example of the structure. \
+You should extract additional attributes or personal information if you see fit: 
+Age: [extracted value]
+Monthly Income: [extracted value]
+Resources: [extracted value]
+Disability Status: [extracted value]
+Family Status: [extracted value]
+Here is the user input: {}

@@ -1,0 +1,4 @@
+Please read the following text extracted from a pdf file: {} containing benefits and eligibility criteria.
+Original information: {}
+User update request: {}
+Please update the original information based on the request and present it in a structured format.

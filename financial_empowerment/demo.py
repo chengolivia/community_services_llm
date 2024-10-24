@@ -1,22 +1,22 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import openai
+from extract_information import extract_information
+from utils import call_chatgpt_api_all_chats
+from eligible_benefits import get_eligible_benefits
 
-
-# openai.api_key = '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'
-openai.api_key = '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'
-
-system_prompt = "You are a highly knowledgeable, patient, and helpful assistant that specializes in collecting user information and evaluating eligibility \
-                for various social and financial benefits. Your goal is to guide the user through the process, ensuring they provide clear and accurate answers. \
-                Be polite and professional in your responses. If a user’s input is unclear or incomplete, ask follow-up questions to gather the necessary details. \
-                Always provide additional explanations or examples if the user appears confused. If a question involves complex terms, offer simple definitions to ensure the user understands"
-
-chat_prompt = open("chat_prompt.txt").read()
-
+system_prompt = open("prompts/system_prompt.txt").read()
+chat_prompt = open("prompts/chat_prompt.txt").read()
 all_chats = [{"role": "system", "content": system_prompt}, {"role": "system", "content": chat_prompt}]
 
-
 def send_message():
+    """Analyze the newest chat, and give a response
+    
+    Arguments: None
+    
+    Returns: Nothing
+    
+    Side Effects: Runs ChatGPT to analyze the message"""
+
     message = entry_box.get()
     if message:
         chat_box.config(state=tk.NORMAL)  # Enable writing to text box
@@ -25,9 +25,7 @@ def send_message():
         entry_box.delete(0, tk.END)  # Clear the entry box
         all_chats.append({'role': 'user', 'content': message})
 
-        response = openai.chat.completions.create(model="gpt-4o-mini",
-        messages=all_chats,max_tokens=300)
-        content = response.choices[0].message.content
+        content = call_chatgpt_api_all_chats(all_chats)
         print(content)
         all_chats.append({'role': 'assistant', 'content': content})
         content = content.strip().split("\n")   
@@ -46,71 +44,22 @@ def send_message():
         chat_box.insert(tk.END, "LLM: " + other_content + "\n")
         chat_box.config(state=tk.DISABLED)  # Disable text box to prevent user edits
 
-
         if len(info_content) > 0:
             fill_form_with_extracted_info(extract_information(info_content))
 
-def extract_information(conversation):
-    prompt = f"""
-    You are provided with a conversation between a specialist and a client. Extract the following information:
-    
-    1. Age
-    2. Income from work (monthly)
-    3. Non-work income (monthly)
-    4. Marital status
-    5. Resources (e.g., savings, investments)
-    6. Disability status (Yes/No)
-    7. Total years of work
-    8. Lifetime earnings
-    9. Railroad Retirement Board benefits (Yes/No)
-    10. Government employee who paid Medicare tax (Yes/No)
-    11. Covered by Social Security Disability Insurance (SSDI) (Yes/No)
-    12. Ability to perform substantial gainful activity (SGA) (Yes/No)
-    13. Ability to adjust to other work (Yes/No)
-    14. Condition lasting or expected to last more than 12 months (Yes/No)
-    
-    Conversation:
-    {conversation}
-    
-    Please output the extracted information in the following format:
-    If there is nothing to enter, then leave it as empty
-    Age: [age]
-    Income from work: [income]
-    Non-work income: [non_work_income]
-    Marital status: [marital_status]
-    Resources: [resources]
-    Disability status: [disability_status]
-    Years worked: [years_worked]
-    Lifetime earnings: [lifetime_earnings]
-    Railroad Retirement benefits: [railroad_benefits]
-    Medicare tax: [gov_employee_medicare_tax]
-    SSDI covered: [ssdi_covered]
-    SGA ability: [ssdi_sga]
-    Adjustment to other work: [ssdi_adjustment]
-    Condition lasting over 12 months: [ssdi_duration]
-    """
-    
-    response = openai.chat.completions.create(
-    model="gpt-4o-mini",  # The chat-based model
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
-    ],
-    max_tokens=150
-)
-    
-    # Parsing the LLM response and extracting information
-    extracted_info = {}
-    lines = response.choices[0].message.content.strip().split("\n")
-    for line in lines:
-        if ": " in line:
-            key, value = line.split(": ")
-            extracted_info[key.strip().lower().replace(" ", "_")] = value.strip().replace("$","").replace(",","")
-    print(extracted_info)
-    return extracted_info
+
 
 # Function to fill the form with extracted data
 def fill_form_with_extracted_info(extracted_info):
+    """Given a list of extracted data, fill out the form with it
+    
+    Arguments:
+        extracted_info: Dictionary with information on different fields
+        
+    Returns: Nothing
+    
+    Side Effects: Updates form with this extracted information"""
+
     insert_buttons = [age_entry,
         income_entry,
         non_work_income_entry,
@@ -148,46 +97,15 @@ def fill_form_with_extracted_info(extracted_info):
         if extracted_info.get(set_strings[i],"") != "":
             set_buttons[i].set(extracted_info.get(set_strings[i],""))
 
-def chat_based_prompt():
-    whole_prompt = """You are a highly knowledgeable, patient, and helpful assistant that specializes in collecting user information and evaluating eligibility for various social and financial benefits. Your goal is to guide the user through the process, ensuring they provide clear and accurate answers. 
-    Be polite and professional in your responses. If a user’s input is unclear or incomplete, ask follow-up questions to gather the necessary details. Always provide additional explanations or examples if the user appears confused. If a question involves complex terms, offer simple definitions to ensure the user understands
-
-    You are to engage in a back and forth conversation to extract the following information: 
-        
-        1. Age
-        2. Income from work (monthly)
-        3. Non-work income (monthly)
-        4. Marital status
-        5. Resources (e.g., savings, investments)
-        6. Disability status (Yes/No)
-        7. Total years of work
-        8. Lifetime earnings
-        9. Railroad Retirement Board benefits (Yes/No)
-        10. Government employee who paid Medicare tax (Yes/No)
-        11. Covered by Social Security Disability Insurance (SSDI) (Yes/No)
-        12. Ability to perform substantial gainful activity (SGA) (Yes/No)
-        13. Ability to adjust to other work (Yes/No)
-        14. Condition lasting or expected to last more than 12 months (Yes/No)
-
-    At each turn in the conversation, ask about each of these pieces of information, in order. If someone has an issue, answer their questions; if they can't answer any of these, then move on to the next one. Be polite and explain in simple terms. 
-    Additionally, with each thing you say, at the end, output the following: 
-    Age: [age]
-    Income from work: [income]
-    Non-work income: [non_work_income]
-    Marital status: [marital_status]
-    Resources: [resources]
-    Disability status: [disability_status]
-    Years worked: [years_worked]
-    Lifetime earnings: [lifetime_earnings]
-    Railroad Retirement benefits: [railroad_benefits]
-    Medicare tax: [gov_employee_medicare_tax]
-    SSDI covered: [ssdi_covered]
-    SGA ability: [ssdi_sga]
-    Adjustment to other work: [ssdi_adjustment]
-    Condition lasting over 12 months: [ssdi_duration]
-    If there is nothing to enter, then leave it as empty"""
-
 def analyze_data():
+    """Analyze what data was entered and what benefits are eligible
+    
+    Arguments: Nothing
+    
+    Returns: Nothing 
+    
+    Side Effects: Updates the prompt with the things that are eligible"""
+
     try:
         income = float(income_entry.get())
         non_work_income = float(non_work_income_entry.get())
@@ -204,72 +122,11 @@ def analyze_data():
         ssdi_adjustment = ssdi_adjustment_var.get()
         ssdi_duration = ssdi_duration_var.get()
 
-        eligible_benefits = []
-        explanations = []
-
-        # Little to no income check for SSI
-        low_income = False
-        if marital_status == "single adult" and (income < 1971 and non_work_income < 963):
-            low_income = True
-        elif marital_status == "married couples who live together" and (income < 2915 and non_work_income < 1435):
-            low_income = True
-        elif marital_status == "an individual parent who has a child with a disability" and (income < 3897 and non_work_income < 1926):
-            low_income = True
-        elif marital_status == "couples who have a child with a disability" and (income < 4841 and non_work_income < 2398):
-            low_income = True
-        elif marital_status == "a child with disability not living with their parent" and (income < 1971 and non_work_income < 963):
-            low_income = True
-        
-        # Little to no resources check for SSI
-        low_resources = resources <= (2000 if marital_status == "single adult" else 3000)
-        
-        # Disability or age check for SSI
-        eligible_disability_age = disability_status == "Yes" or age > 65
-
-        # Supplemental Security Income (SSI) eligibility logic
-        ssi_eligible = low_income and low_resources and eligible_disability_age
-        if ssi_eligible:
-            eligible_benefits.append("Supplemental Security Income (SSI)")
-            explanations.append("You are eligible for SSI because you have low income, limited resources, and you are either disabled or over the age of 65.")
-
-        # Social Security Administration (SSA) eligibility
-        credits_earned = lifetime_earnings // 1730
-        ssa_eligible = credits_earned >= 40
-        if ssa_eligible:
-            eligible_benefits.append("Social Security Administration (SSA)")
-            explanations.append("You are eligible for SSA benefits because you have earned at least 40 credits from your lifetime earnings.")
-
-        # Medicare Part A eligibility
-        medicare_part_a_eligible = ssa_eligible or railroad_benefits == "Yes" or gov_employee_medicare_tax == "Yes"
-        if medicare_part_a_eligible:
-            eligible_benefits.append("Medicare Part A")
-            explanations.append("You are eligible for Medicare Part A because you either qualify for SSA benefits, Railroad Retirement benefits, or have paid Medicare taxes as a government employee.")
-
-        # Medicare Part B eligibility
-        medicare_part_b_eligible = medicare_part_a_eligible
-        if medicare_part_b_eligible:
-            eligible_benefits.append("Medicare Part B")
-            explanations.append("You are eligible for Medicare Part B since you are eligible for Medicare Part A.")
-
-        # Medicare Part C (Advantage Plan) eligibility
-        medicare_part_c_eligible = medicare_part_a_eligible and medicare_part_b_eligible
-        if medicare_part_c_eligible:
-            eligible_benefits.append("Medicare Part C (Advantage Plan)")
-            explanations.append("You are eligible for Medicare Part C (Advantage Plan) since you are eligible for both Medicare Part A and Part B.")
-
-        # Medicare Part D eligibility
-        medicare_part_d_eligible = medicare_part_a_eligible or medicare_part_b_eligible
-        if medicare_part_d_eligible:
-            eligible_benefits.append("Medicare Part D")
-            explanations.append("You are eligible for Medicare Part D because you are eligible for either Medicare Part A or Part B.")
-
-        # SSDI eligibility
-        ssdi_eligible = ssdi_covered == "Yes" and credits_earned >= 40 and (credits_earned - years_worked * 4) >= 20
-        ssdi_eligible = ssdi_eligible and ssdi_sga == "Yes" and ssdi_adjustment == "Yes" and ssdi_duration == "Yes"
-        if ssdi_eligible:
-            eligible_benefits.append("Social Security Disability Insurance (SSDI)")
-            explanations.append("You are eligible for SSDI because you have sufficient work credits, cannot perform substantial gainful activity, and your condition has lasted or is expected to last at least 12 months.")
-
+        eligible_benefits, explanations = get_eligible_benefits(income, 
+        non_work_income, marital_status, resources, disability_status, 
+        age, years_worked, lifetime_earnings,
+        railroad_benefits, gov_employee_medicare_tax, ssdi_covered, ssdi_sga,
+        ssdi_adjustment, ssdi_duration)
         # Building the final result message
         if eligible_benefits:
             result = "You are eligible for the following benefits:\n"
