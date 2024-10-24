@@ -1,6 +1,6 @@
-database/__pycache__
 database/secrets.py
 .DS_Store
 */.ipynb_checkpoints
 */.DS_Store
 database/results/*.npy
+*/__pycache__
