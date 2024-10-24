@@ -5,6 +5,9 @@ import pandas as pd
 from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer, DPRContextEncoder, DPRContextEncoderTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 import faiss
+import time 
+import os 
+import numpy as np
 
 openai.api_key = key
 
@@ -57,15 +60,20 @@ def analyze_situation_rag(situation, csv_file_path):
     descriptions = list(hotlines_df['Description'])
     documents = ["{}: {}".format(names[i],descriptions[i]) for i in range(len(names))]
 
+    start = time.time()
     # Initialize FAISS and create an index
-    tokenizer = DPRContextEncoderTokenizer.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
-    model = DPRContextEncoder.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
+    file_path = "results/saved_embedding.npy"
 
-    # Tokenize and encode documents
-    inputs = tokenizer(documents, return_tensors='pt', padding=True, truncation=True)
-    embeddings = model(**inputs).pooler_output.detach().numpy()
+    if os.path.exists(file_path):
+        embeddings = np.load(file_path)
+    else:
+        tokenizer = DPRContextEncoderTokenizer.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
+        model = DPRContextEncoder.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
+        inputs = tokenizer(documents, return_tensors='pt', padding=True, truncation=True)
+        embeddings = model(**inputs).pooler_output.detach().numpy()
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        np.save(file_path, embeddings)
 
-    # Use FAISS to index the embeddings
     index = faiss.IndexFlatL2(embeddings.shape[1])  # Index for fast search
     index.add(embeddings)
     question_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained('facebook/dpr-question_encoder-single-nq-base')
@@ -76,7 +84,7 @@ def analyze_situation_rag(situation, csv_file_path):
     query_embedding = question_model(**query_inputs).pooler_output.detach().numpy()
 
     # Search FAISS index to find the most relevant hotlines
-    D, I = index.search(query_embedding, k=3)  # Retrieve top 3 hotlines
+    _, I = index.search(query_embedding, k=3)  # Retrieve top 3 hotlines
     retrieved_hotlines = [documents[i] for i in I[0]]
 
     retrieved_text = "\n".join(retrieved_hotlines)
