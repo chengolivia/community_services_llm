@@ -10,7 +10,7 @@ def call_chatgpt_api(system_prompt,prompt):
 
     Returns: String, result from ChatGPT"""
 
-    response = openai.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4o-mini",  
         messages=[
             {"role": "system", "content": system_prompt},

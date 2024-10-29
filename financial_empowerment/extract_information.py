@@ -28,7 +28,7 @@ def extract_information(conversation):
     return extracted_info
 
 
-def call_llm_extract(user_input, pdf_text):
+def call_llm_extract(user_input):
     """Extract information from a user's input
     
     Arguments:
@@ -37,7 +37,7 @@ def call_llm_extract(user_input, pdf_text):
         
     Returns: Response, which is the extracted information"""
     system_prompt = open("prompts/system_prompt_extract.txt").read()
-    prompt = open("prompts/uncertain_prompt.txt").read().format(pdf_text,user_input)
+    prompt = open("prompts/uncertain_prompt.txt").read().format(user_input)
     extracted_info = call_chatgpt_api(system_prompt,prompt).strip()
     return extracted_info
 
@@ -51,7 +51,7 @@ def call_llm_update(original_info, update_request, pdf_text):
         
     Returns: Response, which is the updated information"""
     
-    update_sys_prompt = open("prompts/update_sys_prompt.txt").read()
+    update_sys_prompt = open("prompts/update_system_prompt.txt").read()
     prompt = open("prompts/update_prompt.txt").read().format(pdf_text,original_info,update_request)
     updated_info = call_chatgpt_api(update_sys_prompt,prompt).strip()
     return updated_info

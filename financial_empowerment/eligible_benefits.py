@@ -94,3 +94,5 @@ def call_llm_check_eligibility(extracted_info, pdf_text):
     prompt = open("prompts/check_propmt.txt").read().format(pdf_text,extracted_info)
     eligibility_info = call_chatgpt_api(check_sys_prompt,prompt).strip()
     return eligibility_info
+
+

@@ -1,8 +1,18 @@
-Extract the relevant personal information from the following user input and present it in a structured format. Pay attention to the attributes or requirements that are mentioned in the text :{}. These extracted information will be used to determine if the user is eligible for certain government benefit. Here is just an example of the structure. \
-You should extract additional attributes or personal information if you see fit: 
-Age: [extracted value]
-Monthly Income: [extracted value]
-Resources: [extracted value]
-Disability Status: [extracted value]
-Family Status: [extracted value]
-Here is the user input: {}
+Extract the relevant personal information from the following user input and present it in a structured dictionary format.This extracted information will be used to determine eligibility for government benefits. Here is the user input: {}. Use the structure below, filling in values or indicating None if unclear. Present the final result as a Python dictionary.
+
+Expected Python Dictionary Structure:
+
+    "age": [extracted value or None if unclear],
+    "marital_status": [e.g., "single_adult", "married_couple", or None if unclear],
+    "family_status": [e.g., "single_adult", "individual_parent_disabled_child", "married_couple", or None if unclear],
+    "income": [Monthly Income from Work, before taxes, or None if unclear],
+    "non_work_income": [Monthly Income from Non-Work Sources (e.g., pensions, unemployment), or None if unclear],
+    "resources": [Total Resources/Assets (e.g., savings, property value), or None if unclear],
+    "disability": [True if disabled, False if not, or None if unclear],
+    "condition": [e.g., specific conditions like "terminal_illness", "kidney_failure", or None if unclear],
+    "work_credits": [Total lifetime work credits, or None if unclear],
+    "sga": [True if engaged in substantial gainful activity, False if not, or None if unclear],
+    "social_security_eligibility": [True if eligible, False if not, or None if unclear]
+
+
+Make sure that your output is a python dictionary, not a string. 

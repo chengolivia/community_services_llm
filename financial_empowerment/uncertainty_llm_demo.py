@@ -3,6 +3,11 @@ from tkinter import scrolledtext
 from utils import extract_text_from_pdf
 from eligible_benefits import call_llm_check_eligibility
 from extract_information import call_llm_update, call_llm_extract
+from python_constraint_checker import eligibility_check
+import numpy as np
+import sounddevice as sd
+import wavio
+import speech_recognition as sr
 
 pdf_file_path = 'assets/benefits.pdf'
 
@@ -34,7 +39,7 @@ def extract_info():
 
     user_input = input_field.get("1.0", tk.END).strip()
     pdf_text = extract_text_from_pdf(pdf_file_path)
-    extracted_info = call_llm_extract(user_input, pdf_text)
+    extracted_info = call_llm_extract(user_input)
     
     output_field_1.config(state=tk.NORMAL)
     output_field_1.delete(1.0, tk.END)
@@ -79,8 +84,11 @@ def check_eligibility():
     Side Effects: Call the check eligibility and update the info"""
 
     extracted_info = output_field_1.get("1.0", tk.END).strip()
-    pdf_text = extract_text_from_pdf(pdf_file_path)
-    eligibility_info = call_llm_check_eligibility(extracted_info, pdf_text)
+    # pdf_text = extract_text_from_pdf(pdf_file_path)
+    
+    # eligibility_info = call_llm_check_eligibility(extracted_info, pdf_text)
+    
+    eligibility_info = eligibility_check(extracted_info)
     
     eligibility_output.config(state=tk.NORMAL)
     eligibility_output.delete(1.0, tk.END)
@@ -90,6 +98,67 @@ def check_eligibility():
     adjust_text_field_size(eligibility_output, eligibility_info)
     
     eligibility_output.config(state=tk.DISABLED)
+    
+# Parameters for recording
+SAMPLE_RATE = 16000  # Sample rate in Hz
+audio_data = []  # Initialize a list to store audio chunks
+is_recording = False  # Flag to track recording state
+
+# Function to handle the start of recording
+def start_recording():
+    global is_recording, audio_data
+    is_recording = True
+    audio_data = []  # Reset the audio data list
+
+    def callback(indata, frames, time, status):
+        if is_recording:
+            audio_data.append(indata.copy())  # Store audio chunks
+
+    # Open the input stream
+    stream = sd.InputStream(callback=callback, channels=1, samplerate=SAMPLE_RATE, dtype='int16')
+    stream.start()
+    
+    # Store the stream in the global context to stop it later
+    window.audio_stream = stream
+    print("Recording started...")
+
+# Function to handle the stop of recording
+def stop_recording():
+    global is_recording
+    is_recording = False
+    print("Recording stopped.")
+    
+    # Stop the audio stream
+    if hasattr(window, 'audio_stream'):
+        window.audio_stream.stop()
+        window.audio_stream.close()
+    
+    # Convert the audio data to a NumPy array and save it
+    if audio_data:
+        full_audio_data = np.concatenate(audio_data)
+        wavio.write("temp_audio.wav", full_audio_data, SAMPLE_RATE, sampwidth=2)
+        transcribe_audio()
+
+# Function to transcribe the recorded audio
+def transcribe_audio():
+    recognizer = sr.Recognizer()
+    try:
+        with sr.AudioFile("temp_audio.wav") as source:
+            audio = recognizer.record(source)
+            voice_text = recognizer.recognize_google(audio)
+            print(f"Voice input captured: {voice_text}")
+            
+            # Append the transcribed voice input to the existing content in the input field
+            current_text = input_field.get("1.0", tk.END).strip()
+            new_text = current_text + " " + voice_text if current_text else voice_text
+            
+            # Populate the input field with the updated text
+            input_field.delete("1.0", tk.END)
+            input_field.insert(tk.END, new_text)
+    except sr.UnknownValueError:
+        print("Could not understand audio")
+    except sr.RequestError as e:
+        print(f"Could not request results; {e}")
 
 
 # Set up the main application window
@@ -102,6 +171,14 @@ input_label.pack()
 
 input_field = scrolledtext.ScrolledText(window, height=5, width=60)
 input_field.pack()
+
+# Add the "Start Recording" button to the GUI
+start_button = tk.Button(window, text="Start Recording", command=start_recording)
+start_button.pack()
+
+# Add the "Stop Recording" button to the GUI
+stop_button = tk.Button(window, text="Stop Recording", command=stop_recording)
+stop_button.pack()
 
 # Button to extract information
 extract_button = tk.Button(window, text="Extract", command=extract_info)

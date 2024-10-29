@@ -4,7 +4,7 @@ from extract_resources import analyze_situation
 
 def handle_analyze():
     situation = situation_input.get("1.0", tk.END).strip()  # Get the input situation
-    csv_file_path = "data/enhanced_hotlines.csv"
+    csv_file_path = "data/small_hotlines.csv"
     if situation:
         response = analyze_situation(situation, csv_file_path)
         result_output.delete("1.0", tk.END)  # Clear previous output
