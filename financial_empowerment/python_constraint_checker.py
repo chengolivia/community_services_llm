@@ -60,7 +60,7 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
 
     def categorize_eligibility(score: float) -> str:
         if score >= 90:
-            return "100% eligible"
+            return "Highly likely eligible"
         elif score >= 70:
             return "Likely eligible"
         elif score >= 40:
