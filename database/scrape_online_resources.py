@@ -5,7 +5,7 @@ from utils import call_chatgpt_api
 from secret import naveen_key as key 
 
 openai.api_key = key 
-system_prompt = "You are a helpful assistant that reformats information on hotlines for mental health and other community services. You will return information in the format provided"
+system_prompt = "You are a helpful assistant that reformats information on resources for mental health and other community services. You will return information in the format provided"
 general_prompt = open("prompts/scrape_data.txt").read().strip()
 csv_header = "Service,Phone Number,Description,Website Link,Responsible Region,Operating Hours,Category\n"
 
@@ -101,7 +101,7 @@ for i in range(len(all_entries)):
         print("Error with entry {} of {}".format(i+1,len(all_entries)))
         continue 
     
-w = open("data/enhanced_hotlines.csv","w")
+w = open("data/enhanced_resources.csv","w")
 w.write(csv_header)
 w.write("\n".join(list(set(new_csv))))
 w.close()

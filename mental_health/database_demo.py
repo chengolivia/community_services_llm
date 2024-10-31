@@ -1,12 +1,15 @@
 import tkinter as tk
 from tkinter import scrolledtext
 from extract_resources import analyze_situation
+from utils import extract_text_from_pdf
+
+pdf_file_path = 'assets/wellness.pdf'
 
 def handle_analyze():
     situation = situation_input.get("1.0", tk.END).strip()  # Get the input situation
-    csv_file_path = "data/small_resources.csv"
     if situation:
-        response = analyze_situation(situation, csv_file_path)
+        pdf_text = extract_text_from_pdf(pdf_file_path)
+        response = analyze_situation(situation, pdf_text)
         result_output.delete("1.0", tk.END)  # Clear previous output
         result_output.insert(tk.END, response)  # Insert new response
         
@@ -16,7 +19,7 @@ def handle_analyze():
 
 # Create the main window
 window = tk.Tk()
-window.title("Resource Recommendation System")
+window.title("Activity Suggestion Tool")
 
 # Configure the grid layout to expand as the window is resized
 window.grid_columnconfigure(0, weight=1)
@@ -24,7 +27,7 @@ window.grid_rowconfigure(1, weight=1)
 window.grid_rowconfigure(4, weight=1)
 
 # Create a label for the input box
-situation_label = tk.Label(window, text="Enter Situation:")
+situation_label = tk.Label(window, text="Enter Situation + Goal:")
 situation_label.grid(column=0, row=0, padx=10, pady=10, sticky="n")
 
 # Create a text input box for the situation
@@ -36,7 +39,7 @@ analyze_button = tk.Button(window, text="Analyze", command=handle_analyze)
 analyze_button.grid(column=0, row=2, padx=10, pady=10, sticky="n")
 
 # Create a label for the output box
-result_label = tk.Label(window, text="Recommended Resources:")
+result_label = tk.Label(window, text="Recommended Activities:")
 result_label.grid(column=0, row=3, padx=10, pady=10, sticky="n")
 
 # Create a scrolled text output box to display the response

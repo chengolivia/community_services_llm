@@ -13,20 +13,20 @@ openai.api_key = key
 
 system_prompt = open("prompts/system_prompt.txt").read()
 
-def create_basic_prompt(situation, hotlines_df):
-    """Format a prompt based on a situation and a list of hotlines
-    We input all the hotlines to the ChatGPT API, and see what it returns
+def create_basic_prompt(situation, resources_df):
+    """Format a prompt based on a situation and a list of resources
+    We input all the resources to the ChatGPT API, and see what it returns
     
     Arguments:
         situation: String, what the user requests
-        hotlines_df: Pandas DataFrame, which contains information on each service
+        resources_df: Pandas DataFrame, which contains information on each service
     
     Returns: String, the prompt to use"""
 
-    services = ", ".join(hotlines_df["Service"].tolist())
+    services = ", ".join(resources_df["Service"].tolist())
     prompt = f"""
-    I have a list of hotline services: {services}. Based on the situation "{situation}", which hotlines should I call? 
-    Return a few appropriate hotline names, number, and why they are the appropriate choices for this situation. Make sure you provide more than one hotline if they can help even just a little.
+    I have a list of resources: {services}. Based on the situation "{situation}", which resources should I use? 
+    Return a few appropriate resources, number, and why they are the appropriate choices for this situation. Make sure you provide more than one resource if they can help even just a little.
     """
     return prompt
 
@@ -40,8 +40,8 @@ def analyze_situation(situation, csv_file_path):
         
     Returns: A string, the response from ChatGPT"""
 
-    hotlines_df = pd.read_csv(csv_file_path)
-    prompt = create_basic_prompt(situation, hotlines_df)   
+    resources_df = pd.read_csv(csv_file_path)
+    prompt = create_basic_prompt(situation, resources_df)   
     response = call_chatgpt_api(system_prompt,prompt)
     return response
 
@@ -55,9 +55,9 @@ def analyze_situation_rag(situation, csv_file_path,k=3):
         
     Returns: A string, the response from ChatGPT"""
 
-    hotlines_df = pd.read_csv(csv_file_path)
-    names = list(hotlines_df['Service'])
-    descriptions = list(hotlines_df['Description'])
+    resources_df = pd.read_csv(csv_file_path)
+    names = list(resources_df['Service'])
+    descriptions = list(resources_df['Description'])
     documents = ["{}: {}".format(names[i],descriptions[i]) for i in range(len(names))]
 
     start = time.time()
@@ -85,14 +85,14 @@ def analyze_situation_rag(situation, csv_file_path,k=3):
 
     print("k is {}".format(k))
 
-    # Search FAISS index to find the most relevant hotlines
-    _, I = index.search(query_embedding, k=k)  # Retrieve top 3 hotlines
-    retrieved_hotlines = [documents[i] for i in I[0]]
-    print("Retrieved hotlines {}".format(len(retrieved_hotlines)))
+    # Search FAISS index to find the most relevant resources
+    _, I = index.search(query_embedding, k=k)  # Retrieve top 3 resources
+    retrieved_resources = [documents[i] for i in I[0]]
+    print("Retrieved resources {}".format(len(retrieved_resources)))
 
-    retrieved_text = "\n".join(retrieved_hotlines)
-    system_prompt = "You are a helpful assistant recommending hotline services."
-    prompt = f"The user is experiencing: {situation}\nHere are some suggested hotlines:\n{retrieved_text}\nPlease explain why these hotlines are appropriate for the user's situation. The only thing to put in bold (**) is the name of the place."
+    retrieved_text = "\n".join(retrieved_resources)
+    system_prompt = "You are a helpful assistant recommending resources."
+    prompt = f"The user is experiencing: {situation}\nHere are some suggested resources:\n{retrieved_text}\nPlease explain why these resources are appropriate for the user's situation. The only thing to put in bold (**) is the name of the place."
 
     response = call_chatgpt_api(system_prompt,prompt)
     return response
