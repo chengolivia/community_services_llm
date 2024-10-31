@@ -21,9 +21,10 @@ def create_basic_prompt(situation, pdf_text):
     prompt = """
     I am trying to suggest activities that can help people with the 8 dimensions of wellness. 
     Create SMART goals (Specific, Measurable, Achievable, Realistic, and Timely) tailored to the client’s needs.
-    For example, if the client identifies stress management as an emotional wellness priority, the LLM could help turn this into a SMART goal: “Engage in 10 minutes of mindfulness exercises daily for the next 30 days to reduce stress.”
     Here is the situation that someone is dealing with: {}
-    Can you suggest 2-3 activites that align with the dimension of wellness that they are interested in
+    Can you suggest 2-3 activites, which can be along different dimensions of wellness, that align with their situations. 
+    Think carefully; remember that suggestions from different types of wellness might be helpful, because wellness is holistic.
+    Please state the dimensions of wellness
     """.format(situation)
     return prompt
 
