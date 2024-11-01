@@ -166,7 +166,7 @@ window = tk.Tk()
 window.title("Benefit Eligibility Checker")
 
 # Input field for user input (e.g., conversation or self-introduction)
-input_label = tk.Label(window, text="Enter your information:")
+input_label = tk.Label(window, text="Enter client's information:")
 input_label.pack()
 
 input_field = scrolledtext.ScrolledText(window, height=5, width=60)

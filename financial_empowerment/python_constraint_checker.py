@@ -121,7 +121,6 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
         for benefit, result in results.items():
             output += f"Benefit: {benefit}\n"
             output += f"  Category: {result['category']}\n"
-            output += f"  Score: {result['score']:.2f}%\n"
             output += f"  Met Constraints: {', '.join(result['met_constraints'])}\n"
             output += f"  Unmet Constraints: {', '.join(result['unmet_constraints'])}\n"
             output += f"  Missing Constraints: {', '.join(result['missing_constraints'])}\n\n"
