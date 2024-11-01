@@ -10,11 +10,20 @@ def call_chatgpt_api(system_prompt,prompt):
 
     Returns: String, result from ChatGPT"""
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-    )
+    if openai.__version__ == '1.44.0':
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
+    else:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
     return response.choices[0].message.content

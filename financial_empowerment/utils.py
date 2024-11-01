@@ -1,9 +1,6 @@
 import openai
 import PyPDF2
 
-required_version = "0.28.0"
-if openai.__version__ != required_version:
-    raise ImportError(f"OpenAI version {required_version} is required, but version {openai.__version__} is installed.")
 
 def call_chatgpt_api(system_prompt,prompt):
     """Run ChatGPT with the 4o-mini model for a system prompt
@@ -15,14 +12,24 @@ def call_chatgpt_api(system_prompt,prompt):
 
     Returns: String, result from ChatGPT"""
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-    )
-    return response['choices'][0]['message']['content'].strip()
+    if openai.__version__ == '1.44.0':
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
+    else:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
+    return response.choices[0].message.content
+
 
 def call_chatgpt_api_all_chats(all_chats):
     """Run ChatGPT with the 4o-mini model for a system prompt
@@ -34,11 +41,17 @@ def call_chatgpt_api_all_chats(all_chats):
 
     Returns: String, result from ChatGPT"""
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  
-        messages=all_chats
-    )
-    return response['choices'][0]['message']['content'].strip()
+    if openai.__version__ == '1.44.0':
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=all_chats,
+        )
+    else:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  
+            messages=all_chats,
+        )
+    return response.choices[0].message.content.strip()
 
 def extract_text_from_pdf(pdf_file_path):
     """Extract some text from a PDF file path
