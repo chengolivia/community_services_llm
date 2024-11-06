@@ -51,7 +51,7 @@ def format_gpt(entry):
 
     return ",".join(entry)
 
-data = open("data/all_resources.txt").read().strip().split("\n")
+data = open("data/all_resources.txt").read().strip().split("\n")[:10]
 
 all_counties = {"atlantic","bergen","burlington","camden",
             "cape may","cumberland","essex","gloucester","hudson","hunterdon",
@@ -89,19 +89,22 @@ for line in data:
         all_entries.append(curr_entry)
         curr_entry = deepcopy(default_curr_entry)
         curr_field_idx = 0
-new_csv = []
-for i in range(len(all_entries)):
-    try:
-        formatted_prompt = general_prompt.format(all_entries[i])
-        gpt_info = call_chatgpt_api(system_prompt,formatted_prompt)
-        formatted_csv = format_gpt(gpt_info)
-        new_csv.append(formatted_csv)
-        print("Succesfully processed resource {} of {}".format(i+1,len(all_entries)))
-    except:
-        print("Error with entry {} of {}".format(i+1,len(all_entries)))
-        continue 
+
+print(all_entries)
+
+# new_csv = []
+# for i in range(len(all_entries)):
+#     try:
+#         formatted_prompt = general_prompt.format(all_entries[i])
+#         gpt_info = call_chatgpt_api(system_prompt,formatted_prompt)
+#         formatted_csv = format_gpt(gpt_info)
+#         new_csv.append(formatted_csv)
+#         print("Succesfully processed resource {} of {}".format(i+1,len(all_entries)))
+#     except:
+#         print("Error with entry {} of {}".format(i+1,len(all_entries)))
+#         continue 
     
-w = open("data/enhanced_resources.csv","w")
-w.write(csv_header)
-w.write("\n".join(list(set(new_csv))))
-w.close()
+# w = open("data/enhanced_resources.csv","w")
+# w.write(csv_header)
+# w.write("\n".join(list(set(new_csv))))
+# w.close()
