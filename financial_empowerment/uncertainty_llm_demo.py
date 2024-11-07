@@ -38,9 +38,8 @@ def extract_info():
     Side Effects: Calls the LLM to extract information"""
 
     user_input = input_field.get("1.0", tk.END).strip()
-    pdf_text = extract_text_from_pdf(pdf_file_path)
     extracted_info = call_llm_extract(user_input)
-    
+
     output_field_1.config(state=tk.NORMAL)
     output_field_1.delete(1.0, tk.END)
     output_field_1.insert(tk.END, extracted_info)

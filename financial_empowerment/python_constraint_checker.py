@@ -2,6 +2,9 @@ from typing import Dict, Optional, List
 import re
 import ast
 import inspect
+from extract_information import call_llm_extract
+import argparse 
+from utils import call_chatgpt_api
 
 
 def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
@@ -17,7 +20,16 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
     """
     match = re.search(r"{.*}", user_info, re.DOTALL) 
     if match: cleaned_output = match.group(0) 
-    user_info = ast.literal_eval(cleaned_output)
+    
+    if "}," in cleaned_output:
+        cleaned_output = cleaned_output.split("},")
+        cleaned_output[0] = cleaned_output[0] + "}"
+        cleaned_output = [i.strip() for i in cleaned_output]
+    else:
+        cleaned_output = [cleaned_output]
+    print(cleaned_output)
+    
+    all_user_info = [ast.literal_eval(i) for i in cleaned_output]
 
 
     # Define benefit constraints with dynamic SSI conditions based on family and marital status
@@ -68,7 +80,7 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
         else:
             return "Not eligible"
 
-    def calculate_eligibility_score(benefit: str) -> Dict[str, any]:
+    def calculate_eligibility_score(user_info,benefit: str) -> Dict[str, any]:
         score = 0.0
         met_constraints: List[str] = []
         unmet_constraints: List[str] = []
@@ -126,8 +138,30 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
             output += f"  Missing Constraints: {', '.join(result['missing_constraints'])}\n\n"
         return output
 
-    results = {}
-    for benefit in benefit_constraints.keys():
-        results[benefit] = calculate_eligibility_score(benefit)
-        
-    return generate_output(results)
+    results = []
+    for user_info in all_user_info:
+        temp_result = {}
+        for benefit in benefit_constraints.keys():
+            temp_result[benefit] = calculate_eligibility_score(user_info,benefit)
+        results.append(temp_result)
+    outputs = [generate_output(r) for r in results]
+
+    if len(outputs) > 1:
+        prompt = open("prompts/comparison_prompt.txt").read() 
+        for i in range(len(outputs)):
+            prompt += str("\nOption {}\n{}".format(i+1,outputs[i]))
+            outputs[i] = "Situation {}\n{}".format(i+1,outputs[i])
+        comparison_string = call_chatgpt_api("You are a helpful assistant than can help compare benefits.",prompt).strip()
+        outputs += [comparison_string]
+
+    return "\n".join(outputs)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--situation', help="What situation do you want to analyze",type=str)
+    args = parser.parse_args()  
+    situation = args.situation
+    extracted_info = call_llm_extract(situation)
+    eligibility_info = eligibility_check(extracted_info)
+    print(eligibility_info)

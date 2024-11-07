@@ -1,5 +1,6 @@
 from utils import call_chatgpt_api
 
+
 def get_eligible_benefits(income, non_work_income, marital_status,
         resources, disability_status, age, years_worked, lifetime_earnings,
         railroad_benefits, gov_employee_medicare_tax, ssdi_covered, ssdi_sga,
@@ -94,5 +95,4 @@ def call_llm_check_eligibility(extracted_info, pdf_text):
     prompt = open("prompts/check_propmt.txt").read().format(pdf_text,extracted_info)
     eligibility_info = call_chatgpt_api(check_sys_prompt,prompt).strip()
     return eligibility_info
-
 
