@@ -3,6 +3,12 @@ from copy import deepcopy
 import openai
 from utils import call_chatgpt_api
 from secret import naveen_key as key 
+from googlesearch import search
+import requests
+from bs4 import BeautifulSoup
+import time
+import cloudscraper
+import json 
 
 openai.api_key = key 
 system_prompt = "You are a helpful assistant that reformats information on resources for mental health and other community services. You will return information in the format provided"
@@ -17,6 +23,25 @@ def is_date(line):
     Returns: Boolean, whether the line is a date"""
 
     return re.match(r"\d{2}/\d{2}/\d{4}", line)
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+scraper = cloudscraper.create_scraper()
+def get_text_from_url(url):
+    # Send a request to the URL
+    response = requests.get(url,headers=headers)
+    
+    # Check if the request was successful
+    if response.status_code != 200:
+        response = scraper.get(url)
+        if response.status_code != 200:
+            return "Error"
+    
+    # Parse the HTML content
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Extract all text and clean it up
+    page_text = soup.get_text(separator='\n', strip=True)
+    return page_text[:100000]
+
 
 def format_entry(entry):
     """Format a dictionary, with fields in some order, into a list of strings
@@ -51,7 +76,7 @@ def format_gpt(entry):
 
     return ",".join(entry)
 
-data = open("data/all_resources.txt").read().strip().split("\n")[:10]
+data = open("data/all_resources.txt").read().strip().split("\n")[:250]
 
 all_counties = {"atlantic","bergen","burlington","camden",
             "cape may","cumberland","essex","gloucester","hudson","hunterdon",
@@ -90,21 +115,38 @@ for line in data:
         curr_entry = deepcopy(default_curr_entry)
         curr_field_idx = 0
 
-print(all_entries)
+num_error = 0
+tot = 0
+print("There are {} entries".format(len(all_entries)))
+resources_by_description_phone = {}
+for idx,i in enumerate(all_entries):
+    print("On {} of {}, have {}".format(idx+1,len(all_entries),tot))
+    resources_by_description_phone[i['name']] = {
+        'description': '',
+        'url': '',
+        'phone': '',
+        'url_phone': '',
+    }
+    try:
+        url = list(search(i['name']+' Phone Number New Jersey',num_results=1))[0]
+        all_text = get_text_from_url(url)
+    except:
+        continue 
 
-# new_csv = []
-# for i in range(len(all_entries)):
-#     try:
-#         formatted_prompt = general_prompt.format(all_entries[i])
-#         gpt_info = call_chatgpt_api(system_prompt,formatted_prompt)
-#         formatted_csv = format_gpt(gpt_info)
-#         new_csv.append(formatted_csv)
-#         print("Succesfully processed resource {} of {}".format(i+1,len(all_entries)))
-#     except:
-#         print("Error with entry {} of {}".format(i+1,len(all_entries)))
-#         continue 
-    
-# w = open("data/enhanced_resources.csv","w")
-# w.write(csv_header)
-# w.write("\n".join(list(set(new_csv))))
-# w.close()
+    if all_text != 'Error':
+        resources_by_description_phone[i['name']]['phone'] = call_chatgpt_api("You are a helpful assistant that helps users find a phone number from the text from a website. Return only the phone number, nothing else","Please find the phone number (and return only the phone number, no dashes) for the following. Use only the text, and if no phone number is found, return an empty string: {}".format(all_text))
+        resources_by_description_phone[i['name']]['url_phone'] = url
+
+    try:
+        url = list(search(i['name']+' New Jersey',num_results=1))[0]
+        all_text = get_text_from_url(url)
+    except:
+        continue 
+
+    if all_text != 'Error':
+        resources_by_description_phone[i['name']]['description'] = call_chatgpt_api("You are a helpful assistant that helps users summarize the text from a website. Return only the description, nothing else","Please summarize the information from the following website. Make sure you capture the location, operating hours, and whether there are prerequisites to using this (e.g. need a form of identification, etc.). If no information is found, return an empty string: {}".format(all_text))
+        resources_by_description_phone[i['name']]['url'] = url
+        tot += 1
+
+print("Writing")
+json.dump(resources_by_description_phone,open("data/all_resources_raw.json","w"))
