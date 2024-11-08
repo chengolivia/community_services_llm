@@ -10,7 +10,7 @@ def call_chatgpt_api(system_prompt,prompt):
 
     Returns: String, result from ChatGPT"""
 
-    if openai.__version__ in ['1.44.0','1.53.0']:
+    if openai.__version__[0] == '1':
         response = openai.chat.completions.create(
             model="gpt-4o-mini",  
             messages=[

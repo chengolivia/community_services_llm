@@ -128,21 +128,19 @@ for idx,i in enumerate(all_entries):
         'url_phone': '',
     }
     try:
-        url = list(search(i['name']+' Phone Number New Jersey',num_results=1))[0]
+        url = next(search(i['name']+' Phone Number New Jersey',num=1,stop=1))
         all_text = get_text_from_url(url)
-    except:
-        continue 
-
+    except Exception as e:
+        print(e) 
     if all_text != 'Error':
         resources_by_description_phone[i['name']]['phone'] = call_chatgpt_api("You are a helpful assistant that helps users find a phone number from the text from a website. Return only the phone number, nothing else","Please find the phone number (and return only the phone number, no dashes) for the following. Use only the text, and if no phone number is found, return an empty string: {}".format(all_text))
         resources_by_description_phone[i['name']]['url_phone'] = url
 
     try:
-        url = list(search(i['name']+' New Jersey',num_results=1))[0]
+        url = next(search(i['name']+' New Jersey',num=1,stop=1))
         all_text = get_text_from_url(url)
-    except:
-        continue 
-
+    except Exception as e:
+        print(e) 
     if all_text != 'Error':
         resources_by_description_phone[i['name']]['description'] = call_chatgpt_api("You are a helpful assistant that helps users summarize the text from a website. Return only the description, nothing else","Please summarize the information from the following website. Make sure you capture the location, operating hours, and whether there are prerequisites to using this (e.g. need a form of identification, etc.). If no information is found, return an empty string: {}".format(all_text))
         resources_by_description_phone[i['name']]['url'] = url
