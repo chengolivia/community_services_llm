@@ -27,11 +27,11 @@ headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleW
 scraper = cloudscraper.create_scraper()
 def get_text_from_url(url):
     # Send a request to the URL
-    response = requests.get(url,headers=headers)
+    response = requests.get(url,headers=headers,timeout=5)
     
     # Check if the request was successful
     if response.status_code != 200:
-        response = scraper.get(url)
+        response = scraper.get(url,timeout=5)
         if response.status_code != 200:
             return "Error"
     
@@ -76,7 +76,7 @@ def format_gpt(entry):
 
     return ",".join(entry)
 
-data = open("data/all_resources.txt").read().strip().split("\n")[:250]
+data = open("data/all_resources.txt").read().strip().split("\n")
 
 all_counties = {"atlantic","bergen","burlington","camden",
             "cape may","cumberland","essex","gloucester","hudson","hunterdon",

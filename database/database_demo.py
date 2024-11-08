@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import scrolledtext
-from extract_resources import analyze_situation
+from extract_resources import analyze_situation_rag, analyze_situation
 
 def handle_analyze():
     situation = situation_input.get("1.0", tk.END).strip()  # Get the input situation
-    csv_file_path = "data/small_resources.csv"
+    csv_file_path = "data/enhanced_resources.csv"
     if situation:
-        response = analyze_situation(situation, csv_file_path)
+        response = analyze_situation_rag(situation, csv_file_path)
         result_output.delete("1.0", tk.END)  # Clear previous output
         result_output.insert(tk.END, response)  # Insert new response
         

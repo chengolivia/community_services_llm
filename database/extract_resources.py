@@ -8,6 +8,7 @@ import faiss
 import time 
 import os 
 import numpy as np
+from sentence_transformers import SentenceTransformer, util
 
 openai.api_key = key
 
@@ -45,7 +46,7 @@ def analyze_situation(situation, csv_file_path):
     response = call_chatgpt_api(system_prompt,prompt)
     return response
 
-def analyze_situation_rag(situation, csv_file_path,k=3):
+def analyze_situation_rag(situation, csv_file_path,k=10):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt using a RAG to whittle down the number of things
     
@@ -58,41 +59,56 @@ def analyze_situation_rag(situation, csv_file_path,k=3):
     resources_df = pd.read_csv(csv_file_path)
     names = list(resources_df['Service'])
     descriptions = list(resources_df['Description'])
+    urls = list(resources_df['Website Link'])
+    phones = list(resources_df['Phone Number'])
+
     documents = ["{}: {}".format(names[i],descriptions[i]) for i in range(len(names))]
 
-    start = time.time()
     # Initialize FAISS and create an index
     file_path = "results/saved_embedding.npy"
 
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+
+    # Define the file path for storing embeddings
     if os.path.exists(file_path):
         embeddings = np.load(file_path)
     else:
-        tokenizer = DPRContextEncoderTokenizer.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
-        model = DPRContextEncoder.from_pretrained('facebook/dpr-ctx_encoder-single-nq-base')
-        inputs = tokenizer(documents, return_tensors='pt', padding=True, truncation=True)
-        embeddings = model(**inputs).pooler_output.detach().numpy()
+        # Encode the documents using all-mpnet-base-v2
+        embeddings = model.encode(documents, convert_to_tensor=False, show_progress_bar=True)
+        embeddings = np.array(embeddings)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         np.save(file_path, embeddings)
 
-    index = faiss.IndexFlatL2(embeddings.shape[1])  # Index for fast search
+    # Set up the FAISS index
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)  # L2 distance (cosine similarity can be used as well)
     index.add(embeddings)
-    question_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained('facebook/dpr-question_encoder-single-nq-base')
-    question_model = DPRQuestionEncoder.from_pretrained('facebook/dpr-question_encoder-single-nq-base')
 
-    # Tokenize and encode the query
-    query_inputs = question_tokenizer(situation, return_tensors='pt', padding=True, truncation=True)
-    query_embedding = question_model(**query_inputs).pooler_output.detach().numpy()
+    # Get relevant resources using the call_chatgpt_api function
+    relevant_resources = call_chatgpt_api(
+        "You are a helpful assistant that can turn a user's situation into suggestions for the types of resources that you might suggest",
+        "Write 1-2 sentences describing the types of resources which can help a user with the following situation: {}".format(situation)
+    )
+    print("Relevant resources:", relevant_resources)
 
-    print("k is {}".format(k))
+    # Encode the query using the Sentence Transformer model
+    query_embedding = model.encode(relevant_resources, convert_to_tensor=False)
 
     # Search FAISS index to find the most relevant resources
-    _, I = index.search(query_embedding, k=k)  # Retrieve top 3 resources
-    retrieved_resources = [documents[i] for i in I[0]]
-    print("Retrieved resources {}".format(len(retrieved_resources)))
+    _, I = index.search(np.array([query_embedding]), k=k)  # Retrieve top k resources
+    retrieved_resources = [f"{documents[i]}, URL: {urls[i]}, Phone: {phones[i]}" for i in I[0]]
+    print("Retrieved resources:", len(retrieved_resources))
 
+    # Prepare the retrieved text
     retrieved_text = "\n".join(retrieved_resources)
     system_prompt = "You are a helpful assistant recommending resources."
-    prompt = f"The user is experiencing: {situation}\nHere are some suggested resources:\n{retrieved_text}\nPlease explain why these resources are appropriate for the user's situation. The only thing to put in bold (**) is the name of the place."
+    prompt = (
+        f"The user is experiencing: {situation}\nHere are some suggested resources:\n{retrieved_text}\n"
+        "Please explain why these resources are appropriate for the user's situation. "
+        "The only thing to put in bold (**) is the name of the place. Please also state the URL and the phone number for the place. "
+        "If a resource is not relevant, do NOT include it. Please sort by the relevance of the resource. Finally, group resources by type (e.g. housing, transportation, mental health, etc.)."
+    )
 
-    response = call_chatgpt_api(system_prompt,prompt)
+    # Get the response from the ChatGPT API
+    response = call_chatgpt_api(system_prompt, prompt)
     return response
