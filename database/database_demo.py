@@ -158,9 +158,6 @@ translated_label.pack(pady=5)
 translated_output = scrolledtext.ScrolledText(window, height=10, width=60, font=("Helvetica", 10), bg="#3C3C3C", fg="white", insertbackground="white")
 translated_output.pack(padx=10, pady=5)
 
-# Footer
-footer_label = tk.Label(window, text="Developed by Your Name", font=("Helvetica", 8), fg="white", bg="#2C2C2C")
-footer_label.pack(pady=10)
 
 # Start the main loop
 window.mainloop()
