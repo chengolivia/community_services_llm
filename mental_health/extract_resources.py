@@ -1,6 +1,6 @@
 import openai 
 from utils import call_chatgpt_api_all_chats
-from secret import naveen_key as key 
+from secret import gao_key as key 
 
 openai.api_key = key
 

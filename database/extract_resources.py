@@ -1,6 +1,6 @@
 import openai 
 from utils import call_chatgpt_api
-from secret import naveen_key as key 
+from secret import gao_key as key 
 import pandas as pd
 from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer, DPRContextEncoder, DPRContextEncoderTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -31,6 +31,7 @@ def create_basic_prompt(situation, resources_df):
     """
     return prompt
 
+
 def analyze_situation(situation, csv_file_path):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt
@@ -57,10 +58,10 @@ def analyze_situation_rag(situation, csv_file_path,k=10):
     Returns: A string, the response from ChatGPT"""
 
     resources_df = pd.read_csv(csv_file_path)
-    names = list(resources_df['Service'])
-    descriptions = list(resources_df['Description'])
-    urls = list(resources_df['Website Link'])
-    phones = list(resources_df['Phone Number'])
+    names = list(resources_df['service'])
+    descriptions = list(resources_df['description'])
+    urls = list(resources_df['url'])
+    phones = list(resources_df['phone'])
 
     documents = ["{}: {}".format(names[i],descriptions[i]) for i in range(len(names))]
 
@@ -86,8 +87,8 @@ def analyze_situation_rag(situation, csv_file_path,k=10):
 
     # Get relevant resources using the call_chatgpt_api function
     relevant_resources = call_chatgpt_api(
-        "You are a helpful assistant that can turn a user's situation into suggestions for the types of resources that you might suggest",
-        "Write 1-2 sentences describing the types of resources which can help a user with the following situation: {}".format(situation)
+        "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. ",
+        " Provide a brief description, 1-2 sentences, of each resource type, explaining how it could assist the user in resolving or improving their situation: {}".format(situation)
     )
     print("Relevant resources:", relevant_resources)
 
@@ -112,3 +113,17 @@ def analyze_situation_rag(situation, csv_file_path,k=10):
     # Get the response from the ChatGPT API
     response = call_chatgpt_api(system_prompt, prompt)
     return response
+
+def translate_with_gpt(text, language):
+    prompt = f"Translate the following text to {language}:\n\n{text}"
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error: {str(e)}"
