@@ -121,9 +121,7 @@ function ResourceRecommendation() {
           {activeTab === 'benefits' && (
             <div>
               <p>
-                benefits are recommended based on the client information from your
-                meeting notes. Get more tailored recommendations by sending additional
-                client information in the chat.
+              Benefit program results are recommended based on the client information from your meeting notes. Get more accurate results analysis by sending additional client information in the chat.
               </p>
               {benefits.map((resource, index) => (
                 <div key={index} className="resource-item">
