@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import '../styles/ResourceRecommendation.css';
+import '../styles/feature.css';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [activeTab, setActiveTab] = useState('resources');
-  const [resources, setResources] = useState([]); // Store recommended resources
+  const [resources, setResources] = useState([]);
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent new line
+      handleSubmit(); // Submit input
+    }
   };
 
   const handleSubmit = () => {
@@ -17,28 +24,26 @@ function ResourceRecommendation() {
       const userMessage = { sender: 'user', text: inputText.trim() };
       const botMessage = {
         sender: 'bot',
-        text: `Thank you for sharing. Based on your input: "${inputText.trim()}", here are some suggestions.`,
-      }; 
+        text: `Thank you for sharing! Here's what we found based on your input: "${inputText.trim()}".`,
+      };
 
-      // Update conversation
       setConversation([...conversation, userMessage, botMessage]);
 
-      // Update resources
       const newResources = [
         {
           title: 'Division of Mental Health & Addictions Services (DMHAS)',
           phone: '1-800-382-6717',
           website: 'https://www.samhsa.gov/find-help/national-helpline',
-          description: 'SAMHSA’s National Helpline is a free, confidential, 24/7, 365-day-a-year treatment referral service.',
-          reason: `DMHAS can help with both mental health issues and addiction services for input: "${inputText.trim()}".`,
+          description: 'SAMHSA’s National Helpline is a free, confidential, 24/7 service.',
+          reason: `DMHAS provides excellent support for concerns similar to: "${inputText.trim()}".`,
         },
       ];
-      setResources(newResources); // Replace old suggestions with new ones
-
+      setResources(newResources);
       setInputText('');
       setSubmitted(true);
     }
   };
+
 
   return (
     <div className="resource-recommendation-container">
@@ -60,14 +65,15 @@ function ResourceRecommendation() {
         </div>
         <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
           <div className="input-box">
-            <input
-              type="text"
+            <textarea
               className="input-bar"
               placeholder={
                 submitted ? 'Write a follow-up to update...' : 'Describe your client’s situation...'
               }
               value={inputText}
               onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              rows={1} // Auto-resize if needed
             />
             <button className="voice-icon">🎤</button>
             <button className="submit-button" onClick={handleSubmit}>
@@ -123,14 +129,15 @@ function ResourceRecommendation() {
                 Client profile information is extracted from the meeting notes you send in
                 chat. Edit by sending updated information in the chat.
               </p>
+              <h3>Client needs</h3>
+              <p><strong>Goals:</strong> Lorem ipsum dolor sit amet consectetur. Fames lacinia sapien elementum diam tellus. Aliquet nulla purus nibh suspendisse sit in sed aliquam commodo.</p>
+              <p><strong>Immediate needs:</strong> Lorem ipsum dolor sit amet consectetur. Fames lacinia sapien elementum diam tellus. Aliquet nulla purus nibh suspendisse sit in sed aliquam commodo.</p>
+              <h3>Demographics</h3>
               <ul>
-                {conversation
-                  .filter((msg) => msg.sender === 'user')
-                  .map((msg, index) => (
-                    <li key={index}>
-                      <strong>Input:</strong> {msg.text}
-                    </li>
-                  ))}
+                <li><strong>County:</strong> Lorem ipsum</li>
+                <li><strong>Age:</strong> Lorem ipsum</li>
+                <li><strong>Housing status:</strong> Lorem ipsum</li>
+                <li><strong>Other client info:</strong> Lorem ipsum</li>
               </ul>
             </div>
           )}
