@@ -14,8 +14,8 @@ function ResourceRecommendation() {
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // Prevent new line
-      handleSubmit(); // Submit input
+      e.preventDefault();
+      handleSubmit();
     }
   };
 
@@ -28,7 +28,8 @@ function ResourceRecommendation() {
       };
 
       setConversation([...conversation, userMessage, botMessage]);
-
+      
+      //The generated content should show up here
       const newResources = [
         {
           title: 'Division of Mental Health & Addictions Services (DMHAS)',
@@ -73,7 +74,7 @@ function ResourceRecommendation() {
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              rows={1} // Auto-resize if needed
+              rows={1}
             />
             <button className="voice-icon">🎤</button>
             <button className="submit-button" onClick={handleSubmit}>
@@ -123,6 +124,7 @@ function ResourceRecommendation() {
               ))}
             </div>
           )}
+          {/* Updated client profile below */}
           {activeTab === 'profile' && (
             <div>
               <p>
