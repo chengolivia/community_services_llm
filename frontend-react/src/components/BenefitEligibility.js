@@ -139,6 +139,7 @@ function ResourceRecommendation() {
               ))}
             </div>
           )}
+          {/* Update client info here */}
           {activeTab === 'profile' && (
             <div>
               <p>
