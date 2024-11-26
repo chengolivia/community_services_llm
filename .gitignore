@@ -4,3 +4,4 @@
 database/results/*.npy
 */__pycache__
 */secret.py
+backend/mental_health/secret.py

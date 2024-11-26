@@ -1,0 +1,109 @@
+import openai
+import PyPDF2
+import pyttsx3
+from fpdf import FPDF
+
+
+def read_text(text):
+    """Read some text outloud
+    
+    Arguments:
+        text: String, some text to read
+    
+    Returns: Nothing
+    
+    Side Effects: Reads the text outloud"""
+
+    engine = pyttsx3.init()
+    
+    # Set properties, such as the speech rate
+    engine.setProperty('rate', 150)  # Adjust as needed
+    
+    # Speak the text
+    engine.say(text)
+    engine.runAndWait()
+
+def write_text_pdf(text,pdf_loc):
+    """Save some text into a PDF
+    
+    Arguments:
+        text: String, what to save
+        pdf_loc: File location, where to save the resulting PDF
+    
+    Returns: Nothing
+    
+    Side Effects: Saves a PDF"""
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, text)
+    pdf.output(pdf_loc)
+
+
+def call_chatgpt_api(system_prompt,prompt):
+    """Run ChatGPT with the 4o-mini model for a system prompt
+    
+    Arguments:
+        system_prompt: String, what the main system prompt is
+            Tells ChatGPT the general scenario
+        prompt: Specific promt for ChatGPT
+
+    Returns: String, result from ChatGPT"""
+
+    if openai.__version__ in ['1.44.0','1.53.0', '1.54.4']:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
+    else:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+        )
+    return response.choices[0].message.content
+
+
+def call_chatgpt_api_all_chats(all_chats):
+    """Run ChatGPT with the 4o-mini model for a system prompt
+    
+    Arguments:
+        system_prompt: String, what the main system prompt is
+            Tells ChatGPT the general scenario
+        prompt: Specific promt for ChatGPT
+
+    Returns: String, result from ChatGPT"""
+
+    if openai.__version__ in ['1.44.0','1.53.0', '1.54.4']:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=all_chats,
+            stream=True,
+        )
+    else:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  
+            messages=all_chats,
+        )
+    return response
+
+def extract_text_from_pdf(pdf_file_path):
+    """Extract some text from a PDF file path
+    
+    Arguments:
+        pdf_file_path: String, location to the PDF file
+        
+    Returns: String, all the text in the file"""
+
+    with open(pdf_file_path, 'rb') as file:
+        reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+    return text

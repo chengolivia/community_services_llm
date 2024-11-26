@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import '../styles/feature.css';
 
 function ResourceRecommendation() {
@@ -19,49 +20,46 @@ function ResourceRecommendation() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (inputText.trim()) {
+      // Add user message to the conversation
       const userMessage = { sender: 'user', text: inputText.trim() };
-      const botMessage = {
-        sender: 'bot',
-        text: `Thank you for sharing! Here's what we found based on your input: "${inputText.trim()}".`,
-      };
-
-      setConversation([...conversation, userMessage, botMessage]);
-
-      // Update benefits list
-      const newbenefits = [
-        {
-          category: 'Highly Eligible',
-          phone: '1-800-772-1213',
-          website: 'https://www.nj.gov/humanservices/dfd/programs/ssi/',
-          description:
-            'Supplemental Security Income (SSI) for Single Adults',
-          reason: `The user meets all the eligibility criteria for SSI as a single adult. They have an income less than $1,971 per month from work, and their resources are less than $2,000.`,
-        },
-        {
-          category: 'Likely Eligible',
-          phone: '1-800-772-1213',
-          website: 'https://www.ssa.gov/',
-          description: 'Social Security Administration (SSA)',
-          reason: `The user has been working for the past 12 years, which should give them 48 credits, assuming they’ve been earning at least $1,730 per year. This makes them eligible for the SSA, considering that a minimum of 40 credits is required. However, the actual earnings and credits need to be confirmed.`,
-        },
-        {
-          category: 'Maybe Eligible',
-          phone: '1-732-243-0311',
-          website: 'https://njmedicare.com/',
-          description:
-            'Benefits 3 & 4: Medicare Part A & B, and Social Security Disability Insurance (SSDI)',
-          reason: `For Medicare, the user meets the age requirement for eligibility. However, further details regarding their health status may be required to determine SSDI eligibility.`,
-        },
-      ];
-      setbenefits(newbenefits);
-
+      setConversation((prev) => [...prev, userMessage]);
+  
+      try {
+        // Make an async call to the FastAPI endpoint
+        const response = await axios.post('http://127.0.0.1:8000/benefit_response', {
+          text: inputText.trim(),
+        });
+  
+        // Assume response.data is the new benefits array
+        const newBenefits = response.data;
+  
+        // Update bot message with the response and benefits
+        const botMessage = {
+          sender: 'bot',
+          text: `Thank you for sharing! Here's what we found based on your input: "${inputText.trim()}".`,
+        };
+  
+        setConversation((prev) => [...prev, botMessage]);
+        setbenefits(newBenefits);
+      } catch (error) {
+        console.error('Error fetching benefits:', error);
+  
+        // Handle error gracefully in the conversation
+        const errorMessage = {
+          sender: 'bot',
+          text: `Sorry, we encountered an error while processing your input. Please try again later.`,
+        };
+        setConversation((prev) => [...prev, errorMessage]);
+      }
+  
+      // Reset input and set submitted state
       setInputText('');
       setSubmitted(true);
     }
   };
-
+  
 
   return (
     <div className="resource-recommendation-container">

@@ -82,12 +82,13 @@ def check_eligibility():
     
     Side Effects: Call the check eligibility and update the info"""
 
+    user_input = input_field.get("1.0", tk.END).strip()
     extracted_info = output_field_1.get("1.0", tk.END).strip()
     # pdf_text = extract_text_from_pdf(pdf_file_path)
     
     # eligibility_info = call_llm_check_eligibility(extracted_info, pdf_text)
     
-    eligibility_info = eligibility_check(extracted_info)
+    eligibility_info = eligibility_check(user_input,extracted_info)
     
     eligibility_output.config(state=tk.NORMAL)
     eligibility_output.delete(1.0, tk.END)

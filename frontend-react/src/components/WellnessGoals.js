@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../styles/feature.css';
+import axios from 'axios';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
@@ -7,6 +8,7 @@ function ResourceRecommendation() {
   const [submitted, setSubmitted] = useState(false);
   const [activeTab, setActiveTab] = useState('wellnessgoals');
   const [wellnessgoals, setwellnessgoals] = useState([]);
+  const [chatConvo, setchatConvo] = useState([]);
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
@@ -19,29 +21,49 @@ function ResourceRecommendation() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (inputText.trim()) {
+      // Add user message to the conversation
       const userMessage = { sender: 'user', text: inputText.trim() };
-      const botMessage = {
-        sender: 'bot',
-        text: `Thank you for sharing! Here's what we found based on your input: "${inputText.trim()}".`,
-      };
-
-      setConversation([...conversation, userMessage, botMessage]);
-
-
-      //The generated content should show up here
-      const newwellnessgoals = [
-        {
-          title: 'Division of Mental Health & Addictions Services (DMHAS)',
-          phone: '1-800-382-6717',
-          website: 'https://www.samhsa.gov/find-help/national-helpline',
-          description: 'SAMHSA’s National Helpline is a free, confidential, 24/7 service.',
-          reason: `DMHAS provides excellent support for concerns similar to: "${inputText.trim()}".`,
-        },
-      ];
-      setwellnessgoals(newwellnessgoals);
+      setConversation((prev) => [...prev, userMessage]);
       setInputText('');
+
+      try {
+        // Make an async call to the FastAPI endpoint
+        const eventSource = new EventSource(`http://127.0.0.1:8000/wellness_response/?text=${encodeURIComponent(inputText.trim())}&previous_text=${encodeURIComponent(JSON.stringify(chatConvo))}`);
+        eventSource.onmessage = (event) => {
+          // The response data is the streamed token
+          const botMessage = {
+            sender: 'bot',
+            text: event.data,
+          };
+          // Update the conversation with the streamed response
+          setConversation((prev) => [...prev, botMessage]);
+        };
+        eventSource.onerror = () => {
+          // Handle error in case of connection issues
+          const errorMessage = {
+            sender: 'bot',
+            text: "Sorry, something went wrong while streaming. Please try again.",
+          };
+          setConversation((prev) => [...prev, errorMessage]);
+          eventSource.close(); // Close the EventSource connection
+        };
+        eventSource.onclose = () => {
+          setSubmitted(true);  // Set submitted flag to true once streaming is done
+        };   
+      } catch (error) {
+        console.error('Error fetching benefits:', error);
+  
+        // Handle error gracefully in the conversation
+        const errorMessage = {
+          sender: 'bot',
+          text: `Sorry, we encountered an error while processing your input. Please try again later.`,
+        };
+        setConversation((prev) => [...prev, errorMessage]);
+      }
+  
+      // Reset input and set submitted state
       setSubmitted(true);
     }
   };

@@ -7,7 +7,7 @@ import argparse
 from utils import call_chatgpt_api
 
 
-def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
+def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
     """
     Determines eligibility for various government benefits based on user information.
     Returns a formatted string with eligibility results and explanations.
@@ -70,6 +70,25 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
         }
     }
 
+    # TODO: Other Benefit Programs
+    # Medicaid
+    # TANF (WFNJ)
+        # Depends on parole status, income/total resources, and looking for work
+    # SNAP (EBT/Food Stamps)
+        # Depends on household size, income, whether they're in college
+        # Different requirements for 60+
+        # Work requirements
+    # Section 8
+        # Depends on the household size + county
+        # Informally, also depends on the number of people on the waitlist
+        # But this is private information? 
+        # Also everything depends on criminal history probably
+    # LIHEAP? 
+        # 60% of income
+        # 2+% for gas or 2+% for electricity
+        # or 4+% for gas+electricity 
+    # Add in amount of benefit
+
     def categorize_eligibility(score: float) -> str:
         if score >= 90:
             return "Highly likely eligible"
@@ -130,7 +149,9 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
 
     def generate_output(results: Dict[str, Dict[str, any]]) -> str:
         output = ""
-        for benefit, result in results.items():
+
+        sorted_results = sorted(results.items(),key=lambda k: k[1]['score'],reverse=True)
+        for benefit, result in sorted_results:
             output += f"Benefit: {benefit}\n"
             output += f"  Category: {result['category']}\n"
             output += f"  Met Constraints: {', '.join(result['met_constraints'])}\n"
@@ -148,11 +169,12 @@ def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
 
     if len(outputs) > 1:
         prompt = open("prompts/comparison_prompt.txt").read() 
+        prompt += "\nHere is the original request: {}".format(situation)
         for i in range(len(outputs)):
             prompt += str("\nOption {}\n{}".format(i+1,outputs[i]))
             outputs[i] = "Situation {}\n{}".format(i+1,outputs[i])
         comparison_string = call_chatgpt_api("You are a helpful assistant than can help compare benefits.",prompt).strip()
-        outputs += [comparison_string]
+        outputs = [comparison_string]+outputs
 
     return "\n".join(outputs)
 
