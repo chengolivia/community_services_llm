@@ -4,6 +4,7 @@ import sounddevice as sd
 import numpy as np
 import wavio
 import speech_recognition as sr
+from fpdf import FPDF
 from extract_resources import analyze_situation_rag, analyze_situation, translate_with_gpt
 
 # Constants
@@ -97,6 +98,37 @@ def handle_translate():
         translated_text = translate_with_gpt(original_text, language)
         translated_output.delete("1.0", tk.END)
         translated_output.insert(tk.END, translated_text)
+
+def export_to_pdf():
+    recommended_resources = result_output.get("1.0", tk.END).strip()
+    translated_text = translated_output.get("1.0", tk.END).strip()
+    
+    if not recommended_resources and not translated_text:
+        print("No content to export.")
+        return
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    pdf.cell(200, 10, txt="Exported Results", ln=True, align="C")
+    
+    if recommended_resources:
+        pdf.set_font("Arial", style="B", size=12)
+        pdf.cell(0, 10, txt="Recommended Resources:", ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=recommended_resources)
+        pdf.ln(5)
+    
+    if translated_text:
+        pdf.set_font("Arial", style="B", size=12)
+        pdf.cell(0, 10, txt="Translated Output:", ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=translated_text)
+    
+    pdf_output_path = "exported_results.pdf"
+    pdf.output(pdf_output_path)
+    print(f"Results exported to {pdf_output_path}.")
         
 # Create the main window
 window = tk.Tk()
@@ -157,6 +189,10 @@ translated_label.pack(pady=5)
 
 translated_output = scrolledtext.ScrolledText(window, height=10, width=60, font=("Helvetica", 10), bg="#3C3C3C", fg="white", insertbackground="white")
 translated_output.pack(padx=10, pady=5)
+
+# Export button
+export_button = tk.Button(window, text="Export Current Results", command=export_to_pdf, bg="#4B4B4B", fg="black", relief="flat")
+export_button.pack(pady=10)
 
 
 # Start the main loop

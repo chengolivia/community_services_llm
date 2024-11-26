@@ -55,3 +55,17 @@ def call_llm_update(original_info, update_request, pdf_text):
     prompt = open("prompts/update_prompt.txt").read().format(pdf_text,original_info,update_request)
     updated_info = call_chatgpt_api(update_sys_prompt,prompt).strip()
     return updated_info
+
+def translate_with_gpt(text, language):
+    prompt = f"Translate the following text to {language}:\n\n{text}"
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=[
+                {"role": "system", "content": "you are a helpful assistant for translating important text."},
+                {"role": "user", "content": prompt}
+            ],
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error: {str(e)}"

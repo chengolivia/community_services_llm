@@ -2,11 +2,12 @@ import tkinter as tk
 from tkinter import scrolledtext
 from utils import extract_text_from_pdf
 from eligible_benefits import call_llm_check_eligibility
-from extract_information import call_llm_update, call_llm_extract
+from extract_information import call_llm_update, call_llm_extract, translate_with_gpt
 from python_constraint_checker import eligibility_check
 import numpy as np
 import sounddevice as sd
 import wavio
+from fpdf import FPDF
 import speech_recognition as sr
 
 pdf_file_path = 'assets/benefits.pdf'
@@ -159,6 +160,51 @@ def transcribe_audio():
         print("Could not understand audio")
     except sr.RequestError as e:
         print(f"Could not request results; {e}")
+        
+def handle_translate():
+    language = language_var.get()
+    original_text = eligibility_output.get("1.0", tk.END).strip()
+    
+    if not original_text:
+        translated_output.delete("1.0", tk.END)
+        translated_output.insert(tk.END, "No text to translate.")
+        return
+
+    if language:
+        translated_text = translate_with_gpt(original_text, language)
+        translated_output.delete("1.0", tk.END)
+        translated_output.insert(tk.END, translated_text)
+
+def export_to_pdf():
+    recommended_resources = eligibility_output.get("1.0", tk.END).strip()
+    translated_text = translated_output.get("1.0", tk.END).strip()
+    
+    if not recommended_resources and not translated_text:
+        print("No content to export.")
+        return
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    pdf.cell(200, 10, txt="Exported Results", ln=True, align="C")
+    
+    if recommended_resources:
+        pdf.set_font("Arial", style="B", size=12)
+        pdf.cell(0, 10, txt="Recommended Resources:", ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=recommended_resources)
+        pdf.ln(5)
+    
+    if translated_text:
+        pdf.set_font("Arial", style="B", size=12)
+        pdf.cell(0, 10, txt="Translated Output:", ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.multi_cell(0, 10, txt=translated_text)
+    
+    pdf_output_path = "exported_results.pdf"
+    pdf.output(pdf_output_path)
+    print(f"Results exported to {pdf_output_path}.")
 
 
 # Set up the main application window
@@ -213,5 +259,31 @@ eligibility_label.pack()
 eligibility_output = scrolledtext.ScrolledText(window, height=10, width=60, state=tk.DISABLED)
 eligibility_output.pack()
 
+# Language Selection Dropdown
+language_frame = tk.Frame(window, bg="#2C2C2C")
+language_frame.pack(pady=10)
+
+language_label = tk.Label(language_frame, text="Select Language for Translation:", font=("Helvetica", 12), bg="#2C2C2C", fg="white")
+language_label.grid(column=0, row=0, padx=10, pady=5, sticky="w")
+
+language_var = tk.StringVar()
+language_dropdown = tk.OptionMenu(language_frame, language_var, "Spanish", "French", "German", "Chinese", "Japanese")
+language_dropdown.config(bg="#4B4B4B", fg="white", relief="flat")
+language_dropdown.grid(column=1, row=0, padx=10, pady=5)
+
+# Translate Button
+translate_button = tk.Button(language_frame, text="Translate", command=handle_translate, bg="#4B4B4B", fg="black", relief="flat")
+translate_button.grid(column=2, row=0, padx=10, pady=5)
+
+# Translated Output Label and ScrolledText
+translated_label = tk.Label(window, text="Translated Output:", font=("Helvetica", 12), bg="#2C2C2C", fg="white")
+translated_label.pack(pady=5)
+
+translated_output = scrolledtext.ScrolledText(window, height=10, width=60, font=("Helvetica", 10), bg="#3C3C3C", fg="white", insertbackground="white")
+translated_output.pack(padx=10, pady=5)
+
+# Export button
+export_button = tk.Button(window, text="Export Current Results", command=export_to_pdf, bg="#4B4B4B", fg="black", relief="flat")
+export_button.pack(pady=10)
 # Run the GUI application
 window.mainloop()

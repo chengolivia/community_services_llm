@@ -27,7 +27,7 @@ def create_basic_prompt(situation, resources_df):
     services = ", ".join(resources_df["Service"].tolist())
     prompt = f"""
     I have a list of resources: {services}. Based on the situation "{situation}", which resources should I use? 
-    Return a few appropriate resources, number, and why they are the appropriate choices for this situation. Make sure you provide more than one resource if they can help even just a little.
+    Return a few appropriate resources, number, and why they are the appropriate choices for this situation.
     """
     return prompt
 
@@ -88,7 +88,7 @@ def analyze_situation_rag(situation, csv_file_path,k=10):
     # Get relevant resources using the call_chatgpt_api function
     relevant_resources = call_chatgpt_api(
         "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. ",
-        " Provide a brief description, 1-2 sentences, of each resource type, explaining how it could assist the user in resolving or improving their situation: {}".format(situation)
+        "Provide the text in the 'description' column from the CSV of each resource, make sure that the situation's specified region is the responsible region mentioned in the description. if situation does not specify any location, then ignore the location requirement. explain how it could assist the user in resolving or improving their situation: {}".format(situation)
     )
     print("Relevant resources:", relevant_resources)
 
@@ -97,16 +97,16 @@ def analyze_situation_rag(situation, csv_file_path,k=10):
 
     # Search FAISS index to find the most relevant resources
     _, I = index.search(np.array([query_embedding]), k=k)  # Retrieve top k resources
-    retrieved_resources = [f"{documents[i]}, URL: {urls[i]}, Phone: {phones[i]}" for i in I[0]]
+    retrieved_resources = [f"{documents[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in I[0]]
     print("Retrieved resources:", len(retrieved_resources))
 
     # Prepare the retrieved text
     retrieved_text = "\n".join(retrieved_resources)
-    system_prompt = "You are a helpful assistant recommending resources."
+    system_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances."
     prompt = (
         f"The user is experiencing: {situation}\nHere are some suggested resources:\n{retrieved_text}\n"
         "Please explain why these resources are appropriate for the user's situation. "
-        "The only thing to put in bold (**) is the name of the place. Please also state the URL and the phone number for the place. "
+        "The only thing to put in bold (**) is the name of the place. Please also state the URL, and the phone number for the place, the responsible region of the service (name of the city or county, not the street address, and if the service does not specify the responsible location, just leave the answer blank), and description of the service"
         "If a resource is not relevant, do NOT include it. Please sort by the relevance of the resource. Finally, group resources by type (e.g. housing, transportation, mental health, etc.)."
     )
 
