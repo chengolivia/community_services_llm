@@ -20,7 +20,7 @@ class Item(BaseModel):
     previous_text: list
 
 @app.post("/benefit_response/")
-async def create_item(item: Item):
+async def benefit_response(item: Item):
     response = [
         {
           'category': 'Highly Eligible',
