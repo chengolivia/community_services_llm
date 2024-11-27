@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
 import axios from 'axios';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
+  const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [activeTab, setActiveTab] = useState('wellnessgoals');
   const [wellnessgoals, setwellnessgoals] = useState([]);
   const [chatConvo, setchatConvo] = useState([]);
-
+  const latestMessageRef = useRef(newMessage);
+  
   const handleInputChange = (e) => {
     setInputText(e.target.value);
   };
@@ -21,6 +24,10 @@ function ResourceRecommendation() {
     }
   };
 
+  useEffect(() => {
+    latestMessageRef.current = newMessage;
+  }, [newMessage])
+
   const handleSubmit = async () => {
     if (inputText.trim()) {
       // Add user message to the conversation
@@ -28,43 +35,53 @@ function ResourceRecommendation() {
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
 
-      try {
-        // Make an async call to the FastAPI endpoint
-        const eventSource = new EventSource(`http://127.0.0.1:8000/wellness_response/?text=${encodeURIComponent(inputText.trim())}&previous_text=${encodeURIComponent(JSON.stringify(chatConvo))}`);
-        eventSource.onmessage = (event) => {
-          // The response data is the streamed token
-          const botMessage = {
-            sender: 'bot',
-            text: event.data,
-          };
-          // Update the conversation with the streamed response
-          setConversation((prev) => [...prev, botMessage]);
-        };
-        eventSource.onerror = () => {
-          // Handle error in case of connection issues
-          const errorMessage = {
-            sender: 'bot',
-            text: "Sorry, something went wrong while streaming. Please try again.",
-          };
-          setConversation((prev) => [...prev, errorMessage]);
-          eventSource.close(); // Close the EventSource connection
-        };
-        eventSource.onclose = () => {
-          setSubmitted(true);  // Set submitted flag to true once streaming is done
-        };   
-      } catch (error) {
-        console.error('Error fetching benefits:', error);
-  
-        // Handle error gracefully in the conversation
-        const errorMessage = {
-          sender: 'bot',
-          text: `Sorry, we encountered an error while processing your input. Please try again later.`,
-        };
-        setConversation((prev) => [...prev, errorMessage]);
-      }
-  
-      // Reset input and set submitted state
-      setSubmitted(true);
+      await fetchEventSource(`http://127.0.0.1:8000/wellness_response/`, {
+        method: "POST",
+        headers: { Accept: "text/event-stream",         
+                  'Content-Type': 'application/json', },
+        body: JSON.stringify({
+          "text": userMessage.text, 
+          "previous_text": chatConvo
+        }),
+        onopen(res) {
+          if (res.ok && res.status === 200) {
+            setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
+            setNewMessage("");
+            
+            const botMessage = {
+              sender: "bot",
+              text: "", 
+            };
+            setConversation((prev) => [...prev, botMessage]);
+          } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            console.log("Client-side error ", res);
+          }
+        },
+        onmessage(event) {
+          setNewMessage((prev) => {
+            const updatedMessage = prev + event.data;
+            const botMessage = {
+              sender: "bot",
+              text: updatedMessage, // Use the updated message
+            };
+            setConversation((convPrev) => {
+              if (convPrev.length > 0) {
+                return [...convPrev.slice(0, -1), botMessage];
+              }
+              return [botMessage];
+            });
+        
+            return updatedMessage; // Return the updated newMessage state
+          });
+        
+        },
+        onclose() {
+          setchatConvo((prev) => [...prev,{'role': 'system','content': latestMessageRef.current}])
+        },
+        onerror(err) {
+          console.log("There was an error from server", err);
+        },
+      });
     }
   };
 

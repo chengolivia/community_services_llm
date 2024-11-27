@@ -29,14 +29,14 @@ def analyze_mental_health_situation(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
-
+    print("Analyzing mental health!")
     prompt = create_basic_prompt(situation)   
     all_messages.append({"role": "user", "content": prompt})
     response = call_chatgpt_api_all_chats(all_messages)
-    for chunk in response:
-        if 'choices' in chunk:
-            token = chunk['choices'][0].get('delta', {}).get('content', '')
-            if token:
-                yield token
+    for event in response:
+        pass 
+        if event.choices[0].delta.content != None:
+            current_response = event.choices[0].delta.content
+            yield "data: " + current_response + "\n\n"
 
     all_messages.pop() 
