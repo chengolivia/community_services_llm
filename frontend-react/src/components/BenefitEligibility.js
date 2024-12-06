@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import '../styles/feature.css';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
+  const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
-  const [activeTab, setActiveTab] = useState('benefits');
+  const [activeTab, setActiveTab] = useState('wellnessgoals');
   const [benefits, setbenefits] = useState([]);
+  const [chatConvo, setchatConvo] = useState([]);
+  const latestMessageRef = useRef(newMessage);
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
@@ -25,38 +29,55 @@ function ResourceRecommendation() {
       // Add user message to the conversation
       const userMessage = { sender: 'user', text: inputText.trim() };
       setConversation((prev) => [...prev, userMessage]);
-  
-      try {
-        // Make an async call to the FastAPI endpoint
-        const response = await axios.post('http://127.0.0.1:8000/benefit_response', {
-          text: inputText.trim(),
-        });
-  
-        // Assume response.data is the new benefits array
-        const newBenefits = response.data;
-  
-        // Update bot message with the response and benefits
-        const botMessage = {
-          sender: 'bot',
-          text: `Thank you for sharing! Here's what we found based on your input: "${inputText.trim()}".`,
-        };
-  
-        setConversation((prev) => [...prev, botMessage]);
-        setbenefits(newBenefits);
-      } catch (error) {
-        console.error('Error fetching benefits:', error);
-  
-        // Handle error gracefully in the conversation
-        const errorMessage = {
-          sender: 'bot',
-          text: `Sorry, we encountered an error while processing your input. Please try again later.`,
-        };
-        setConversation((prev) => [...prev, errorMessage]);
-      }
-  
-      // Reset input and set submitted state
       setInputText('');
-      setSubmitted(true);
+
+      await fetchEventSource(`http://127.0.0.1:8000/benefit_response/`, {
+        method: "POST",
+        headers: { Accept: "text/event-stream",         
+                  'Content-Type': 'application/json', },
+        body: JSON.stringify({
+          "text": userMessage.text, 
+          "previous_text": chatConvo
+        }),
+        onopen(res) {
+          if (res.ok && res.status === 200) {
+            setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
+            setNewMessage("");
+            
+            const botMessage = {
+              sender: "bot",
+              text: "Loading...", 
+            };
+            setConversation((prev) => [...prev, botMessage]);
+          } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            console.log("Client-side error ", res);
+          }
+        },
+        onmessage(event) {
+          setNewMessage((prev) => {
+            const updatedMessage = prev + event.data;
+            const botMessage = {
+              sender: "bot",
+              text: updatedMessage, // Use the updated message
+            };
+            setConversation((convPrev) => {
+              if (convPrev.length > 0) {
+                return [...convPrev.slice(0, -1), botMessage];
+              }
+              return [botMessage];
+            });
+        
+            return updatedMessage; // Return the updated newMessage state
+          });
+        
+        },
+        onclose() {
+          setchatConvo((prev) => [...prev,{'role': 'system','content': latestMessageRef.current}])
+        },
+        onerror(err) {
+          console.log("There was an error from server", err);
+        },
+      });
     }
   };
   
