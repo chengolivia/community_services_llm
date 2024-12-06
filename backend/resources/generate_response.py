@@ -33,7 +33,7 @@ def analyze_resource_situation(situation, all_messages):
     for event in response:
         if event.choices[0].delta.content != None:
             current_response = event.choices[0].delta.content
-            print("Current response {}".format(current_response))
+            current_response = current_response.replace("\n","<br/>")
             yield "data: " + current_response + "\n\n"
 
 def analyze_situation_rag(situation, csv_file_path,k=10):

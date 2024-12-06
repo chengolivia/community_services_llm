@@ -35,7 +35,6 @@ def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
         cleaned_output = [i.strip() for i in cleaned_output]
     else:
         cleaned_output = [cleaned_output]
-    print(cleaned_output)
     
     all_user_info = [ast.literal_eval(i) for i in cleaned_output]
 
