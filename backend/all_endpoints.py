@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from mental_health.generate_response import analyze_mental_health_situation
+from resources.generate_response import analyze_resource_situation
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -50,5 +51,9 @@ async def benefit_response(item: Item):
 
 @app.post("/wellness_response/")
 async def wellness_response(item: Item):
-  print("Item {}".format(item))
   return StreamingResponse(analyze_mental_health_situation(item.text,item.previous_text), media_type='text/event-stream')
+
+@app.post("/resource_response/")
+async def resource_response(item: Item):
+  print("Analyzing resources!")
+  return StreamingResponse(analyze_resource_situation(item.text,item.previous_text), media_type='text/event-stream')

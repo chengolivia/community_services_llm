@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
+  const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
-  const [activeTab, setActiveTab] = useState('resources');
+  const [activeTab, setActiveTab] = useState('wellnessgoals');
   const [resources, setResources] = useState([]);
+  const [chatConvo, setchatConvo] = useState([]);
+  const latestMessageRef = useRef(newMessage);
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
@@ -19,29 +23,60 @@ function ResourceRecommendation() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (inputText.trim()) {
+      // Add user message to the conversation
       const userMessage = { sender: 'user', text: inputText.trim() };
-      const botMessage = {
-        sender: 'bot',
-        text: `Thank you for sharing! Here's what we found based on your input: "${inputText.trim()}".`,
-      };
-
-      setConversation([...conversation, userMessage, botMessage]);
-      
-      //The generated content should show up here
-      const newResources = [
-        {
-          title: 'Division of Mental Health & Addictions Services (DMHAS)',
-          phone: '1-800-382-6717',
-          website: 'https://www.samhsa.gov/find-help/national-helpline',
-          description: 'SAMHSA’s National Helpline is a free, confidential, 24/7 service.',
-          reason: `DMHAS provides excellent support for concerns similar to: "${inputText.trim()}".`,
-        },
-      ];
-      setResources(newResources);
+      setConversation((prev) => [...prev, userMessage]);
       setInputText('');
-      setSubmitted(true);
+
+      await fetchEventSource(`http://127.0.0.1:8000/resource_response/`, {
+        method: "POST",
+        headers: { Accept: "text/event-stream",         
+                  'Content-Type': 'application/json', },
+        body: JSON.stringify({
+          "text": userMessage.text, 
+          "previous_text": chatConvo
+        }),
+        onopen(res) {
+          if (res.ok && res.status === 200) {
+            setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
+            setNewMessage("");
+            
+            const botMessage = {
+              sender: "bot",
+              text: "Loading...", 
+            };
+            setConversation((prev) => [...prev, botMessage]);
+          } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            console.log("Client-side error ", res);
+          }
+        },
+        onmessage(event) {
+          setNewMessage((prev) => {
+            const updatedMessage = prev + event.data;
+            const botMessage = {
+              sender: "bot",
+              text: updatedMessage, // Use the updated message
+            };
+            setConversation((convPrev) => {
+              if (convPrev.length > 0) {
+                return [...convPrev.slice(0, -1), botMessage];
+              }
+              return [botMessage];
+            });
+        
+            return updatedMessage; // Return the updated newMessage state
+          });
+        
+        },
+        onclose() {
+          setchatConvo((prev) => [...prev,{'role': 'system','content': latestMessageRef.current}])
+        },
+        onerror(err) {
+          console.log("There was an error from server", err);
+        },
+      });
     }
   };
 

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
-import axios from 'axios';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 function ResourceRecommendation() {
