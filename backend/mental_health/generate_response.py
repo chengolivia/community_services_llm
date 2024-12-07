@@ -1,6 +1,9 @@
 import openai 
 from mental_health.utils import call_chatgpt_api_all_chats
 from mental_health.secret import naveen_key as key 
+from resources.generate_response import analyze_situation_rag
+from benefits.generate_response import analyze_benefits_non_stream
+import re
 
 openai.api_key = key
 
@@ -29,14 +32,23 @@ def analyze_mental_health_situation(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
-    print("Analyzing mental health!")
     prompt = create_basic_prompt(situation)   
     all_messages.append({"role": "user", "content": prompt})
-    response = call_chatgpt_api_all_chats(all_messages)
-    for event in response:
-        if event.choices[0].delta.content != None:
-            current_response = event.choices[0].delta.content
-            current_response = current_response.replace("\n","<br/>")
-            yield "data: " + current_response + "\n\n"
-
+    response = call_chatgpt_api_all_chats(all_messages,stream=False)
     all_messages.pop() 
+
+    print("Original response {}".format(response))
+
+    csv_file_path = "resources/data/all_resources.csv"
+    pattern = r"\[Resource\](.*?)\[/Resource\]"
+    # Replace the matched content with the transformed version
+    response = re.sub(pattern, lambda m: analyze_situation_rag(m, csv_file_path,[],stream=False), response)
+    
+    pattern = r"\[Benefit\](.*?)\[/Benefit\]"
+    # Replace the matched content with the transformed version
+    response = re.sub(pattern, lambda m: analyze_benefits_non_stream(m,[]), response)
+
+    
+    response = response.replace("\n","<br/>")
+    
+    yield "data: " + response + "\n\n"

@@ -33,7 +33,7 @@ def analyze_resource_situation(situation, all_messages):
             current_response = current_response.replace("\n","<br/>")
             yield "data: " + current_response + "\n\n"
 
-def analyze_situation_rag(situation, csv_file_path,all_messages,k=10):
+def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt using a RAG to whittle down the number of things
     
@@ -101,9 +101,7 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10):
     all_messages.append({"role": "user", "content": prompt})
     all_messages.append({"role": "system", "content": all_resources})
 
-    print("All messages are {}".format(all_messages))
-
     # Get the response from the ChatGPT API
-    response = call_chatgpt_api_all_chats(all_messages)
+    response = call_chatgpt_api_all_chats(all_messages,stream=stream)
     all_messages = all_messages[1:-1]
     return response

@@ -1,5 +1,22 @@
 Create SMART goals (Specific, Measurable, Achievable, Realistic, and Timely) tailored to the client’s needs.
 Here is the situation that someone is dealing with: {}
+In your response, feel free to add the following two tags to get specific advice on resources and benefits: 
+For example, to get resources related to food in Newark: 
+[Resource]
+The client has a hard time accessing food, and wants resources near Newark
+[/Resource]
+Similarly, to receive information on their eligible benefits (SSI, SSDI, SSA, and Medicare)
+[Benefit]
+The client is 25 years old, has worked for 5 years, and earned $2500 over the past 2 months
+[/Benefit]
+For example, suppose your response has 
+"Identify and contact at least three local shelters or housing assistance programs within the next week."
+Then you can instead respond with 
+"Identify and contact at least three local shelters or housing assistance programs within the next week. [Resource] Housing assistance programs in New Jersey [/Resource]"
+However, fill in the benefit or resource tags with the specific details that the client provides; if the information isn't available, you can just leave it blank
+Additionally, the location might not always be Newark; if you don't know the location, leave it blank
+Additionally, the client ,ay not always be 25 years old, work for 5 years, or earn $2500, etc.; instead, if any specific information is available, use that, otherwise, just leave it blank
+Include as many specific details as you can about the client's situation
 Respond in one of the following ways:
 1. If the client is providing a situation, then help the client by suggesting 2-3 activites, which can be along different dimensions of wellness, that align with their situations. Think carefully; remember that suggestions from different types of wellness might be helpful, because wellness is holistic. Please order the activities by the urgency. For example, activities that can help a user with their housing situation is more important than one that improves their spiritual health.
 2. If the client is asking a question, then answer the question, and help the client find better activities/suggest other activities. You might need to ask clients for more inforation. For example, if the client does not like the suggested activities, then it would be helpful to ask what the client might enjoy, or what types of activities the client enjoys. 

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from mental_health.generate_response import analyze_mental_health_situation
 from resources.generate_response import analyze_resource_situation
-from benefits.generate_response import analyze_benefit_situation
+from benefits.generate_response import analyze_benefits
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -23,7 +23,7 @@ class Item(BaseModel):
 
 @app.post("/benefit_response/")
 async def benefit_response(item: Item):
-  return StreamingResponse(analyze_benefit_situation(item.text,item.previous_text), media_type='text/event-stream')
+  return StreamingResponse(analyze_benefits(item.text,item.previous_text), media_type='text/event-stream')
 
 @app.post("/wellness_response/")
 async def wellness_response(item: Item):

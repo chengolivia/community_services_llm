@@ -41,7 +41,7 @@ def write_text_pdf(text,pdf_loc):
     pdf.output(pdf_loc)
 
 
-def call_chatgpt_api(system_prompt,prompt):
+def call_chatgpt_api(system_prompt,prompt,stream=True):
     """Run ChatGPT with the 4o-mini model for a system prompt
     
     Arguments:
@@ -58,6 +58,8 @@ def call_chatgpt_api(system_prompt,prompt):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
+            stream=stream,
+
         )
     else:
         response = openai.ChatCompletion.create(
@@ -66,31 +68,41 @@ def call_chatgpt_api(system_prompt,prompt):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-        )
-    return response.choices[0].message.content
-
-
-def call_chatgpt_api_all_chats(all_chats):
-    """Run ChatGPT with the 4o-mini model for a system prompt
-    
-    Arguments:
-        system_prompt: String, what the main system prompt is
-            Tells ChatGPT the general scenario
-        prompt: Specific promt for ChatGPT
-
-    Returns: String, result from ChatGPT"""
-    if openai.__version__ in ['1.44.0','1.53.0', '1.54.4']:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",  
-            messages=all_chats,
             stream=True,
         )
+    
+    if stream:
+        return response
+    else:
+        return response.choices[0].message.content
+
+
+def call_chatgpt_api_all_chats(all_chats,stream=True):
+    """Run ChatGPT with the 4o-mini model for a system prompt
+    
+    Arguments:
+        system_prompt: String, what the main system prompt is
+            Tells ChatGPT the general scenario
+        prompt: Specific promt for ChatGPT
+
+    Returns: String, result from ChatGPT"""
+    if openai.__version__ in ['1.44.0','1.53.0', '1.54.4']:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",  
+            messages=all_chats,
+            stream=stream,
+        )
     else:
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",  
             messages=all_chats,
+            stream=stream
         )
-    return response
+    
+    if stream:
+        return response
+    else:
+        return response.choices[0].message.content
 
 def extract_text_from_pdf(pdf_file_path):
     """Extract some text from a PDF file path
