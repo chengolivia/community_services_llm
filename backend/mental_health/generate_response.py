@@ -37,8 +37,6 @@ def analyze_mental_health_situation(situation, all_messages):
     response = call_chatgpt_api_all_chats(all_messages,stream=False)
     all_messages.pop() 
 
-    print("Original response {}".format(response))
-
     csv_file_path = "resources/data/all_resources.csv"
     pattern = r"\[Resource\](.*?)\[/Resource\]"
     # Replace the matched content with the transformed version
