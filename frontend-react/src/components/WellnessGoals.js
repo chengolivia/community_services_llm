@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import ReactMarkdown from 'react-markdown';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
@@ -49,7 +50,7 @@ function ResourceRecommendation() {
             
             const botMessage = {
               sender: "bot",
-              text: "", 
+              text: "Loading...", 
             };
             setConversation((prev) => [...prev, botMessage]);
           } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
@@ -58,7 +59,7 @@ function ResourceRecommendation() {
         },
         onmessage(event) {
           setNewMessage((prev) => {
-            const updatedMessage = prev + event.data;
+            const updatedMessage = prev + event.data.replaceAll("<br/>","\n");
             const botMessage = {
               sender: "bot",
               text: updatedMessage, // Use the updated message
@@ -99,7 +100,7 @@ function ResourceRecommendation() {
               key={index}
               className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}
             >
-              {msg.text}
+              <ReactMarkdown children={msg.text} />
             </div>
           ))}
         </div>

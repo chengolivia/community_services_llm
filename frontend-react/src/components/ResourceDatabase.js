@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
+  const [inputLocationText, setInputLocationText] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
@@ -16,6 +17,10 @@ function ResourceRecommendation() {
   const handleInputChange = (e) => {
     setInputText(e.target.value);
   };
+
+  const handleInputChangeLocation = (e) => {
+    setInputLocationText(e.target.value)
+  }
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -32,7 +37,11 @@ function ResourceRecommendation() {
   const handleSubmit = async () => {
     if (inputText.trim()) {
       // Add user message to the conversation
-      const userMessage = { sender: 'user', text: inputText.trim() };
+      let location = inputLocationText.trim();
+      if(location.length < 2) {
+        location = "New Jersey";
+      }
+      const userMessage = { sender: 'user', text: inputText.trim()};
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
 
@@ -41,7 +50,7 @@ function ResourceRecommendation() {
         headers: { Accept: "text/event-stream",         
                   'Content-Type': 'application/json', },
         body: JSON.stringify({
-          "text": userMessage.text, 
+          "text": userMessage.text +"\n Location: "+location, 
           "previous_text": chatConvo
         }),
         onopen(res) {
@@ -106,6 +115,18 @@ function ResourceRecommendation() {
           ))}
         </div>
         <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
+          <div className="input-box">
+          <textarea
+              className="input-bar"
+              placeholder={
+                'Enter location (city or county)'
+              }
+              value={inputLocationText}
+              onChange={handleInputChangeLocation}
+              rows={1}
+            /> 
+
+          </div>
           <div className="input-box">
             <textarea
               className="input-bar"

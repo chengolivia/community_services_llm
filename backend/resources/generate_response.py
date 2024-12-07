@@ -73,7 +73,7 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10):
     index = faiss.IndexFlatL2(dimension)  # L2 distance (cosine similarity can be used as well)
     index.add(embeddings)
 
-    original_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. Provide the text in the 'description' column from the CSV of each resource, make sure that the situation's specified region is the responsible region mentioned in the description. if situation does not specify any location, then ignore the location requirement. explain how it could assist the user in resolving or improving their situation"
+    original_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. Provide the text in the 'description' column from the CSV of each resource, make sure that the situation's specified region is the responsible region mentioned in the description. if situation does not specify any location, then ignore the location requirement. explain how it could assist the user in resolving or improving their situation. Prioritize locations that are near the individual's specified location"
     all_messages = [{"role": "system", "content": original_prompt}] + all_messages
     all_messages.append({"role": "user", "content": full_situation})
 
@@ -89,7 +89,7 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10):
 
     # Prepare the retrieved text
     retrieved_text = "\n".join(retrieved_resources)
-    system_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances."
+    system_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend 1-2 types of resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. Try and prioritize resources that are nearer the individual's location."
     prompt = f"The user is experiencing: {full_situation}"
     all_resources = (f"Here are some suggested resources:\n{retrieved_text}\n"
         "Please explain why these resources are appropriate for the user's situation. "

@@ -36,6 +36,7 @@ def analyze_mental_health_situation(situation, all_messages):
     for event in response:
         if event.choices[0].delta.content != None:
             current_response = event.choices[0].delta.content
+            current_response = current_response.replace("\n","<br/>")
             yield "data: " + current_response + "\n\n"
 
     all_messages.pop() 
