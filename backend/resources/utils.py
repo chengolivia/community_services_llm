@@ -77,7 +77,7 @@ def call_chatgpt_api(system_prompt,prompt,stream=True):
         return response.choices[0].message.content
 
 
-def call_chatgpt_api_all_chats(all_chats):
+def call_chatgpt_api_all_chats(all_chats,stream=True):
     """Run ChatGPT with the 4o-mini model for a system prompt
     
     Arguments:
@@ -90,14 +90,19 @@ def call_chatgpt_api_all_chats(all_chats):
         response = openai.chat.completions.create(
             model="gpt-4o-mini",  
             messages=all_chats,
-            stream=True,
+            stream=stream,
         )
     else:
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",  
             messages=all_chats,
+            stream=stream
         )
-    return response
+    
+    if stream:
+        return response
+    else:
+        return response.choices[0].message.content
 
 
 def extract_text_from_pdf(pdf_file_path):

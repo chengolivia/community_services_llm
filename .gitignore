@@ -6,3 +6,5 @@ database/results/*.npy
 */secret.py
 backend/mental_health/secret.py
 backend/mental_health/__pycache__/
+backend/*/__pycache__
+backend/*/secret.py

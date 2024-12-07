@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import ReactMarkdown from 'react-markdown';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
@@ -22,6 +23,11 @@ function ResourceRecommendation() {
       handleSubmit();
     }
   };
+
+  useEffect(() => {
+    latestMessageRef.current = newMessage;
+  }, [newMessage])
+
 
   const handleSubmit = async () => {
     if (inputText.trim()) {
@@ -54,7 +60,8 @@ function ResourceRecommendation() {
         },
         onmessage(event) {
           setNewMessage((prev) => {
-            const updatedMessage = prev + event.data;
+            const updatedMessage = prev + event.data.replaceAll("<br/>","\n");
+            console.log(updatedMessage)
             const botMessage = {
               sender: "bot",
               text: updatedMessage, // Use the updated message
@@ -80,7 +87,6 @@ function ResourceRecommendation() {
     }
   };
 
-
   return (
     <div className="resource-recommendation-container">
       {/* Left Section */}
@@ -95,7 +101,7 @@ function ResourceRecommendation() {
               key={index}
               className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}
             >
-              {msg.text}
+              <ReactMarkdown children={msg.text} />
             </div>
           ))}
         </div>
