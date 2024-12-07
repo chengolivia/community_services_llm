@@ -1,5 +1,14 @@
-Extract the relevant personal information from the following user input and present it in a structured dictionary format.This extracted information will be used to determine eligibility for government benefits. Here is the user input: {}. Use the structure below, filling in values or indicating None if unclear. Present the final result as a Python dictionary.
-Sometimes, the client will ask for two scenarios (for example; "I am 25 years old and single. I make $1800 per month. What happens if I make $200 more per month?"). In that situation, return a list of dictionaries, with one dictionary for each situation. 
+The user will ask about benefits and comparing benefits between one or more situations 
+They will present some information about these one or more situations; your responsbility is to turn each situation into a dictionary, along with a summary of the user's question
+Include each situation in a tag as follows: 
+[Situation]
+    {{ "age": 25, 
+      "marital_status": "single_adult",
+      ...
+    }}
+[/Situation]
+
+Use the structure below, filling in values or indicating None if unclear. The one below is an example of the structure of each dictionary.
 
 Expected Python Dictionary Structure:
 
@@ -15,4 +24,26 @@ Expected Python Dictionary Structure:
     "sga": [True if engaged in substantial gainful activity, False if not, or None if unclear],
     "social_security_eligibility": [True if eligible, False if not, or None if unclear]
 
-Make sure that your output is a python dictionary, not a string. 
+For example, here's a user input "Hey, if my income changes from $1500 to $1800 how will my benefits change" 
+Output: 
+    [Situation]
+        {{
+            "age": None, 
+            "marital_status": None, 
+            ...
+            "income": 1500
+            ...
+        }}
+    [/Situation]
+    [Situation]
+        {{
+            "age": None, 
+            "marital_status": None, 
+            ...
+            "income": 1800
+            ...
+        }}
+    [/Situation]
+    How will my benefits change between these situations when my income changes from $1500 to $1800
+
+Here is the user input: {}. 
