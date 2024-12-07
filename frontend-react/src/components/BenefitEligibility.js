@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import ReactMarkdown from 'react-markdown';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
@@ -55,7 +56,7 @@ function ResourceRecommendation() {
         },
         onmessage(event) {
           setNewMessage((prev) => {
-            const updatedMessage = prev + event.data;
+            const updatedMessage = prev + event.data.replaceAll("<br/>","\n");
             const botMessage = {
               sender: "bot",
               text: updatedMessage, // Use the updated message
@@ -96,7 +97,7 @@ function ResourceRecommendation() {
               key={index}
               className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}
             >
-              {msg.text}
+              <ReactMarkdown children={msg.text} />
             </div>
           ))}
         </div>

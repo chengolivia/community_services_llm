@@ -1,5 +1,5 @@
 import openai 
-from resources.utils import call_chatgpt_api
+from resources.utils import call_chatgpt_api, call_chatgpt_api_all_chats
 from resources.secret import naveen_key as key 
 from benefits.utils import *
 from benefits.secret import gao_key as key 
@@ -12,8 +12,6 @@ import inspect
 openai.api_key = key
 
 system_prompt = open("benefits/prompts/system_prompt.txt").read()
-
-
 
 def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
     """
@@ -185,7 +183,7 @@ def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
 
     return "\n".join(outputs)
 
-def call_llm_extract(user_input):
+def call_llm_extract(user_input,all_messages):
     """Extract information from a user's input
     
     Arguments:
@@ -194,8 +192,15 @@ def call_llm_extract(user_input):
         
     Returns: Response, which is the extracted information"""
     system_prompt = open("benefits/prompts/system_prompt_extract.txt").read()
-    prompt = open("benefits/prompts/uncertain_prompt.txt").read().format(user_input)
-    extracted_info = call_chatgpt_api(system_prompt,prompt,stream=False).strip()
+
+    full_situation = "\n".join(["Message {} {}: ".format(idx+1,i['content']) for idx,i in enumerate([j for j in (all_messages+[{'role': 'user', 'content': user_input}]) if j['role'] == 'user'])])
+
+    prompt = open("benefits/prompts/uncertain_prompt.txt").read().format(full_situation)
+
+    new_messages = [{'role': 'system', 'content': system_prompt}] + all_messages
+    new_messages.append({'role': 'user', 'content': prompt})
+
+    extracted_info = call_chatgpt_api_all_chats(new_messages,stream=False).strip()
     return extracted_info
 
 def analyze_benefit_situation(situation, all_messages):
@@ -208,19 +213,27 @@ def analyze_benefit_situation(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
-    extracted_info = call_llm_extract(situation)
+    extracted_info = call_llm_extract(situation,all_messages)
     eligibility_info = eligibility_check(situation,extracted_info)
 
     prompt = (
         f"The user is eligible for the following benefits {eligibility_info}"
+        f"The last message is {situation}"
         "Can you respond with the following: "
-        "1. A nicely formatted version of this, which states which things the user MAY be eligible for, which things they're not, etc. and why not"
-        "2. What additional information might be helpful to further help determine eligibilities"
-        "3. Any next steps or links for applying for benefits"
+        "1. If the user is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
+        "2. If the user is not asking a question, provide a nicely formatted version of the benefits, which states which things the user MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least"
+        "3. What additional information might be helpful to further help determine eligibilities"
+        "4. Any next steps or links for applying for benefits. The SSI website is: https://www.ssa.gov/apply/ssi. The SSA website is: https://www.ssa.gov/apply. The medicare website is: https://www.ssa.gov/medicare/sign-up. You can apply for SSDI here: https://secure.ssa.gov/iClaim/dib. Can you state the type of documentation needed to apply as well"
+        "Make sure you're conversational and as collegial as possible"
     )
 
-    response = call_chatgpt_api(system_prompt, prompt)
+    all_messages = [{'role': 'system', 'content': system_prompt}] + all_messages
+    all_messages.append({'role': 'user', 'content': prompt})
+
+    response = call_chatgpt_api_all_chats(all_messages)
+    all_messages = all_messages[1:-1]
     for event in response:
         if event.choices[0].delta.content != None:
             current_response = event.choices[0].delta.content
+            current_response = current_response.replace("\n","<br/>")
             yield "data: " + current_response + "\n\n"

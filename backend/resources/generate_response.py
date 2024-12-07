@@ -1,17 +1,14 @@
 import openai 
-from resources.utils import call_chatgpt_api,call_chatgpt_api_all_chats
+from resources.utils import call_chatgpt_api_all_chats
 from resources.secret import naveen_key as key 
 import openai 
 from resources.utils import *
 from resources.secret import gao_key as key 
 import pandas as pd
-from transformers import DPRQuestionEncoder, DPRQuestionEncoderTokenizer, DPRContextEncoder, DPRContextEncoderTokenizer
-from sklearn.feature_extraction.text import TfidfVectorizer
 import faiss
-import time 
 import os 
 import numpy as np
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import SentenceTransformer
 
 
 openai.api_key = key
