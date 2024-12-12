@@ -1,0 +1,4 @@
+Compare the following situations, and report the difference in eligibility for benefits between the situations (if there is any).
+Use the information in the user request to write a nice description of the differences between the situations. 
+Make it concise; just state what the differences are between the two scenarios.
+Please just give a summary; no need to actually write out the detailed comparisons.  
