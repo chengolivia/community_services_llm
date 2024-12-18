@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 
 function ResourceRecommendation() {
   const [inputText, setInputText] = useState('');
+  const [notesText, setNotesText] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
@@ -17,11 +18,31 @@ function ResourceRecommendation() {
     setInputText(e.target.value);
   };
 
+  const handleNotesChange = (e) => {
+    setNotesText(e.target.value);
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
+  };
+
+  const handleSave = () => {
+    const blob = new Blob([notesText], { type: 'text/plain' });
+    
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+    
+    // Create an anchor element and trigger a download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'saved_notes.txt'; // Name of the file to be downloaded
+    link.click();
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -31,7 +52,8 @@ function ResourceRecommendation() {
   const handleSubmit = async () => {
     if (inputText.trim()) {
       // Add user message to the conversation
-      const userMessage = { sender: 'user', text: inputText.trim() };
+      const new_message = "Client: "+inputText.trim()+", Notes: "+notesText.trim();
+      const userMessage = { sender: 'user', text: inputText.trim()};
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
       setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
@@ -50,7 +72,7 @@ function ResourceRecommendation() {
         headers: { Accept: "text/event-stream",         
                   'Content-Type': 'application/json', },
         body: JSON.stringify({
-          "text": userMessage.text, 
+          "text": new_message, 
           "previous_text": chatConvo
         }),
         onopen(res) {
@@ -127,21 +149,21 @@ function ResourceRecommendation() {
       </div>
 
       <div className="right-section">
-        <div className="tabs">
-          <button
-            className={`tab-button ${activeTab === 'wellnessgoals' ? 'active' : ''}`}
-            onClick={() => setActiveTab('wellnessgoals')}
-          >
-            Notes
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => setActiveTab('profile')}
-          >
-            Notes
-          </button>
-        </div>
         <div className="tab-content">
+          <h2>Notes</h2>
+          <textarea
+              className="notes-bar"
+              placeholder={
+                'Any notes during conversation'
+              }
+              value={notesText}
+              onChange={handleNotesChange}
+              rows={100}
+            />  
+        </div>
+        <div class="notes-box">
+          <button className="voice-icon">🎤</button>
+          <button className="submit-button" onClick={handleSave}>💾</button>
         </div>
       </div>
     </div>

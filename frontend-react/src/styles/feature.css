@@ -83,9 +83,28 @@
   background-color: #fff;
 }
 
+.notes-box {
+  display: flex;
+  align-items: flex-start; /* Allow multi-line input */
+}
+
 .input-bar {
   flex: 1;
   height: 100%;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  color: #333;
+  resize: none; /* Disable resize handle */
+  padding: 5px 10px;
+  line-height: 1.5;
+  font-family: Arial, sans-serif;
+}
+
+.notes-bar {
+  flex: 1;
+  height: 90%;
+  width: 100%;
   border: none;
   outline: none;
   font-size: 1rem;
@@ -126,7 +145,7 @@
   padding: 20px;
   border: 1px solid #ddd;
   border-radius: 10px;
-  height: 100%;
+  height: 95%;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   margin-right: 20px;
   box-sizing: border-box;
@@ -147,6 +166,7 @@
   background-color: #f1f1f1;
   cursor: pointer;
   transition: background-color 0.3s;
+  height: 90%;
 }
 
 .tab-button:hover,
@@ -156,9 +176,9 @@
 
 .tab-content {
   flex: 1;
-  padding: 20px;
   font-size: 1rem;
   overflow-y: auto;
+  margin-top: 10px;
 }
 
 .resource-item {
