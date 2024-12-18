@@ -69,7 +69,6 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         np.save(file_path, embeddings)
 
-    print("Setting up FAISS")
     # Set up the FAISS index
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)  # L2 distance (cosine similarity can be used as well)
@@ -80,11 +79,9 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
     all_messages = [{"role": "system", "content": original_prompt}] + all_messages
     all_messages.append({"role": "user", "content": full_situation})
 
-    print("Before first call")
     relevant_resources = call_chatgpt_api_all_chats(all_messages,stream=False)
     all_messages = all_messages[1:-1]
 
-    print("Encoding")
     # Encode the query using the Sentence Transformer model
     query_embedding = model.encode(relevant_resources, convert_to_tensor=False)
 
@@ -95,17 +92,16 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
     # Prepare the retrieved text
     retrieved_text = "\n".join(retrieved_resources)
     
-    system_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend relevant resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. Prioritize resources that are nearer the individual's location."
+    system_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a client's specific situation. Your goal is to thoughtfully analyze the given context and recommend relevant resources that would be most effective in addressing the client's needs. Ensure your response is clear, concise, and directly relevant to the client's circumstances. Prioritize resources that are nearer the individual's location."
     
-    prompt = f"The user is experiencing: {full_situation}"
+    prompt = f"The client is experiencing: {full_situation}"
     
     all_resources = (f"Here are some suggested resources:\n{retrieved_text}\n"
-        "Please explain why these resources are appropriate for the user's situation. "
+        "Please explain why these resources are appropriate for the client's situation; note that all of these recommendations, etc. are for the client. "
         "The only thing to put in bold (**) is the name of the place. Please also state the URL, and the phone number for the place, the responsible region of the service (name of the city or county, not the street address, and if the service does not specify the responsible location, just leave the answer blank), eligibility requirements, description of the service, and an explanation why this was selected"
-        "If a resource is not relevant, do NOT include it. Also do NOT include resources that are far away (e.g. more than 50 miles away, or those that might not be available in their region/state). Please sort by the relevance and the ease of accessing the resource (e.g. one with the least stringent conditions comes first). Finally, group resources by type (e.g. housing, transportation, mental health, etc.) and sort these types so housing comes first, then food, then mental health, etc. If the user has a question, then answer that question as well, and use all the messages so far to answer the user's question. If a user only asks a question, no need to provide resources."
+        "If a resource is not relevant, do NOT include it. For example, it's not always needed to include food or housing resources; sometimes the client just wants one particular thing. Also do NOT include resources that are far away (e.g. more than 50 miles away, or those that might not be available in their region/state). Please sort by the relevance and the ease of accessing the resource (e.g. one with the least stringent conditions comes first). Finally, group resources by type (e.g. housing, transportation, mental health, etc.) and sort these types so housing comes first, then food, then mental health, etc. If the client has a question, then answer that question as well, and use all the messages so far to answer the client's question. If a client only asks a question, no need to provide resources."
     )
 
-    print("Total message length {}".format(len(system_prompt)+len(prompt)+len(all_resources)))
     all_messages = [{"role": "system", "content": system_prompt}] + all_messages
     all_messages.append({"role": "user", "content": prompt})
     all_messages.append({"role": "system", "content": all_resources})
@@ -113,4 +109,5 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
     # Get the response from the ChatGPT API
     response = call_chatgpt_api_all_chats(all_messages,stream=stream)
     all_messages = all_messages[1:-1]
+    print("Finished analysis")
     return response

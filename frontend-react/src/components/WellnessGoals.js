@@ -43,7 +43,9 @@ function ResourceRecommendation() {
       };
       setConversation((prev) => [...prev, botMessage]);
 
-      await fetchEventSource(`http://127.0.0.1:8000/wellness_response/`, {
+      const baseUrl = `http://${window.location.hostname}:8000/wellness_response/`;
+
+      await fetchEventSource(baseUrl, {
         method: "POST",
         headers: { Accept: "text/event-stream",         
                   'Content-Type': 'application/json', },

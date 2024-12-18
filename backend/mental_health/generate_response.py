@@ -34,17 +34,22 @@ def analyze_mental_health_situation(situation, all_messages):
 
     prompt = create_basic_prompt(situation)   
     all_messages.append({"role": "user", "content": prompt})
+
+    total_length = sum([len(i['content']) for i in all_messages])
+    print("Initial call to ChatGPT, with {} prompt".format(total_length))
     response = call_chatgpt_api_all_chats(all_messages,stream=False)
     all_messages.pop() 
 
     csv_file_path = "resources/data/all_resources.csv"
-    pattern = r"\[Resource\](.*?)\[/Resource\]"
+    pattern = r"\[Resource\](.*?)\[\/Resource\]"
     # Replace the matched content with the transformed version
-    response = re.sub(pattern, lambda m: analyze_situation_rag(m, csv_file_path,[],stream=False), response)
+    print("Raw response {}".format(response))
+
+    response = re.sub(pattern, lambda m: analyze_situation_rag(m.group().replace("[Resource]","").replace("[/Resource]",""), csv_file_path,[],stream=False), response)
     
     pattern = r"\[Benefit\](.*?)\[/Benefit\]"
     # Replace the matched content with the transformed version
-    response = re.sub(pattern, lambda m: analyze_benefits_non_stream(m,[]), response)
+    response = re.sub(pattern, lambda m: analyze_benefits_non_stream(m.group().replace("[Benefit]","").replace("[/Benefit]",""),[]), response)
 
     
     response = response.replace("\n","<br/>")
