@@ -31,6 +31,14 @@ function ResourceRecommendation() {
       const userMessage = { sender: 'user', text: inputText.trim() };
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
+      setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
+      setNewMessage("");
+      
+      const botMessage = {
+        sender: "bot",
+        text: "Loading...", 
+      };
+      setConversation((prev) => [...prev, botMessage]);
 
       await fetchEventSource(`http://127.0.0.1:8000/benefit_response/`, {
         method: "POST",
@@ -41,16 +49,7 @@ function ResourceRecommendation() {
           "previous_text": chatConvo
         }),
         onopen(res) {
-          if (res.ok && res.status === 200) {
-            setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
-            setNewMessage("");
-            
-            const botMessage = {
-              sender: "bot",
-              text: "Loading...", 
-            };
-            setConversation((prev) => [...prev, botMessage]);
-          } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+          if (res.status >= 400 && res.status < 500 && res.status !== 429) {
             console.log("Client-side error ", res);
           }
         },
@@ -125,59 +124,19 @@ function ResourceRecommendation() {
       <div className="right-section">
         <div className="tabs">
           <button
-            className={`tab-button ${activeTab === 'benefits' ? 'active' : ''}`}
-            onClick={() => setActiveTab('benefits')}
+            className={`tab-button ${activeTab === 'wellnessgoals' ? 'active' : ''}`}
+            onClick={() => setActiveTab('wellnessgoals')}
           >
-            Recommended benefits
+            Notes
           </button>
           <button
             className={`tab-button ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
           >
-            Client profile
+            Notes
           </button>
         </div>
         <div className="tab-content">
-          {activeTab === 'benefits' && (
-            <div>
-              <p>
-              Benefit program results are recommended based on the client information from your meeting notes. Get more accurate results analysis by sending additional client information in the chat.
-              </p>
-              {benefits.map((resource, index) => (
-                <div key={index} className="resource-item">
-                  <h3>{resource.title}</h3>
-                  <p><strong>Phone:</strong> {resource.phone}</p>
-                  <p>
-                    <strong>Website:</strong>{' '}
-                    <a href={resource.website} target="_blank" rel="noopener noreferrer">
-                      {resource.website}
-                    </a>
-                  </p>
-                  <p><strong>Description:</strong> {resource.description}</p>
-                  <p><strong>Reason:</strong> {resource.reason}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Update client info here */}
-          {activeTab === 'profile' && (
-            <div>
-              <p>
-                Client profile information is extracted from the meeting notes you send in
-                chat. Edit by sending updated information in the chat.
-              </p>
-              <h3>Client needs</h3>
-              <p><strong>Goals:</strong> Lorem ipsum dolor sit amet consectetur. Fames lacinia sapien elementum diam tellus. Aliquet nulla purus nibh suspendisse sit in sed aliquam commodo.</p>
-              <p><strong>Immediate needs:</strong> Lorem ipsum dolor sit amet consectetur. Fames lacinia sapien elementum diam tellus. Aliquet nulla purus nibh suspendisse sit in sed aliquam commodo.</p>
-              <h3>Demographics</h3>
-              <ul>
-                <li><strong>County:</strong> Lorem ipsum</li>
-                <li><strong>Age:</strong> Lorem ipsum</li>
-                <li><strong>Housing status:</strong> Lorem ipsum</li>
-                <li><strong>Other client info:</strong> Lorem ipsum</li>
-              </ul>
-            </div>
-          )}
         </div>
       </div>
     </div>
