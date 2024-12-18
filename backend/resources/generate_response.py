@@ -43,6 +43,7 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
         
     Returns: A string, the response from ChatGPT"""
 
+    print("Analyzing situation {}".format(situation))
     full_situation = "\n".join(["Message {} {}: ".format(idx+1,i['content']) for idx,i in enumerate([j for j in (all_messages+[{'role': 'user', 'content': situation}]) if j['role'] == 'user'])])
 
     resources_df = pd.read_csv(csv_file_path)
@@ -68,6 +69,7 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         np.save(file_path, embeddings)
 
+    print("Setting up FAISS")
     # Set up the FAISS index
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)  # L2 distance (cosine similarity can be used as well)
@@ -78,9 +80,11 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
     all_messages = [{"role": "system", "content": original_prompt}] + all_messages
     all_messages.append({"role": "user", "content": full_situation})
 
+    print("Before first call")
     relevant_resources = call_chatgpt_api_all_chats(all_messages,stream=False)
     all_messages = all_messages[1:-1]
 
+    print("Encoding")
     # Encode the query using the Sentence Transformer model
     query_embedding = model.encode(relevant_resources, convert_to_tensor=False)
 
@@ -97,10 +101,11 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
     
     all_resources = (f"Here are some suggested resources:\n{retrieved_text}\n"
         "Please explain why these resources are appropriate for the user's situation. "
-        "The only thing to put in bold (**) is the name of the place. Please also state the URL, and the phone number for the place, the responsible region of the service (name of the city or county, not the street address, and if the service does not specify the responsible location, just leave the answer blank), and description of the service"
-        "If a resource is not relevant, do NOT include it. Please sort by the relevance of the resource. Finally, group resources by type (e.g. housing, transportation, mental health, etc.). If the user has a question, then answer that question as well, and use all the messages so far to answer the user's question. If a user only asks a question, no need to provide resources."
-)
+        "The only thing to put in bold (**) is the name of the place. Please also state the URL, and the phone number for the place, the responsible region of the service (name of the city or county, not the street address, and if the service does not specify the responsible location, just leave the answer blank), eligibility requirements, description of the service, and an explanation why this was selected"
+        "If a resource is not relevant, do NOT include it. Also do NOT include resources that are far away (e.g. more than 50 miles away, or those that might not be available in their region/state). Please sort by the relevance and the ease of accessing the resource (e.g. one with the least stringent conditions comes first). Finally, group resources by type (e.g. housing, transportation, mental health, etc.) and sort these types so housing comes first, then food, then mental health, etc. If the user has a question, then answer that question as well, and use all the messages so far to answer the user's question. If a user only asks a question, no need to provide resources."
+    )
 
+    print("Total message length {}".format(len(system_prompt)+len(prompt)+len(all_resources)))
     all_messages = [{"role": "system", "content": system_prompt}] + all_messages
     all_messages.append({"role": "user", "content": prompt})
     all_messages.append({"role": "system", "content": all_resources})
