@@ -51,25 +51,15 @@ def call_chatgpt_api(system_prompt,prompt,stream=True):
 
     Returns: String, result from ChatGPT"""
 
-    if openai.__version__ in ['1.44.0','1.53.0', '1.54.4']:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",  
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            stream=stream,
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",  
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        stream=stream,
 
-        )
-    else:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            stream=True,
-        )
+    )
     
     if stream:
         return response
@@ -86,18 +76,11 @@ def call_chatgpt_api_all_chats(all_chats,stream=True):
         prompt: Specific promt for ChatGPT
 
     Returns: String, result from ChatGPT"""
-    if openai.__version__ in ['1.44.0','1.53.0', '1.54.4']:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",  
-            messages=all_chats,
-            stream=stream,
-        )
-    else:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  
-            messages=all_chats,
-            stream=stream
-        )
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",  
+        messages=all_chats,
+        stream=stream,
+    )
     
     if stream:
         return response

@@ -10,7 +10,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React's dev server
+    allow_origins=["http://localhost:3000","http://feif-i7.isri.cmu.edu:3000"],  # React's dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
