@@ -1,5 +1,5 @@
 The user will ask about benefits and comparing benefits between one or more situations 
-They will present some information about these one or more situations; your responsbility is to turn each situation into a dictionary, along with a summary of the user's question
+They will present some information about these one or more situations; your responsbility is to turn each situation into a dictionary, along with a summary of the user's question. Think carefully about this, and fill in the information to the best of your ability. Try and capture as much information as you can.
 Include each situation in a tag as follows: 
 [Situation]
     {{ "age": 25, 
@@ -24,7 +24,7 @@ Expected Python Dictionary Structure:
     "sga": [True if engaged in substantial gainful activity, False if not, or None if unclear],
     "social_security_eligibility": [True if eligible, False if not, or None if unclear]
 
-For example, here's a user input "Hey, if my income changes from $1500 to $1800 how will my benefits change" 
+For example, here's a user input "Hey, if the center member's income changes from $1500 to $1800 how will their benefits change" 
 Output: 
     [Situation]
         {{
@@ -44,6 +44,18 @@ Output:
             ...
         }}
     [/Situation]
-    How will my benefits change between these situations when my income changes from $1500 to $1800
+    How will their benefits change between these situations when their income changes from $1500 to $1800
 
+Here's another example: "The center member is currently 25 without a disability, what are their benefits?"
+Output: 
+    [Situation]
+        {{
+            "age": 25, 
+            "marital_status": None, 
+            ...
+            "disability": False, 
+            ...
+        }}
+    [/Situation]
+    What benefits is the center member eliglbe for? 
 Here is the user input: {}. 
