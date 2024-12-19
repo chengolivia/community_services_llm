@@ -4,6 +4,9 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
 
 function ResourceRecommendation() {
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [notesText, setNotesText] = useState('');
   const [inputText, setInputText] = useState('');
   const [inputLocationText, setInputLocationText] = useState('');
   const [newMessage, setNewMessage] = useState('');
@@ -18,9 +21,29 @@ function ResourceRecommendation() {
     setInputText(e.target.value);
   };
 
+  const handleNotesChange = (e) => {
+    setNotesText(e.target.value);
+  };
+
   const handleInputChangeLocation = (e) => {
     setInputLocationText(e.target.value)
   }
+
+  const handleSave = () => {
+    const blob = new Blob([notesText], { type: 'text/plain' });
+    
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+    
+    // Create an anchor element and trigger a download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'saved_notes.txt'; // Name of the file to be downloaded
+    link.click();
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -41,6 +64,7 @@ function ResourceRecommendation() {
       if(location.length < 2) {
         location = "New Jersey";
       }
+      const new_message = "Client: "+inputText.trim()+", Notes: "+notesText.trim()+"\n Location: "+location;
       const userMessage = { sender: 'user', text: inputText.trim()};
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
@@ -60,7 +84,7 @@ function ResourceRecommendation() {
         headers: { Accept: "text/event-stream",         
                   'Content-Type': 'application/json', },
         body: JSON.stringify({
-          "text": userMessage.text +"\n Location: "+location, 
+          "text": newMessage, 
           "previous_text": chatConvo
         }),
         onopen(res) {
@@ -94,6 +118,58 @@ function ResourceRecommendation() {
         },
         retryInterval: 10000
       });
+    }
+  };
+
+
+  const clickMike = async () => {
+    if (!isRecording) {
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+
+        const chunks = [];
+        recorder.ondataavailable = (event) => {
+          chunks.push(event.data);
+        };
+
+        recorder.onstop = async () => {
+          // Create an audio blob when recording stops
+          const audioBlob = new Blob(chunks, { type: "audio/mp3" });
+          console.log("Recording stopped, audio blob created.");
+
+          // Automatically upload the audio
+          await uploadAudio(audioBlob);
+        };
+
+        recorder.start();
+        setMediaRecorder(recorder);
+        setIsRecording(true);
+      } catch (error) {
+        console.error("Error accessing microphone:", error);
+      }
+    } else {
+      // Stop recording
+      mediaRecorder.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const uploadAudio = async (audioBlob) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "recording.mp3");
+
+    try {
+      const response = await fetch("http://localhost:8000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      setNotesText(notesText+"\n"+result.message)
+    } catch (error) {
+      console.error("Error uploading file:", error);
     }
   };
 
@@ -147,22 +223,25 @@ function ResourceRecommendation() {
       </div>
 
 
+     
       <div className="right-section">
-        <div className="tabs">
-          <button
-            className={`tab-button ${activeTab === 'wellnessgoals' ? 'active' : ''}`}
-            onClick={() => setActiveTab('wellnessgoals')}
-          >
-            Notes
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => setActiveTab('profile')}
-          >
-            Notes
-          </button>
-        </div>
         <div className="tab-content">
+          <h2>Notes</h2>
+          <textarea
+              className="notes-bar"
+              placeholder={
+                'Any notes during conversation'
+              }
+              value={notesText}
+              onChange={handleNotesChange}
+              rows={100}
+            />  
+        </div>
+        <div className="notes-box">
+          <button className="voice-icon" onClick={clickMike}>
+              {isRecording ? "⏹️": "🎤"}
+          </button>
+          <button className="submit-button" onClick={handleSave}>💾</button>
         </div>
       </div>
     </div>

@@ -2,13 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 function ResourceRecommendation() {
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [inputText, setInputText] = useState('');
   const [notesText, setNotesText] = useState('');
+  const [inputText, setInputText] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
   const [submitted, setSubmitted] = useState(false);
@@ -47,14 +46,6 @@ function ResourceRecommendation() {
     // Clean up the URL object
     URL.revokeObjectURL(url);
   };
-
-const {
-  transcript,
-  listening,
-  resetTranscript,
-  browserSupportsSpeechRecognition
-} = useSpeechRecognition();
-
 
   useEffect(() => {
     latestMessageRef.current = newMessage;

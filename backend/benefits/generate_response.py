@@ -218,14 +218,14 @@ def analyze_benefits_non_stream(situation, all_messages):
     eligibility_info = eligibility_check(situation,extracted_info)
 
     prompt = (
-        f"The client is eligible for the following benefits {eligibility_info}"
+        f"The center member is eligible for the following benefits {eligibility_info}"
         f"The last message is {situation}"
         "Can you respond with the following: "
-        "1. If the client is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
-        "2. If the client is not asking a question, provide a nicely formatted version of the benefits, which states which things the client MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well."
+        "1. If the center member is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
+        "2. If the center member is not asking a question, provide a nicely formatted version of the benefits, which states which things the center member MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well."
         "3. What additional information might be helpful to further help determine eligibilities"
         "4. Any next steps or links for applying for benefits. The SSI website is: https://www.ssa.gov/apply/ssi. The SSA website is: https://www.ssa.gov/apply. The medicare website is: https://www.ssa.gov/medicare/sign-up. You can apply for SSDI here: https://secure.ssa.gov/iClaim/dib. Can you state the type of documentation needed to apply as well"
-        "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the client, whom the provider is aiming to assist."
+        "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the center member, whom the provider is aiming to assist."
     )
 
     all_messages = [{'role': 'system', 'content': system_prompt}] + all_messages
@@ -256,14 +256,14 @@ def analyze_benefits(situation, all_messages):
     )
 
     prompt = (
-        f"The client is eligible for the following benefits {eligibility_info}"
+        f"The center member is eligible for the following benefits {eligibility_info}"
         f"The last message is {situation}"
         "Can you respond with the following: "
-        "1. If the client is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
-        "2. If the client is not asking a question, provide a nicely formatted version of the benefits, which states which things the client MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well."
+        "1. If the center member is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
+        "2. If the center member is not asking a question, provide a nicely formatted version of the benefits, which states which things the center member MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well."
         "3. What additional information might be helpful to further help determine eligibilities"
         "4. Any next steps or links for applying for benefits. The SSI website is: https://www.ssa.gov/apply/ssi. The SSA website is: https://www.ssa.gov/apply. The medicare website is: https://www.ssa.gov/medicare/sign-up. You can apply for SSDI here: https://secure.ssa.gov/iClaim/dib. Can you state the type of documentation needed to apply as well"
-        "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the client, whom the provider is aiming to assist."
+        "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the center member, whom the provider is aiming to assist."
     )
 
     all_messages = [{'role': 'system', 'content': system_prompt}] + all_messages

@@ -3,6 +3,7 @@ from mental_health.utils import call_chatgpt_api_all_chats
 from mental_health.secret import naveen_key as key 
 from resources.generate_response import analyze_situation_rag
 from benefits.generate_response import analyze_benefits_non_stream
+import concurrent.futures
 import re
 
 openai.api_key = key
@@ -45,11 +46,20 @@ def analyze_mental_health_situation(situation, all_messages):
     # Replace the matched content with the transformed version
     print("Raw response {}".format(response))
 
-    response = re.sub(pattern, lambda m: analyze_situation_rag(m.group().replace("[Resource]","").replace("[/Resource]",""), csv_file_path,[],stream=False), response)
+    def parallel_sub(text,pattern,f):
+        matches = re.findall(pattern,text,flags=re.DOTALL)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+                results = list(executor.map(f, matches))
+        for i in range(len(results)):
+                text = text.replace(matches[i],results[i])
+        return text
+
+    response = parallel_sub(response,pattern,lambda m: analyze_situation_rag(m,csv_file_path,[],stream=False))
+    response = response.replace("[Resource]","").replace("[/Resource]","")
     
     pattern = r"\[Benefit\](.*?)\[/Benefit\]"
     # Replace the matched content with the transformed version
-    response = re.sub(pattern, lambda m: analyze_benefits_non_stream(m.group().replace("[Benefit]","").replace("[/Benefit]",""),[]), response)
+    response = re.sub(pattern, lambda m: analyze_benefits_non_stream(m.group().replace("[Benefit]","").replace("[/Benefit]",""),[]), response,flags=re.DOTALL)
 
     
     response = response.replace("\n","<br/>")
