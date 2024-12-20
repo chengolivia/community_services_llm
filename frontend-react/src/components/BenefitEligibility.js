@@ -3,6 +3,8 @@ import axios from 'axios';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
+import { jsPDF } from 'jspdf';
+import { marked } from 'marked';
 
 function ResourceRecommendation() {
   const [isRecording, setIsRecording] = useState(false);
@@ -32,20 +34,51 @@ function ResourceRecommendation() {
     }
   };
 
-  const handleSave = () => {
-    const blob = new Blob([notesText], { type: 'text/plain' });
+  const handleSave = async () => {
+    const baseUrl = `http://${window.location.hostname}:8000/notes/`;
+    try {
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          Accept: "text/event-stream",
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "text": notesText, 
+          "previous_text": chatConvo,
+        })
+      });
+      
+      if (response.ok) {
+        // If the response is successful (status 200-299)
+        const responseData = await response.json(); // or response.text() if you're expecting plain text
+        console.log(responseData.message); // Log the actual response data
+        const htmlContent = marked(responseData.message);
+
+        // Create a new jsPDF instance
+        const doc = new jsPDF('p', 'pt', 'a4');
+        var getContent = "<div style='font-size:11px; border:1px solid; background-color: rgb(239 240 240); padding: 05px 15px; width:300px;'>"+htmlContent+"</div>";
+
+        console.log("HTML")
+        console.log(getContent)
     
-    // Create a URL for the Blob
-    const url = URL.createObjectURL(blob);
+        // Use the jsPDF `html` method to convert HTML to PDF
+        doc.html(getContent, {
+          callback: (doc) => {
+            // Save the PDF with a name
+            doc.save('notes.pdf');
+          },
+          x: 10,
+          y: 10,
+        });
     
-    // Create an anchor element and trigger a download
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'saved_notes.txt'; // Name of the file to be downloaded
-    link.click();
-    
-    // Clean up the URL object
-    URL.revokeObjectURL(url);
+      } else {
+        console.error('Error:', response.status, response.statusText);
+      }
+
+    } catch (error) {
+      console.error("Error saving notes:", error);
+    }    
   };
 
   const handleSubmit = async () => {
@@ -71,7 +104,7 @@ function ResourceRecommendation() {
         headers: { Accept: "text/event-stream",         
                   'Content-Type': 'application/json', },
         body: JSON.stringify({
-          "text": newMessage, 
+          "text": new_message, 
           "previous_text": chatConvo
         }),
         onopen(res) {
@@ -190,7 +223,6 @@ function ResourceRecommendation() {
               onKeyDown={handleKeyDown}
               rows={1} // Auto-resize if needed
             />
-            <button className="voice-icon">🎤</button>
             <button className="submit-button" onClick={handleSubmit}>
               ➤
             </button>

@@ -64,11 +64,13 @@ async def upload_audio(file: UploadFile = File(...)):
 @app.post("/notes")
 async def upload_notes(item: Item):
   all_messages = [{"role": "system", "content": "You are a helpful assistant than can summarize notes into a Markdown format"}]
-  all_messages.append({"role": "user", "content": "I have the following notes: {}, can you summarize these into a pretty Markdown format? Return only the Markdown text, no need for anything else. The notes might be brief, but try to fill in the blanks, and write out a more comprehensive set of notes with details on who the client is, what the conversation is about, and the next set of goals. Also try not to use nested lists because they render weird.".format(item.text + "\n".join(['{}: {}'.format(i['role'],i['content']) for i in item.previous_text]))})
+  all_messages.append({"role": "user", "content": "I have the following notes: {}, can you summarize these into a pretty Markdown format? Return only the Markdown text, no need for anything else. The notes might be brief, but try to fill in the blanks, and write out a more comprehensive set of notes with details on who the client is, what the conversation is about, and the next set of goals. AVOID using tabs/nested lists, as they render strangely".format(item.text + "\n".join(['{}: {}'.format(i['role'],i['content']) for i in item.previous_text]))})
 
   # Get the response from the ChatGPT API
   response = call_chatgpt_api_all_chats(all_messages,stream=False)
   response = "\n".join(response.strip().split("\n")[1:-1])
+  print("Response is {}".format(response))
+  response = response.replace("-","1.")
   print("Message {}".format(response))
 
   return {"message": response}

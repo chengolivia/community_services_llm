@@ -227,7 +227,6 @@ function ResourceRecommendation() {
               onKeyDown={handleKeyDown}
               rows={1}
             />
-            <button className="voice-icon">🎤</button>
             <button className="submit-button" onClick={handleSubmit}>
               ➤
             </button>

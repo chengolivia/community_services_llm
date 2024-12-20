@@ -25,8 +25,10 @@ def analyze_resource_situation(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
+    print("All situation {}".format(situation))
+
     csv_file_path = "resources/data/all_resources.csv"
-    response = analyze_situation_rag(situation, csv_file_path, all_messages)
+    response = analyze_situation_rag(situation, csv_file_path, all_messages[-2:])
     for event in response:
         if event.choices[0].delta.content != None:
             current_response = event.choices[0].delta.content
@@ -45,6 +47,8 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
 
     print("Analyzing situation {}".format(situation))
     full_situation = "\n".join(["Message {} {}: ".format(idx+1,i['content']) for idx,i in enumerate([j for j in (all_messages+[{'role': 'user', 'content': situation}]) if j['role'] == 'user'])])
+
+    print("Full situation {}, situation {}".format(full_situation,situation))
 
     resources_df = pd.read_csv(csv_file_path)
     names = list(resources_df['service'])
@@ -78,6 +82,8 @@ def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True
     
     all_messages = [{"role": "system", "content": original_prompt}] + all_messages
     all_messages.append({"role": "user", "content": full_situation})
+
+    print("Full situation {}".format(full_situation))
 
     relevant_resources = call_chatgpt_api_all_chats(all_messages,stream=False)
     all_messages = all_messages[1:-1]

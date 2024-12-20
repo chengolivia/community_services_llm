@@ -222,7 +222,7 @@ def analyze_benefits_non_stream(situation, all_messages):
         f"The last message is {situation}"
         "Can you respond with the following: "
         "1. If the center member is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
-        "2. If the center member is not asking a question, provide a nicely formatted version of the benefits, which states which things the center member MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well."
+        "2. If the center member is not asking a question, provide a nicely formatted version of the benefits, which states which things the center member MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well. Also state what additional information might be helpful to determine eligibilities and why."
         "3. What additional information might be helpful to further help determine eligibilities"
         "4. Any next steps or links for applying for benefits. The SSI website is: https://www.ssa.gov/apply/ssi. The SSA website is: https://www.ssa.gov/apply. The medicare website is: https://www.ssa.gov/medicare/sign-up. You can apply for SSDI here: https://secure.ssa.gov/iClaim/dib. Can you state the type of documentation needed to apply as well"
         "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the center member, whom the provider is aiming to assist."
@@ -246,7 +246,12 @@ def analyze_benefits(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
-    extracted_info = call_llm_extract(situation,all_messages)
+    all_user_messages = [i for i in all_messages if i['role'] == 'user']
+    non_user_messages = [i for i in all_messages if i['role'] != 'user']
+
+    extracted_info = call_llm_extract(situation,all_user_messages+non_user_messages[-1:])
+
+    print("All user messages {}".format(all_user_messages))
 
     print("Extracted info {}".format(extracted_info))
 
@@ -271,7 +276,7 @@ def analyze_benefits(situation, all_messages):
         "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the center member, whom the provider is aiming to assist."
     )
 
-    all_messages = [{'role': 'system', 'content': system_prompt}] + all_messages
+    all_messages = [{'role': 'system', 'content': system_prompt}] + all_user_messages+non_user_messages[-1:]
     all_messages.append({'role': 'user', 'content': prompt})
 
     response = call_chatgpt_api_all_chats(all_messages)
