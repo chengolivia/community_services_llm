@@ -38,6 +38,15 @@ async def wellness_response(item: Item):
 async def resource_response(item: Item):
   return StreamingResponse(analyze_resource_situation(item.text,item.previous_text), media_type='text/event-stream')
 
+async def event_generator():
+  yield f"data: Hello\n\n"  # SSE format
+
+@app.get("/test/")
+async def test():
+    print("HERE!")
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @app.post("/upload")
 async def upload_audio(file: UploadFile = File(...)):
     print("Uploading file!")

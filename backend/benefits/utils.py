@@ -76,10 +76,14 @@ def call_chatgpt_api_all_chats(all_chats,stream=True):
         prompt: Specific promt for ChatGPT
 
     Returns: String, result from ChatGPT"""
+
+    
+
     response = openai.chat.completions.create(
         model="gpt-4o-mini",  
         messages=all_chats,
         stream=stream,
+        max_tokens=100
     )
     
     if stream:
@@ -103,3 +107,15 @@ def extract_text_from_pdf(pdf_file_path):
         for page in reader.pages:
             text += page.extract_text()
     return text
+
+
+def attempt():
+    start = time.time()
+    response = openai.chat.completions.create(
+        model=model,  
+        messages=all_chats,
+        stream=stream,
+        max_tokens=max_tokens
+    )
+    print(response.choices[0].message.content)
+    return time.time()-start

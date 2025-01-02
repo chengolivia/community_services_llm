@@ -7,6 +7,7 @@ from typing import Dict, Optional, List
 import re
 import ast
 import inspect
+import time 
 
 
 openai.api_key = key
@@ -191,6 +192,7 @@ def call_llm_extract(user_input,all_messages):
         pdf_text: Information from the PDF, as text
         
     Returns: Response, which is the extracted information"""
+    start = time.time()
     system_prompt = open("benefits/prompts/system_prompt_extract.txt").read()
 
     full_situation = "\n".join(["Message {} {}: ".format(idx+1,i['content']) for idx,i in enumerate([j for j in (all_messages+[{'role': 'user', 'content': user_input}]) if j['role'] == 'user'])])
@@ -199,8 +201,9 @@ def call_llm_extract(user_input,all_messages):
 
     new_messages = [{'role': 'system', 'content': system_prompt}] + all_messages
     new_messages.append({'role': 'user', 'content': prompt})
-
+    print("Pre-GPT {}".format(time.time()-start))
     extracted_info = call_chatgpt_api_all_chats(new_messages,stream=False).strip()
+    print("GPT {}".format)
     return extracted_info
 
 def analyze_benefits_non_stream(situation, all_messages):
@@ -246,14 +249,15 @@ def analyze_benefits(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
+    start = time.time()
     all_user_messages = [i for i in all_messages if i['role'] == 'user']
     non_user_messages = [i for i in all_messages if i['role'] != 'user']
+    print("Total time before 1st call {}".format(time.time()-start))
 
     extracted_info = call_llm_extract(situation,all_user_messages+non_user_messages[-1:])
-
-    print("All user messages {}".format(all_user_messages))
-
-    print("Extracted info {}".format(extracted_info))
+    
+    print("Total length {}".format(len(situation) + sum([len(i['content']) for i in all_user_messages+non_user_messages])))
+    print("Total time after 1st call {}".format(time.time()-start))
 
     pattern = r"\[Situation\](.*?)\[/Situation\]"
     eligibility_info = re.sub(
@@ -263,7 +267,6 @@ def analyze_benefits(situation, all_messages):
         flags=re.DOTALL
     )
 
-    print("Eligibility info {}".format(eligibility_info))
 
     prompt = (
         f"The center member is eligible for the following benefits {eligibility_info}"
@@ -278,12 +281,22 @@ def analyze_benefits(situation, all_messages):
 
     all_messages = [{'role': 'system', 'content': system_prompt}] + all_user_messages+non_user_messages[-1:]
     all_messages.append({'role': 'user', 'content': prompt})
+    print("Total time before 2nd call {}".format(time.time()-start))
 
-    response = call_chatgpt_api_all_chats(all_messages)
-    all_messages = all_messages[1:-1]
+    # TODO: Comment this out this
+    all_messages = all_messages[:1]
 
-    for event in response:
-        if event.choices[0].delta.content != None:
-            current_response = event.choices[0].delta.content
-            current_response = current_response.replace("\n","<br/>")
-            yield "data: " + current_response + "\n\n"
+    response = call_chatgpt_api_all_chats(all_messages,stream=False)
+    # TODO: Uncomment this
+    # all_messages = all_messages[1:-1]
+
+    yield "data: "+response+"\n\n"
+
+    print("Total time {}".format(time.time()-start))
+
+    # for event in response:
+    #     if event.choices[0].delta.content != None:
+    #         current_response = event.choices[0].delta.content
+    #         current_response = current_response.replace("\n","<br/>")
+    #         print("Event generation took {}".format(time.time()-start))
+    #         yield "data: " + current_response + "\n\n"

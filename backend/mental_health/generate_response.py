@@ -5,10 +5,16 @@ from resources.generate_response import analyze_situation_rag
 from benefits.generate_response import analyze_benefits_non_stream
 import concurrent.futures
 import re
+import time 
+import asyncio 
 
 openai.api_key = key
 
 system_prompt = open("mental_health/prompts/system_prompt.txt").read()
+mental_health_system_prompt = open("mental_health/prompts/mental_health_prompt.txt").read()
+question_prompt = open("mental_health/prompts/question_prompts.txt").read()
+summary_prompt = open("mental_health/prompts/summary_prompt.txt").read()
+resource_prompt = open("mental_health/prompts/resource_prompt.txt").read()
 
 def create_basic_prompt(situation):
     """Format a prompt based on a situation and a list of hotlines
@@ -23,6 +29,12 @@ def create_basic_prompt(situation):
     prompt = open("mental_health/prompts/mental_health_prompt.txt").read().format(situation)
     return prompt
 
+def run_chatgpt(situation):
+    if type(situation) == type(""):
+        return analyze_situation_rag(situation,stream=False)
+    else:
+        return call_chatgpt_api_all_chats(situation,stream=False)
+
 def analyze_mental_health_situation(situation, all_messages):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt
@@ -33,35 +45,41 @@ def analyze_mental_health_situation(situation, all_messages):
         
     Returns: A string, the response from ChatGPT"""
 
-    prompt = create_basic_prompt(situation)   
-    all_messages.append({"role": "user", "content": prompt})
+    start = time.time() 
 
-    total_length = sum([len(i['content']) for i in all_messages])
-    print("Initial call to ChatGPT, with {} prompt".format(total_length))
-    response = call_chatgpt_api_all_chats(all_messages,stream=False)
-    all_messages.pop() 
+    all_message_list = []
 
-    csv_file_path = "resources/data/all_resources.csv"
+
+    all_message_list = [[{'role': 'system', 'content': mental_health_system_prompt}]+all_messages+[{"role": "user", "content": situation}]]
+    all_message_list.append([{'role': 'system', 'content': question_prompt}]+all_messages+[{"role": "user", "content": situation}])
+    all_message_list.append([{'role': 'system', 'content': resource_prompt}]+all_messages+[{"role": "user", "content": situation}])
+    print("Code before GPT took {}".format(time.time()-start))
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
+
+    responses = list(responses)
+    print("First GPT call took {}".format(time.time()-start))
+
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
-    # Replace the matched content with the transformed version
-    print("Raw response {}".format(response))
+    matches = re.findall(pattern,str(responses[2]),flags=re.DOTALL)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        resources = list(executor.map(run_chatgpt, matches))
+    print("Second GPT call took {}".format(time.time()-start))
 
-    def parallel_sub(text,pattern,f):
-        matches = re.findall(pattern,text,flags=re.DOTALL)
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-                results = list(executor.map(f, matches))
-        for i in range(len(results)):
-                text = text.replace(matches[i],results[i])
-        return text
+    response = "\n".join(["SMART Goals: {}".format(responses[0]),
+                          "Questions: {}".format(responses[1]),
+                          "Resources: {}".format(resources)])
+    
+    print("Response {}".format(response))
 
-    response = parallel_sub(response,pattern,lambda m: analyze_situation_rag(m,csv_file_path,[],stream=False))
-    response = response.replace("[Resource]","").replace("[/Resource]","")
+    new_message = [{'role': 'system', 'content': summary_prompt}]+all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
+    response = call_chatgpt_api_all_chats(new_message,stream=True)
     
-    pattern = r"\[Benefit\](.*?)\[/Benefit\]"
-    # Replace the matched content with the transformed version
-    response = re.sub(pattern, lambda m: analyze_benefits_non_stream(m.group().replace("[Benefit]","").replace("[/Benefit]",""),[]), response,flags=re.DOTALL)
-
+    for event in response:
+        if event.choices[0].delta.content != None:
+            current_response = event.choices[0].delta.content
+            current_response = current_response.replace("\n","<br/>")
+            yield "data: " + current_response + "\n\n"
     
-    response = response.replace("\n","<br/>")
-    
-    yield "data: " + response + "\n\n"
+    print("Took {} time".format(time.time()-start))

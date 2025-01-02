@@ -40,6 +40,9 @@ def write_text_pdf(text,pdf_loc):
     pdf.multi_cell(0, 10, text)
     pdf.output(pdf_loc)
 
+async def event_generator():
+  yield f"data: Hello\n\n"  # SSE format
+
 
 def call_chatgpt_api(system_prompt,prompt,stream=True):
     """Run ChatGPT with the 4o-mini model for a system prompt
@@ -62,9 +65,11 @@ def call_chatgpt_api(system_prompt,prompt,stream=True):
     )
     
     if stream:
-        return response
+        return event_generator()
+        # return response
     else:
-        return response.choices[0].message.content
+        return "Hello"
+        # return response.choices[0].message.content
 
 
 def call_chatgpt_api_all_chats(all_chats,stream=True):
@@ -80,6 +85,7 @@ def call_chatgpt_api_all_chats(all_chats,stream=True):
         model="gpt-4o-mini",  
         messages=all_chats,
         stream=stream,
+        max_tokens=250,
     )
     
     if stream:
