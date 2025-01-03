@@ -253,29 +253,6 @@ function ResourceRecommendation() {
           </div>
         </div>
       </div>
-
-
-     
-      <div className="right-section">
-        <div className="tab-content">
-          <h2>Notes</h2>
-          <textarea
-              className="notes-bar"
-              placeholder={
-                'Any notes during conversation'
-              }
-              value={notesText}
-              onChange={handleNotesChange}
-              rows={100}
-            />  
-        </div>
-        <div className="notes-box">
-          <button className="voice-icon" onClick={clickMike}>
-              {isRecording ? "⏹️": "🎤"}
-          </button>
-          <button className="submit-button" onClick={handleSave}>💾</button>
-        </div>
-      </div>
     </div>
   );
 }

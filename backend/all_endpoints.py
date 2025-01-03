@@ -11,6 +11,9 @@ from benefits.utils import call_chatgpt_api_all_chats
 from openai import OpenAI
 import os
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = '1'
+
 app = FastAPI()
 
 app.add_middleware(
