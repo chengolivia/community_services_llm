@@ -58,4 +58,3 @@ Output:
         }}
     [/Situation]
     What benefits is the center member eliglbe for? 
-Here is the user input: {}. 

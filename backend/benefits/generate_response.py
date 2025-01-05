@@ -14,7 +14,7 @@ openai.api_key = key
 
 system_prompt = open("benefits/prompts/system_prompt.txt").read()
 
-def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
+def eligibility_check(user_info: Dict[str, Optional[int]]) -> str:
     """
     Determines eligibility for various government benefits based on user information.
     Returns a formatted string with eligibility results and explanations.
@@ -75,25 +75,6 @@ def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
             "specific_condition": {"constraint": lambda condition: condition in ['terminal_illness', 'serious_condition'], "weight": 0.3, "description": "Eligible if diagnosed with a terminal or serious condition"}
         }
     }
-
-    # TODO: Other Benefit Programs
-    # Medicaid
-    # TANF (WFNJ)
-        # Depends on parole status, income/total resources, and looking for work
-    # SNAP (EBT/Food Stamps)
-        # Depends on household size, income, whether they're in college
-        # Different requirements for 60+
-        # Work requirements
-    # Section 8
-        # Depends on the household size + county
-        # Informally, also depends on the number of people on the waitlist
-        # But this is private information? 
-        # Also everything depends on criminal history probably
-    # LIHEAP? 
-        # 60% of income
-        # 2+% for gas or 2+% for electricity
-        # or 4+% for gas+electricity 
-    # Add in amount of benefit
 
     def categorize_eligibility(score: float) -> str:
         if score >= 90:
@@ -173,16 +154,7 @@ def eligibility_check(situation,user_info: Dict[str, Optional[int]]) -> str:
         results.append(temp_result)
     outputs = [generate_output(r) for r in results]
 
-    if len(outputs) > 1:
-        prompt = open("benefits/prompts/comparison_prompt.txt").read() 
-        prompt += "\nHere is the original request: {}".format(situation)
-        for i in range(len(outputs)):
-            prompt += str("\nOption {}\n{}".format(i+1,outputs[i]))
-            outputs[i] = "Situation {}\n{}".format(i+1,outputs[i])
-        comparison_string = call_chatgpt_api("You are a helpful assistant than can help compare benefits.",prompt,stream=False).strip()
-        outputs = [comparison_string]+outputs
-
-    return "\n".join(outputs)
+    return str(user_info) + "\n" + "\n".join(outputs)
 
 def call_llm_extract(user_input,all_messages):
     """Extract information from a user's input
@@ -218,7 +190,7 @@ def analyze_benefits_non_stream(situation, all_messages):
 
     extracted_info = call_llm_extract(situation,all_messages)
 
-    eligibility_info = eligibility_check(situation,extracted_info)
+    eligibility_info = eligibility_check(extracted_info)
 
     prompt = (
         f"The center member is eligible for the following benefits {eligibility_info}"
@@ -264,15 +236,10 @@ def analyze_benefits(situation, all_messages,model):
                 yield "data: " + current_response + "\n\n"
         return 
 
-    start = time.time()
-    all_user_messages = [i for i in all_messages if i['role'] == 'user']
-    non_user_messages = [i for i in all_messages if i['role'] != 'user']
-    print("Total time before 1st call {}".format(time.time()-start))
+    extracted_info = call_llm_extract(situation,all_messages)
 
-    extracted_info = call_llm_extract(situation,all_user_messages+non_user_messages[-1:])
-    
-    print("Total length {}".format(len(situation) + sum([len(i['content']) for i in all_user_messages+non_user_messages])))
-    print("Total time after 1st call {}".format(time.time()-start))
+    print("The extracted info is {}".format(extracted_info))
+
 
     pattern = r"\[Situation\](.*?)\[/Situation\]"
     eligibility_info = re.sub(
@@ -282,36 +249,15 @@ def analyze_benefits(situation, all_messages,model):
         flags=re.DOTALL
     )
 
+    print("The client is eligible for {}".format(eligibility_check))
 
-    prompt = (
-        f"The center member is eligible for the following benefits {eligibility_info}"
-        f"The last message is {situation}"
-        "Can you respond with the following: "
-        "1. If the center member is asking a question in the last message, please only answer the question; no need to state the benefit eligibilities"
-        "2. If the center member is not asking a question, provide a nicely formatted version of the benefits, which states which things the center member MAY be eligible for, which things they're not, etc. and why not. Sort this from most likely eligible to least, and provide explanations as well. Make sure you address all four benefits (SSA, SSDI, Medicare, and SSI)"
-        "3. What additional information might be helpful to further help determine eligibilities"
-        "4. Any next steps or links for applying for benefits. The SSI website is: https://www.ssa.gov/apply/ssi. The SSA website is: https://www.ssa.gov/apply. The medicare website is: https://www.ssa.gov/medicare/sign-up. You can apply for SSDI here: https://secure.ssa.gov/iClaim/dib. Can you state the type of documentation needed to apply as well"
-        "Make sure you're conversational and as collegial as possible; note that all benefit programs should be addressed toward the center member, whom the provider is aiming to assist."
-    )
+    constructed_messages = [{'role': 'system', 'content': system_prompt}] + all_messages
+    constructed_messages.append({'role': 'user', 'content': 'Eligible Benefits: {}'.format(eligibility_info)})
 
-    all_messages = [{'role': 'system', 'content': system_prompt}] + all_user_messages+non_user_messages[-1:]
-    all_messages.append({'role': 'user', 'content': prompt})
-    print("Total time before 2nd call {}".format(time.time()-start))
-
-    # TODO: Comment this out this
-    all_messages = all_messages[:1]
-
-    response = call_chatgpt_api_all_chats(all_messages,stream=False)
-    # TODO: Uncomment this
-    # all_messages = all_messages[1:-1]
-
-    yield "data: "+response+"\n\n"
-
-    print("Total time {}".format(time.time()-start))
-
-    # for event in response:
-    #     if event.choices[0].delta.content != None:
-    #         current_response = event.choices[0].delta.content
-    #         current_response = current_response.replace("\n","<br/>")
-    #         print("Event generation took {}".format(time.time()-start))
-    #         yield "data: " + current_response + "\n\n"
+    response = call_chatgpt_api_all_chats(constructed_messages,stream=True,max_tokens=500)
+ 
+    for event in response:
+        if event.choices[0].delta.content != None:
+            current_response = event.choices[0].delta.content
+            current_response = current_response.replace("\n","<br/>")
+            yield "data: " + current_response + "\n\n"

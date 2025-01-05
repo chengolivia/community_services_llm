@@ -14,6 +14,7 @@ openai.api_key = key
 system_prompt = open("mental_health/prompts/system_prompt.txt").read()
 mental_health_system_prompt = open("mental_health/prompts/mental_health_prompt.txt").read()
 question_prompt = open("mental_health/prompts/question_prompts.txt").read()
+benefit_prompt = open("benefits/prompts/uncertain_prompt.txt").read()
 summary_prompt = open("mental_health/prompts/summary_prompt.txt").read()
 resource_prompt = open("mental_health/prompts/resource_prompt.txt").read()
 which_resource_prompt = open("mental_health/prompts/which_resource.txt").read()
@@ -54,6 +55,7 @@ def analyze_mental_health_situation(situation, all_messages,model):
     all_message_list.append([{'role': 'system', 'content': question_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': resource_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': which_resource_prompt}]+[{'role': 'user', 'content': i['content'][:1000]} for i in all_messages if i['role'] == 'user']+[{"role": "user", "content": situation}])
+    all_message_list.append([{'role': 'system', 'content': benefit_prompt}]+all_messages+[{"role": "user", "content": situation}])
 
     print("Code before GPT took {}".format(time.time()-start))
 
