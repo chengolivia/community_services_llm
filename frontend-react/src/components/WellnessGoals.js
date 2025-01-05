@@ -1,27 +1,21 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { useRef, useContext } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
-import { jsPDF } from 'jspdf';
-import { marked } from 'marked';
 import {WellnessContext} from './AppStateContextProvider.js';
 
-function ResourceRecommendation() {
+function WellnessGoals() {
   const {
-    isRecording, setIsRecording,
-    mediaRecorder, setMediaRecorder,
-    notesText, setNotesText,
     inputText, setInputText,
     modelSelect, setModel,
+    inputLocationText, setInputLocationText,
     newMessage, setNewMessage,
     conversation, setConversation,
-    submitted, setSubmitted,
-    activeTab, setActiveTab,
-    wellnessgoals, setWellnessGoals,
-    chatConvo, setChatConvo, // Function to add messages to the conversation
+    submitted,
+    chatConvo, setChatConvo, 
     resetContext
   } = useContext(WellnessContext);
-  const latestMessageRef = useRef(null);
+  const latestMessageRef = useRef(newMessage);
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
@@ -31,76 +25,23 @@ function ResourceRecommendation() {
     setModel(e.target.value);
   };
 
-  const handleNotesChange = (e) => {
-    setNotesText(e.target.value);
-  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
+      e.preventDefault(); // Prevent new line
+      handleSubmit(); // Submit input
     }
   };
-
-  const handleSave = async () => {
-    const baseUrl = `http://${window.location.hostname}:8000/notes/`;
-    try {
-      const response = await fetch(baseUrl, {
-        method: "POST",
-        headers: {
-          Accept: "text/event-stream",
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          "text": notesText, 
-          "previous_text": chatConvo,
-        })
-      });
-      
-      if (response.ok) {
-        // If the response is successful (status 200-299)
-        const responseData = await response.json(); // or response.text() if you're expecting plain text
-        console.log(responseData.message); // Log the actual response data
-        const htmlContent = marked(responseData.message);
-
-        // Create a new jsPDF instance
-        const doc = new jsPDF('p', 'pt', 'a4');
-        var getContent = "<div style='font-size:11px; border:1px solid; background-color: rgb(239 240 240); padding: 05px 15px; width:300px;'>"+htmlContent+"</div>";
-
-        console.log("HTML")
-        console.log(getContent)
-    
-        // Use the jsPDF `html` method to convert HTML to PDF
-        doc.html(getContent, {
-          callback: (doc) => {
-            // Save the PDF with a name
-            doc.save('notes.pdf');
-          },
-          x: 10,
-          y: 10,
-        });
-    
-      } else {
-        console.error('Error:', response.status, response.statusText);
-      }
-
-    } catch (error) {
-      console.error("Error saving notes:", error);
-    }    
-  };
-
-  useEffect(() => {
-    latestMessageRef.current = newMessage;
-  }, [newMessage])
 
   const handleNewSession = async () => {
     resetContext();
   }
 
+
   const handleSubmit = async () => {
     if (inputText.trim()) {
       // Add user message to the conversation
-      const new_message = "Client: "+inputText.trim()+", Notes: "+notesText.trim();
+      const new_message = inputText.trim();
       const userMessage = { sender: 'user', text: inputText.trim()};
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
@@ -159,58 +100,6 @@ function ResourceRecommendation() {
     }
   };
 
-  const clickMike = async () => {
-    if (!isRecording) {
-      // Start recording
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
-
-        const chunks = [];
-        recorder.ondataavailable = (event) => {
-          chunks.push(event.data);
-        };
-
-        recorder.onstop = async () => {
-          // Create an audio blob when recording stops
-          const audioBlob = new Blob(chunks, { type: "audio/mp3" });
-          console.log("Recording stopped, audio blob created.");
-
-          // Automatically upload the audio
-          await uploadAudio(audioBlob);
-        };
-
-        recorder.start();
-        setMediaRecorder(recorder);
-        setIsRecording(true);
-      } catch (error) {
-        console.error("Error accessing microphone:", error);
-      }
-    } else {
-      // Stop recording
-      mediaRecorder.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const uploadAudio = async (audioBlob) => {
-    const formData = new FormData();
-    formData.append("file", audioBlob, "recording.mp3");
-
-    try {
-      const response = await fetch("http://localhost:8000/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-      setNotesText(notesText+"\n"+result.message)
-    } catch (error) {
-      console.error("Error uploading file:", error);
-    }
-  };
-
-
   return (
       <div className="resource-recommendation-container">
         {/* Left Section */}
@@ -262,4 +151,4 @@ function ResourceRecommendation() {
   );
 }
 
-export default ResourceRecommendation;
+export default WellnessGoals;
