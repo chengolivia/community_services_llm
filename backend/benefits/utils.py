@@ -83,7 +83,7 @@ def call_chatgpt_api_all_chats(all_chats,stream=True):
         model="gpt-4o-mini",  
         messages=all_chats,
         stream=stream,
-        max_tokens=100
+        max_tokens=250
     )
     
     if stream:

@@ -239,7 +239,7 @@ def analyze_benefits_non_stream(situation, all_messages):
 
     return response
 
-def analyze_benefits(situation, all_messages):
+def analyze_benefits(situation, all_messages,model):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt
     
@@ -248,6 +248,21 @@ def analyze_benefits(situation, all_messages):
         csv_file_path: Location with the database
         
     Returns: A string, the response from ChatGPT"""
+
+    if model == 'chatgpt':
+        print("Using ChatGPT")
+        all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide information on benefit eligibility'}] + all_messages + [{'role': 'user', 'content': situation}]
+        # Add a sleep time, so the time taken doesn't bias responses
+        time.sleep(4)
+
+        response = call_chatgpt_api_all_chats(all_message_list)
+
+        for event in response:
+            if event.choices[0].delta.content != None:
+                current_response = event.choices[0].delta.content
+                current_response = current_response.replace("\n","<br/>")
+                yield "data: " + current_response + "\n\n"
+        return 
 
     start = time.time()
     all_user_messages = [i for i in all_messages if i['role'] == 'user']

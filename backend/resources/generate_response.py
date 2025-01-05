@@ -9,7 +9,7 @@ import faiss
 import os 
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
+import time 
 
 openai.api_key = key
 csv_file_path = "resources/data/all_resources.csv"
@@ -45,7 +45,7 @@ index = faiss.IndexFlatL2(dimension)  # L2 distance (cosine similarity can be us
 index.add(embeddings)
 
 
-def analyze_resource_situation(situation, all_messages):
+def analyze_resource_situation(situation, all_messages,model):
     """Given a situation and a CSV, get the information from the CSV file
     Then create a prompt
     
@@ -54,6 +54,23 @@ def analyze_resource_situation(situation, all_messages):
         csv_file_path: Location with the database
         
     Returns: A string, the response from ChatGPT"""
+
+    if model == 'chatgpt':
+        print("Using ChatGPT")
+        all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
+        # Add a sleep time, so the time taken doesn't bias responses
+        time.sleep(4)
+
+        response = call_chatgpt_api_all_chats(all_message_list)
+
+        for event in response:
+            if event.choices[0].delta.content != None:
+                current_response = event.choices[0].delta.content
+                current_response = current_response.replace("\n","<br/>")
+                yield "data: " + current_response + "\n\n"
+        return 
+
+
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
     print("Full situation {}".format(full_situation))

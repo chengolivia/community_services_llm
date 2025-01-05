@@ -28,26 +28,19 @@ app.add_middleware(
 class Item(BaseModel):
     text: str
     previous_text: list
+    model: str
 
 @app.post("/benefit_response/")
 async def benefit_response(item: Item):
-  return StreamingResponse(analyze_benefits(item.text,item.previous_text), media_type='text/event-stream')
+  return StreamingResponse(analyze_benefits(item.text,item.previous_text,item.model), media_type='text/event-stream')
 
 @app.post("/wellness_response/")
 async def wellness_response(item: Item):
-  return StreamingResponse(analyze_mental_health_situation(item.text,item.previous_text), media_type='text/event-stream')
+  return StreamingResponse(analyze_mental_health_situation(item.text,item.previous_text,item.model), media_type='text/event-stream')
 
 @app.post("/resource_response/")
 async def resource_response(item: Item):
-  return StreamingResponse(analyze_resource_situation(item.text,item.previous_text), media_type='text/event-stream')
-
-async def event_generator():
-  yield f"data: Hello\n\n"  # SSE format
-
-@app.get("/test/")
-async def test():
-    print("HERE!")
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+  return StreamingResponse(analyze_resource_situation(item.text,item.previous_text,item.model), media_type='text/event-stream')
 
 
 @app.post("/upload")

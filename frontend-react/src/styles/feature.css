@@ -73,6 +73,7 @@
 /* Input box styling */
 .input-box {
   display: flex;
+  float: left;
   align-items: flex-start; /* Allow multi-line input */
   width: calc(100% - 100px); /* Dynamically adjust based on left section */
   max-width: 700px; /* Restrict maximum width */
@@ -189,4 +190,17 @@
 
 .resource-item:last-child {
   border-bottom: none;
+}
+
+.backend-selector-div {
+  display: flex;
+  height: 100%;
+  padding-left: 20px;
+  border-radius: 5px;
+  text-align-last: center;
+}
+
+.backend-select {
+  border-radius: 5px;
+  font-family: Arial, sans-serif;
 }

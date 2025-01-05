@@ -10,6 +10,7 @@ function ResourceRecommendation() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [notesText, setNotesText] = useState('');
   const [inputText, setInputText] = useState('');
+  const [modelSelect,setModel] = useState('copilot'); 
   const [inputLocationText, setInputLocationText] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [conversation, setConversation] = useState([]);
@@ -23,9 +24,10 @@ function ResourceRecommendation() {
     setInputText(e.target.value);
   };
 
-  const handleNotesChange = (e) => {
-    setNotesText(e.target.value);
+  const handleModelChange = (e) => {
+    setModel(e.target.value);
   };
+
 
   const handleInputChangeLocation = (e) => {
     setInputLocationText(e.target.value)
@@ -118,7 +120,8 @@ function ResourceRecommendation() {
                   'Content-Type': 'application/json', },
         body: JSON.stringify({
           "text": new_message, 
-          "previous_text": chatConvo
+          "previous_text": chatConvo, 
+          'model': modelSelect, 
         }),
         onopen(res) {
           if (res.status >= 400 && res.status < 500 && res.status !== 429) {
@@ -251,6 +254,12 @@ function ResourceRecommendation() {
               ➤
             </button>
           </div>
+          <div className="backend-selector-div" style={{'height': '50%'}}> 
+            <select onChange={handleModelChange} value={modelSelect} name="model" id="model" className="backend-select">
+                <option value="copilot">Co-Pilot</option>
+                <option value="chatgpt">ChatGPT</option>
+              </select>
+          </div> 
         </div>
       </div>
     </div>
