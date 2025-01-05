@@ -1,23 +1,27 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import axios from 'axios';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
 import { jsPDF } from 'jspdf';
 import { marked } from 'marked';
+import {BenefitContext} from './AppStateContextProvider.js';
 
 function ResourceRecommendation() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [notesText, setNotesText] = useState('');
-  const [inputText, setInputText] = useState('');
-  const [modelSelect,setModel] = useState('copilot'); 
-  const [newMessage, setNewMessage] = useState('');
-  const [conversation, setConversation] = useState([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [activeTab, setActiveTab] = useState('wellnessgoals');
-  const [benefits, setbenefits] = useState([]);
-  const [chatConvo, setchatConvo] = useState([]);
+  const {
+    isRecording, setIsRecording,
+    mediaRecorder, setMediaRecorder,
+    notesText, setNotesText,
+    inputText, setInputText,
+    modelSelect, setModel,
+    newMessage, setNewMessage,
+    conversation, setConversation,
+    submitted, setSubmitted,
+    activeTab, setActiveTab,
+    benefits, setbenefits,
+    chatConvo, setchatConvo, 
+    resetContext
+  } = useContext(BenefitContext);
   const latestMessageRef = useRef(newMessage);
 
   const handleInputChange = (e) => {
@@ -35,6 +39,10 @@ function ResourceRecommendation() {
       handleSubmit(); // Submit input
     }
   };
+
+  const handleNewSession = async () => {
+    resetContext();
+  }
 
   const handleSave = async () => {
     const baseUrl = `http://${window.location.hostname}:8000/notes/`;
@@ -235,6 +243,10 @@ function ResourceRecommendation() {
                 <option value="copilot">Co-Pilot</option>
                 <option value="chatgpt">ChatGPT</option>
               </select>
+              <button className="submit-button" style={{width: '100px', 'height': '100%', 'marginLeft': '20px'}} onClick={handleNewSession}>
+                Reset Session
+              </button>
+
           </div> 
         </div>
       </div>

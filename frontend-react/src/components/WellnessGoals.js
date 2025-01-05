@@ -1,24 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
 import { jsPDF } from 'jspdf';
 import { marked } from 'marked';
+import {WellnessContext} from './AppStateContextProvider.js';
 
 function ResourceRecommendation() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [notesText, setNotesText] = useState('');
-  const [inputText, setInputText] = useState('');
-  const [modelSelect,setModel] = useState('copilot')
-  const [newMessage, setNewMessage] = useState('');
-  const [conversation, setConversation] = useState([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [activeTab, setActiveTab] = useState('wellnessgoals');
-  const [wellnessgoals, setwellnessgoals] = useState([]);
-  const [chatConvo, setchatConvo] = useState([]);
-  const latestMessageRef = useRef(newMessage);
-  
+  const {
+    isRecording, setIsRecording,
+    mediaRecorder, setMediaRecorder,
+    notesText, setNotesText,
+    inputText, setInputText,
+    modelSelect, setModel,
+    newMessage, setNewMessage,
+    conversation, setConversation,
+    submitted, setSubmitted,
+    activeTab, setActiveTab,
+    wellnessgoals, setWellnessGoals,
+    chatConvo, setChatConvo, // Function to add messages to the conversation
+    resetContext
+  } = useContext(WellnessContext);
+  const latestMessageRef = useRef(null);
+
   const handleInputChange = (e) => {
     setInputText(e.target.value);
   };
@@ -89,6 +93,10 @@ function ResourceRecommendation() {
     latestMessageRef.current = newMessage;
   }, [newMessage])
 
+  const handleNewSession = async () => {
+    resetContext();
+  }
+
   const handleSubmit = async () => {
     if (inputText.trim()) {
       // Add user message to the conversation
@@ -96,7 +104,7 @@ function ResourceRecommendation() {
       const userMessage = { sender: 'user', text: inputText.trim()};
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
-      setchatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
+      setChatConvo((prev) => [...prev,{'role': 'user','content': inputText.trim()}])
       setNewMessage("");
       
       
@@ -141,7 +149,7 @@ function ResourceRecommendation() {
         
         },
         onclose() {
-          setchatConvo((prev) => [...prev,{'role': 'system','content': latestMessageRef.current}])
+          setChatConvo((prev) => [...prev,{'role': 'system','content': latestMessageRef.current}])
         },
         onerror(err) {
           console.log("There was an error from server", err);
@@ -204,48 +212,53 @@ function ResourceRecommendation() {
 
 
   return (
-    <div className="resource-recommendation-container">
-      {/* Left Section */}
-      <div className={`left-section ${submitted ? 'submitted' : ''}`}>
-        <h1 className="page-title">Wellness Goals</h1>
-        <h2 className="instruction">
-          What is your client’s needs and goals for today’s meeting?
-        </h2>
-        <div className={`conversation-thread ${submitted ? 'visible' : ''}`}>
-          {conversation.map((msg, index) => (
-            <div
-              key={index}
-              className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}
-            >
-              <ReactMarkdown children={msg.text} />
-            </div>
-          ))}
-        </div>
-        <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
-          <div className="input-box">
-            <textarea
-              className="input-bar"
-              placeholder={
-                submitted ? 'Write a follow-up to update...' : 'Describe your client’s situation...'
-              }
-              value={inputText}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              rows={1}
-            />
-            <button className="submit-button" onClick={handleSubmit}>
-              ➤
-            </button>
+      <div className="resource-recommendation-container">
+        {/* Left Section */}
+        <div className={`left-section ${submitted ? 'submitted' : ''}`}>
+          <h1 className="page-title">Wellness Goals</h1>
+          <h2 className="instruction">
+            What is your client’s needs and goals for today’s meeting?
+          </h2>
+          <div className={`conversation-thread ${submitted ? 'visible' : ''}`}>
+            {conversation.map((msg, index) => (
+              <div
+                key={index}
+                className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}
+              >
+                <ReactMarkdown children={msg.text} />
+              </div>
+            ))}
           </div>
-          <div className="backend-selector-div"> 
-            <select onChange={handleModelChange} value={modelSelect} name="model" id="model" className="backend-select">
-                <option value="copilot">Co-Pilot</option>
-                <option value="chatgpt">ChatGPT</option>
-              </select>
-          </div> 
+          <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
+            <div className="input-box">
+              <textarea
+                className="input-bar"
+                placeholder={
+                  submitted ? 'Write a follow-up to update...' : 'Describe your client’s situation...'
+                }
+                value={inputText}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                rows={1}
+              />
+              <button className="submit-button" onClick={handleSubmit}>
+                ➤
+              </button>
+            </div>
+            <div className="backend-selector-div"> 
+              <select onChange={handleModelChange} value={modelSelect} name="model" id="model" className="backend-select">
+                  <option value="copilot">Co-Pilot</option>
+                  <option value="chatgpt">ChatGPT</option>
+                </select>
+              
+              <button className="submit-button" style={{width: '100px', 'height': '100%', 'marginLeft': '20px'}} onClick={handleNewSession}>
+                Reset Session
+              </button>
+
+            </div> 
+          </div>
         </div>
       </div>
-    </div>
   );
 }
 

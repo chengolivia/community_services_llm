@@ -1,23 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
 import { jsPDF } from 'jspdf';
 import { marked } from 'marked';
+import {ResourceContext} from './AppStateContextProvider.js';
 
 function ResourceRecommendation() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [notesText, setNotesText] = useState('');
-  const [inputText, setInputText] = useState('');
-  const [modelSelect,setModel] = useState('copilot'); 
-  const [inputLocationText, setInputLocationText] = useState('');
-  const [newMessage, setNewMessage] = useState('');
-  const [conversation, setConversation] = useState([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [activeTab, setActiveTab] = useState('wellnessgoals');
-  const [resources, setResources] = useState([]);
-  const [chatConvo, setchatConvo] = useState([]);
+  const {
+    isRecording, setIsRecording,
+    mediaRecorder, setMediaRecorder,
+    notesText, setNotesText,
+    inputText, setInputText,
+    modelSelect, setModel,
+    inputLocationText, setInputLocationText,
+    newMessage, setNewMessage,
+    conversation, setConversation,
+    submitted, setSubmitted,
+    activeTab, setActiveTab,
+    resources, setResources,
+    chatConvo, setchatConvo, 
+    resetContext
+  } = useContext(ResourceContext);
+
   const latestMessageRef = useRef(newMessage);
 
   const handleInputChange = (e) => {
@@ -31,6 +36,10 @@ function ResourceRecommendation() {
 
   const handleInputChangeLocation = (e) => {
     setInputLocationText(e.target.value)
+  }
+
+  const handleNewSession = async () => {
+    resetContext();
   }
 
   const handleSave = async () => {
@@ -259,6 +268,10 @@ function ResourceRecommendation() {
                 <option value="copilot">Co-Pilot</option>
                 <option value="chatgpt">ChatGPT</option>
               </select>
+              <button className="submit-button" style={{width: '100px', 'height': '100%', 'marginLeft': '20px'}} onClick={handleNewSession}>
+                Reset Session
+              </button>
+
           </div> 
         </div>
       </div>
