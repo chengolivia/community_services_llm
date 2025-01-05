@@ -1,7 +1,7 @@
 import openai 
 from mental_health.utils import call_chatgpt_api_all_chats
 from mental_health.secret import naveen_key as key 
-from resources.generate_response import analyze_situation_rag
+from resources.generate_response import analyze_situation_rag, analyze_situation_rag_guidance
 from benefits.generate_response import analyze_benefits_non_stream
 import concurrent.futures
 import re
@@ -21,7 +21,6 @@ which_resource_prompt = open("mental_health/prompts/which_resource.txt").read()
 external_resources = {}
 for i in ['human_resource','peer','crisis','trans']:
     external_resources[i] = open("mental_health/prompts/resources/{}.txt".format(i)).read()
-
 
 def analyze_mental_health_situation(situation, all_messages,model):
     """Given a situation and a CSV, get the information from the CSV file
@@ -51,7 +50,6 @@ def analyze_mental_health_situation(situation, all_messages,model):
 
     all_message_list = []
 
-
     all_message_list = [[{'role': 'system', 'content': mental_health_system_prompt}]+all_messages+[{"role": "user", "content": situation}]]
     all_message_list.append([{'role': 'system', 'content': question_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': resource_prompt}]+all_messages+[{"role": "user", "content": situation}])
@@ -68,17 +66,22 @@ def analyze_mental_health_situation(situation, all_messages,model):
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(responses[2]),flags=re.DOTALL)
 
+    print("Matches are {}".format(matches))
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         resources = list(executor.map(lambda s: analyze_situation_rag(s,stream=False), matches))
 
     resources = "\n\n\n".join(resources)
 
-    print("Second GPT call took {}".format(time.time()-start))
+    print("RAG call took {}".format(time.time()-start))
 
     response = "\n".join(["SMART Goals: {}\n\n\n".format(responses[0]),
                           "Questions: {}\n\n\n".format(responses[1]),
                           "Resources (use only these resources): {}".format(resources)])
-    
+
+    print("SMART Goals {}, Questions {}, Resources {}".format(len(responses[0]),len(responses[1]),len(resources)))
+    print("Response length {}".format(len(response)))
+
     try:
         which_resources = json.loads(responses[3].strip()) 
     except:
@@ -86,15 +89,14 @@ def analyze_mental_health_situation(situation, all_messages,model):
 
     new_message = [{'role': 'system', 'content': summary_prompt}]
  
-    for i in which_resources:
-        if i in external_resources and which_resources[i] == True:
-            print("Adding resource {}".format(i))
-            new_message += [{'role': 'system', 'content': external_resources[i]}]
- 
+    full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
+
+    rag_info = analyze_situation_rag_guidance(full_situation,which_resources)
+    new_message += [{'role': 'system', 'content': rag_info}]
+    print("Rag info {}".format(rag_info))
+
     new_message += all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
  
-    print("All messages {}".format(new_message))
-
     response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=400)
     
     for event in response:
