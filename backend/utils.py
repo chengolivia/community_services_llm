@@ -119,3 +119,4 @@ def stream_process_chatgpt_response(response):
             current_response = event.choices[0].delta.content
             current_response = current_response.replace("\n", "<br/>")
             yield "data: " + current_response + "\n\n"
+    yield "[DONE]\n\n" 

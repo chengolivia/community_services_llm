@@ -36,7 +36,6 @@ def get_questions_resources(situation,all_messages):
     all_message_list.append([{'role': 'system', 'content': question_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': resource_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': which_resource_prompt}]+[{'role': 'user', 'content': i['content'][:1000]} for i in all_messages if i['role'] == 'user']+[{"role": "user", "content": situation}])
-    all_message_list.append([{'role': 'system', 'content': benefit_prompt}]+all_messages+[{"role": "user", "content": situation}])
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
@@ -55,7 +54,7 @@ def get_questions_resources(situation,all_messages):
     response = "\n".join(["SMART Goals: {}\n\n\n".format(initial_responses[0]),
                           "Questions: {}\n\n\n".format(initial_responses[1]),
                           "Resources (use only these resources): {}".format(resources)])
-    which_external_resources = initial_responses[4]
+    which_external_resources = initial_responses[3]
     start = time.time()
 
     return response, which_external_resources
@@ -76,6 +75,7 @@ def analyze_mental_health_situation(situation, all_messages,model):
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
         response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
+        print("Got response for ChatGPT")
         yield from stream_process_chatgpt_response(response)
         return 
 
@@ -88,6 +88,7 @@ def analyze_mental_health_situation(situation, all_messages,model):
     except:
         which_external_resources = {}
 
+    # print("Which external {}".format(which_external_resources))
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
     rag_info = analyze_situation_rag_guidance(full_situation,which_external_resources)
@@ -97,8 +98,9 @@ def analyze_mental_health_situation(situation, all_messages,model):
     new_message = [{'role': 'system', 'content': summary_prompt}]
     new_message += [{'role': 'system', 'content': rag_info}]
     new_message += all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
- 
+    print("Almost last")
     response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=500)
+
     start = time.time()
     print("Finished")
     yield from stream_process_chatgpt_response(response)

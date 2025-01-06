@@ -29,9 +29,22 @@ function GenericChat({ context, title, baseUrl,showLocation }) {
 
   const handleInputChangeLocation = (e) => setInputLocationText(e.target.value);
   const handleNewSession = async () => resetContext();
+  let shouldFetch = true;  // Set to true initially or based on your logic
+
+  let abortController = new AbortController();  // Initialize a new controller
+  let isRequestInProgress = false;  // Track if a request is already in progress
+  
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && isRequestInProgress) {
+      // Abort the current request when the tab becomes hidden
+      abortController.abort();
+      isRequestInProgress = false;
+    }
+  });
+  
 
   const handleSubmit = async () => {
-    if (inputText.trim()) {
+    if (inputText.trim() && shouldFetch && !isRequestInProgress) {
       const newMessage = inputText.trim() + "\n Location: " + (inputLocationText.trim() || "New Jersey");
       const userMessage = { sender: 'user', text: inputText.trim() };
       setConversation((prev) => [...prev, userMessage]);
@@ -41,10 +54,16 @@ function GenericChat({ context, title, baseUrl,showLocation }) {
 
       const botMessage = { sender: "bot", text: "Loading..." };
       setConversation((prev) => [...prev, botMessage]);
+      shouldFetch = false;
+
+      abortController.abort();
+      abortController = new AbortController(); // Create a new controller for the new request
+      isRequestInProgress = true;  
 
       await fetchEventSource(baseUrl, {
         method: "POST",
         headers: { Accept: "text/event-stream", 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({ "text": newMessage, "previous_text": chatConvo, "model": modelSelect }),
         onopen(res) {
           if (res.status >= 400 && res.status < 500 && res.status !== 429) {
@@ -66,11 +85,13 @@ function GenericChat({ context, title, baseUrl,showLocation }) {
         },
         onclose() {
           setChatConvo((prev) => [...prev, { 'role': 'system', 'content': latestMessageRef.current }]);
+          shouldFetch = true;
         },
         onerror(err) {
+          shouldFetch = true;
           console.log("There was an error from server", err);
         },
-        retryInterval: 10000
+        retryInterval: 0
       });
     }
   };

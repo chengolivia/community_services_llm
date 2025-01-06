@@ -11,7 +11,6 @@ const createContextProvider = (Context) => ({ children }) => {
 
   const resetContext = () => {
     setInputText('');
-    setModel('copilot');
     setNewMessage('');
     setConversation([]);
     setChatConvo([]);

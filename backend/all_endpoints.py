@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from mental_health.generate_response import analyze_mental_health_situation
 from resources.generate_response import analyze_resource_situation
 from benefits.generate_response import analyze_benefits
@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import os
 import warnings
+
+
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = '1'
@@ -28,6 +30,13 @@ class Item(BaseModel):
     text: str
     previous_text: list
     model: str
+
+@app.middleware("http")
+async def add_keep_alive_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Connection"] = "keep-alive"
+    return response
+
 
 @app.post("/benefit_response/")
 async def benefit_response(item: Item):
