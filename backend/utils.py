@@ -67,7 +67,7 @@ def call_chatgpt_api(system_prompt,prompt,stream=True):
         return response.choices[0].message.content
 
 
-def call_chatgpt_api_all_chats(all_chats,stream=True):
+def call_chatgpt_api_all_chats(all_chats,stream=True,max_tokens=250):
     """Run ChatGPT with the 4o-mini model for a system prompt
     
     Arguments:
@@ -80,6 +80,7 @@ def call_chatgpt_api_all_chats(all_chats,stream=True):
         model="gpt-4o-mini",  
         messages=all_chats,
         stream=stream,
+        max_tokens=max_tokens,
     )
     
     if stream:

@@ -1,7 +1,6 @@
 import openai 
-from resources.utils import call_chatgpt_api, call_chatgpt_api_all_chats
 from resources.secret import naveen_key as key 
-from benefits.utils import *
+from utils import *
 from benefits.secret import gao_key as key 
 from typing import Dict, Optional, List
 import re

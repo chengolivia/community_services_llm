@@ -1,12 +1,10 @@
 import openai 
-from mental_health.utils import call_chatgpt_api_all_chats
+from utils import call_chatgpt_api_all_chats
 from mental_health.secret import naveen_key as key 
 from resources.generate_response import analyze_situation_rag, analyze_situation_rag_guidance
-from benefits.generate_response import analyze_benefits_non_stream
 import concurrent.futures
 import re
 import time 
-import asyncio 
 import json
 
 openai.api_key = key
@@ -57,32 +55,22 @@ def analyze_mental_health_situation(situation, all_messages,model):
     all_message_list.append([{'role': 'system', 'content': which_resource_prompt}]+[{'role': 'user', 'content': i['content'][:1000]} for i in all_messages if i['role'] == 'user']+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': benefit_prompt}]+all_messages+[{"role": "user", "content": situation}])
 
-    print("Code before GPT took {}".format(time.time()-start))
-
     with concurrent.futures.ThreadPoolExecutor() as executor:
         responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
 
     responses = list(responses)
-    print("First GPT call took {}".format(time.time()-start))
 
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(responses[2]),flags=re.DOTALL)
 
-    print("Matches are {}".format(matches))
-
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        resources = list(executor.map(lambda s: analyze_situation_rag(s,stream=False), matches))
+        resources = list(executor.map(lambda s: analyze_situation_rag(s), matches))
 
     resources = "\n\n\n".join(resources)
-
-    print("RAG call took {}".format(time.time()-start))
 
     response = "\n".join(["SMART Goals: {}\n\n\n".format(responses[0]),
                           "Questions: {}\n\n\n".format(responses[1]),
                           "Resources (use only these resources): {}".format(resources)])
-
-    print("SMART Goals {}, Questions {}, Resources {}".format(len(responses[0]),len(responses[1]),len(resources)))
-    print("Response length {}".format(len(response)))
 
     try:
         which_resources = json.loads(responses[3].strip()) 
@@ -95,7 +83,6 @@ def analyze_mental_health_situation(situation, all_messages,model):
 
     rag_info = analyze_situation_rag_guidance(full_situation,which_resources)
     new_message += [{'role': 'system', 'content': rag_info}]
-    print("Rag info {}".format(rag_info))
 
     new_message += all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
  
