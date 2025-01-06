@@ -71,11 +71,12 @@ def call_chatgpt_api_all_chats(all_chats,stream=True,max_tokens=250):
     """Run ChatGPT with the 4o-mini model for a system prompt
     
     Arguments:
-        system_prompt: String, what the main system prompt is
-            Tells ChatGPT the general scenario
-        prompt: Specific promt for ChatGPT
-
-    Returns: String, result from ChatGPT"""
+        all_chats: List of dictionaries, 
+            each with a role and content field
+        stream: Boolean, whether to return a stream response
+        max_tokens: Integer, maximum number of tokens from OpenAI
+    
+    Returns: Either a Stream or String, result from ChatGPT"""
     response = openai.chat.completions.create(
         model="gpt-4o-mini",  
         messages=all_chats,
@@ -103,3 +104,18 @@ def extract_text_from_pdf(pdf_file_path):
         for page in reader.pages:
             text += page.extract_text()
     return text
+
+
+def stream_process_chatgpt_response(response):
+    """Process a stream from ChatGPT
+    
+    Arguments:
+        response: Some stream response from ChatGPT
+    
+    Returns: Character-by-character stream from the response"""
+    
+    for event in response:
+        if event.choices[0].delta.content is not None:
+            current_response = event.choices[0].delta.content
+            current_response = current_response.replace("\n", "<br/>")
+            yield "data: " + current_response + "\n\n"

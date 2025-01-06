@@ -6,9 +6,12 @@ from benefits.generate_response import analyze_benefits
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import os
+import warnings
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = '1'
+os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
+warnings.filterwarnings("ignore", message=".*torchvision.*", category=UserWarning)
 
 app = FastAPI()
 

@@ -1,7 +1,6 @@
 import openai 
-from resources.secret import naveen_key as key 
 from utils import *
-from benefits.secret import gao_key as key 
+from secret import gao_key as key 
 from typing import Dict, Optional, List
 import re
 import ast
