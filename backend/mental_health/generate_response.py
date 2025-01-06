@@ -42,7 +42,6 @@ def get_questions_resources(situation,all_messages):
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
 
     initial_responses = list(initial_responses)
-    print("Line 35 {}".format(time.time()-start))
     start = time.time()
 
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
@@ -57,7 +56,6 @@ def get_questions_resources(situation,all_messages):
                           "Questions: {}\n\n\n".format(initial_responses[1]),
                           "Resources (use only these resources): {}".format(resources)])
     which_external_resources = initial_responses[4]
-    print("Line 50 {}".format(time.time()-start))
     start = time.time()
 
     return response, which_external_resources
@@ -72,16 +70,17 @@ def analyze_mental_health_situation(situation, all_messages,model):
         
     Returns: Streaming response in text"""
     
+    print("Mental health {}".format(situation))
+
     if model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
-        response = call_chatgpt_api_all_chats(all_message_list)
-        yield from stream_process_chatgpt_response(response,max_tokens=500)
+        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
+        yield from stream_process_chatgpt_response(response)
         return 
 
     start = time.time() 
     response, which_external_resources = get_questions_resources(situation,all_messages)
-    print("Line 69 {}".format(time.time()-start))
     start = time.time()
 
     try:
@@ -93,15 +92,13 @@ def analyze_mental_health_situation(situation, all_messages,model):
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
     rag_info = analyze_situation_rag_guidance(full_situation,which_external_resources)
 
-    print("Line 81 {}".format(time.time()-start))
     start = time.time()
 
     new_message = [{'role': 'system', 'content': summary_prompt}]
     new_message += [{'role': 'system', 'content': rag_info}]
     new_message += all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
  
-    response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=400)
-    print("Line 89 {}".format(time.time()-start))
+    response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=500)
     start = time.time()
-    
-    yield from stream_process_chatgpt_response(response,max_tokens=500)
+    print("Finished")
+    yield from stream_process_chatgpt_response(response)

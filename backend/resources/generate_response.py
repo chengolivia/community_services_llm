@@ -12,6 +12,7 @@ openai.api_key = key
 csv_file_path = "resources/data/all_resources.csv"
 
 if torch.cuda.is_available():
+    print("CUDA is available!")
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2',device='cuda')
 else:
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
@@ -43,8 +44,8 @@ def analyze_resource_situation(situation, all_messages,text_model):
     if text_model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
-        response = call_chatgpt_api_all_chats(all_message_list)
-        yield from stream_process_chatgpt_response(response,max_tokens=500)
+        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
+        yield from stream_process_chatgpt_response(response)
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
 
