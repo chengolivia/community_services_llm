@@ -76,7 +76,7 @@ def analyze_mental_health_situation(situation, all_messages,model):
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
         response = call_chatgpt_api_all_chats(all_message_list)
-        yield from stream_process_chatgpt_response(response)
+        yield from stream_process_chatgpt_response(response,max_tokens=500)
         return 
 
     start = time.time() 
@@ -104,4 +104,4 @@ def analyze_mental_health_situation(situation, all_messages,model):
     print("Line 89 {}".format(time.time()-start))
     start = time.time()
     
-    yield from stream_process_chatgpt_response(response)
+    yield from stream_process_chatgpt_response(response,max_tokens=500)

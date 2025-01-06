@@ -6,10 +6,15 @@ import time
 from utils import *
 from resources.rag_utils import *
 from secret import naveen_key as key 
+import torch
 
 openai.api_key = key
 csv_file_path = "resources/data/all_resources.csv"
-model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+
+if torch.cuda.is_available():
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2',device='cuda')
+else:
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
 
 documents, names, descriptions, urls, phones = process_resources(csv_file_path)
 documents_by_guidance = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
@@ -39,13 +44,13 @@ def analyze_resource_situation(situation, all_messages,text_model):
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
         response = call_chatgpt_api_all_chats(all_message_list)
-        yield from stream_process_chatgpt_response(response)
+        yield from stream_process_chatgpt_response(response,max_tokens=500)
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
 
     response = analyze_situation_rag(full_situation,k=10)
     stream_response = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a helpful assistant who formats the list of resources provided in a nice Markdown format. Give the list of the most relevant resources along with explanations of why they are relevant. Try to make sure resources are relevant to the location'},
-                                                  {'role': 'user','content': response}])
+                                                  {'role': 'user','content': response}],max_tokens=500)
     yield from stream_process_chatgpt_response(stream_response)
 
 def analyze_situation_rag(situation,k=3):
