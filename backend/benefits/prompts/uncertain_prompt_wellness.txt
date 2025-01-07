@@ -30,7 +30,7 @@ Expected Python Dictionary Structure:
     "work_credits": [Total lifetime work credits, or None if unclear],
     "sga": [True if engaged in substantial gainful activity, False if not, or None if unclear],
     "social_security_eligibility": [True if eligible, False if not, or None if unclear],
-    "relevance": [True if understanding benefits is important to the users situation, False if not]
+    "relevance": [True if understanding benefits is important to the users situation, False if not; make sure that the situation is asking specifically about benefits]
 
 For example, here's a user input "Hey, if the center member's income changes from $1500 to $1800 how will their benefits change" 
 Output: 

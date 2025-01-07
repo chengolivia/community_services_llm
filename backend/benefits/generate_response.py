@@ -42,7 +42,7 @@ def get_benefit_info(situation,all_messages):
         extracted_info,
         flags=re.DOTALL
     )
-
+ 
     return eligibility_info
 
 
