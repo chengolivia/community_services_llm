@@ -1,5 +1,12 @@
 The user will ask about benefits and comparing benefits between one or more situations 
-They will present some information about these one or more situations; your responsbility is to turn each situation into a dictionary, along with a summary of the user's question. Think carefully about this, and fill in the information to the best of your ability. Try and capture as much information as you can.
+They will present some information about these one or more situations; your responsbility is to turn each situation into a dictionary, along with a summary of the user's question. 
+Some tips: 
+1. If a person is married, then their family status is married_couple, assuming they have no disabled kids. However, you might want to ask about this to get more information, as it impacts SSI.
+2. There are 30 days rather than 4 weeks in a month 
+3. You can potentially tell sga from whether the person has a job
+
+Think carefully about this, and fill in the information to the best of your ability. Try and capture as much information as you can. 
+
 Include each situation in a tag as follows: 
 [Situation]
     {{ "age": 25, 
