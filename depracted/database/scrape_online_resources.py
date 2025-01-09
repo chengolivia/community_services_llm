@@ -76,7 +76,8 @@ def format_gpt(entry):
 
     return ",".join(entry)
 
-data = open("data/all_resources.txt").read().strip().split("\n")
+# data = open("data/all_resources.txt").read().strip().split("\n")
+data = open("data/all_resources_2025.txt").read().strip().split("\n")
 
 all_counties = {"atlantic","bergen","burlington","camden",
             "cape may","cumberland","essex","gloucester","hudson","hunterdon",
@@ -115,6 +116,7 @@ for line in data:
         curr_entry = deepcopy(default_curr_entry)
         curr_field_idx = 0
 
+
 num_error = 0
 tot = 0
 print("There are {} entries".format(len(all_entries)))
@@ -128,14 +130,14 @@ for idx,i in enumerate(all_entries):
         'url_phone': '',
     }
     try:
-        url = next(search(i['name']+' Phone Number New Jersey',num=1,stop=1))
+        url = next(search(i['name']+' Phone Number New Jersey', num = 1,stop=1))
         all_text = get_text_from_url(url)
     except Exception as e:
         print(e) 
+        
     if all_text != 'Error':
         resources_by_description_phone[i['name']]['phone'] = call_chatgpt_api("You are a helpful assistant that helps users find a phone number from the text from a website. Return only the phone number, nothing else","Please find the phone number (and return only the phone number, no dashes) for the following. Use only the text, and if no phone number is found, return an empty string: {}".format(all_text))
         resources_by_description_phone[i['name']]['url_phone'] = url
-
     try:
         url = next(search(i['name']+' New Jersey',num=1,stop=1))
         all_text = get_text_from_url(url)

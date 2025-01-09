@@ -9,7 +9,8 @@ from secret import naveen_key as key
 import torch
 
 openai.api_key = key
-csv_file_path = "resources/data/all_resources.csv"
+# csv_file_path = "resources/data/all_resources.csv"
+csv_file_path = "resources/data/all_resources_2025.csv"
 
 if torch.cuda.is_available():
     print("CUDA is available!")
