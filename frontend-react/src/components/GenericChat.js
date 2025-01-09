@@ -139,8 +139,8 @@ function GenericChat({ context, title, baseUrl,showLocation }) {
           
           <div className="backend-selector-div">
             <select onChange={handleModelChange} value={modelSelect} name="model" id="model" className="backend-select">
-              <option value="copilot">Co-Pilot</option>
-              <option value="chatgpt">ChatGPT</option>
+              <option value="copilot">Option A</option>
+              <option value="chatgpt">Option B</option>
             </select>
             <button className="submit-button" style={{ width: '100px', height: '100%', marginLeft: '20px' }} onClick={handleNewSession}>
               Reset Session
