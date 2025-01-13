@@ -5,11 +5,13 @@ import time
 
 from utils import *
 from resources.rag_utils import *
+# from rag_utils import *
 from secret import naveen_key as key 
 import torch
 
 openai.api_key = key
 # csv_file_path = "resources/data/all_resources.csv"
+# csv_file_path = "data/all_resources_2025.csv"
 csv_file_path = "resources/data/all_resources_2025.csv"
 
 if torch.cuda.is_available():
@@ -45,17 +47,17 @@ def analyze_resource_situation(situation, all_messages,text_model):
     if text_model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
-        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
+        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=1000)
         yield from stream_process_chatgpt_response(response)
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
 
     response = analyze_situation_rag(full_situation,k=10)
     stream_response = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a helpful assistant who formats the list of resources provided in a nice Markdown format. Give the list of the most relevant resources along with explanations of why they are relevant. Try to make sure resources are relevant to the location'},
-                                                  {'role': 'user','content': response}],max_tokens=500)
+                                                  {'role': 'user','content': response}],max_tokens=1000)
     yield from stream_process_chatgpt_response(stream_response)
 
-def analyze_situation_rag(situation,k=3):
+def analyze_situation_rag(situation,k=5):
     """Given a string, find the most similar resources using RAG
     
     Arguments:
@@ -68,7 +70,7 @@ def analyze_situation_rag(situation,k=3):
     retrieved_resources = [f"{names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in I[0]]
     return "\n".join(retrieved_resources)
 
-def analyze_situation_rag_guidance(situation,relevant_guidance,k=20):
+def analyze_situation_rag_guidance(situation,relevant_guidance,k=25):
     """Given a string, and a list of external resources to use
         find the most similar lines in the external resources
     

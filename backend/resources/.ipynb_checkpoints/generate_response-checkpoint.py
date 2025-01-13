@@ -1,111 +1,91 @@
 import openai 
-from resources.utils import call_chatgpt_api_all_chats
-from resources.secret import naveen_key as key 
-import openai 
-from resources.utils import *
-from resources.secret import gao_key as key 
-import pandas as pd
-import faiss
-import os 
 import numpy as np
 from sentence_transformers import SentenceTransformer
+import time 
 
+from utils import *
+from resources.rag_utils import *
+# from rag_utils import *
+from secret import naveen_key as key 
+import torch
 
 openai.api_key = key
+# csv_file_path = "resources/data/all_resources.csv"
+# csv_file_path = "data/all_resources_2025.csv"
+csv_file_path = "resources/data/all_resources_2025.csv"
 
-system_prompt = open("resources/prompts/system_prompt.txt").read()
-
-def analyze_resource_situation(situation, all_messages):
-    """Given a situation and a CSV, get the information from the CSV file
-    Then create a prompt
-    
-    Arguments:
-        situation: String, what the user requests
-        csv_file_path: Location with the database
-        
-    Returns: A string, the response from ChatGPT"""
-
-    csv_file_path = "resources/data/all_resources.csv"
-    response = analyze_situation_rag(situation, csv_file_path, all_messages)
-    for event in response:
-        if event.choices[0].delta.content != None:
-            current_response = event.choices[0].delta.content
-            current_response = current_response.replace("\n","<br/>")
-            yield "data: " + current_response + "\n\n"
-
-def analyze_situation_rag(situation, csv_file_path,all_messages,k=10,stream=True):
-    """Given a situation and a CSV, get the information from the CSV file
-    Then create a prompt using a RAG to whittle down the number of things
-    
-    Arguments:
-        situation: String, what the user requests
-        csv_file_path: Location with the database
-        
-    Returns: A string, the response from ChatGPT"""
-
-    full_situation = "\n".join(["Message {} {}: ".format(idx+1,i['content']) for idx,i in enumerate([j for j in (all_messages+[{'role': 'user', 'content': situation}]) if j['role'] == 'user'])])
-
-    resources_df = pd.read_csv(csv_file_path)
-    names = list(resources_df['service'])
-    descriptions = list(resources_df['description'])
-    urls = list(resources_df['url'])
-    phones = list(resources_df['phone'])
-
-    documents = ["{}: {}".format(names[i],descriptions[i]) for i in range(len(names))]
-
-    # Initialize FAISS and create an index
-    file_path = "results/saved_embedding.npy"
-
+if torch.cuda.is_available():
+    print("CUDA is available!")
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2',device='cuda')
+else:
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
 
-    # Define the file path for storing embeddings
-    if os.path.exists(file_path):
-        embeddings = np.load(file_path)
-    else:
-        # Encode the documents using all-mpnet-base-v2
-        embeddings = model.encode(documents, convert_to_tensor=False, show_progress_bar=True)
-        embeddings = np.array(embeddings)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        np.save(file_path, embeddings)
+documents, names, descriptions, urls, phones = process_resources(csv_file_path)
+documents_by_guidance = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
 
-    # Set up the FAISS index
-    dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)  # L2 distance (cosine similarity can be used as well)
-    index.add(embeddings)
+saved_models = {}
+for guidance, doc_list in documents_by_guidance.items():
+    embeddings_file_path = f"results/saved_embedding_{guidance}.npy"
+    embeddings = load_embeddings(embeddings_file_path, doc_list, model)
+    saved_models[guidance] = create_faiss_index(embeddings)
 
-    original_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend relevant resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. Provide the text in the 'description' column from the CSV of each resource, and explain how it could assist the user in resolving or improving their situation. PLEASE ENSURE that the recommended resources are responsible for the specified region in the provided situation. If the situation does not specify a location, ignore regional requirements. When a location is specified, prioritize resources nearest to the individual’s specified location."
+# Process main documents
+file_path = "results/saved_embedding.npy"
+embeddings = load_embeddings(file_path, documents, model)
+main_index = create_faiss_index(embeddings)
+
+def analyze_resource_situation(situation, all_messages,text_model):
+    """Process user situation + find the relevant resources.
+
+    Arguments:
+        situation: String, last message user sent
+        all_messages: List of dictionaries, with all the messages
+        text_model: String, either chatgpt or copilot 
+        
+    Returns: Streaming response in text"""
+
+    if text_model == 'chatgpt':
+        all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
+        time.sleep(4)
+        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=1000)
+        yield from stream_process_chatgpt_response(response)
+
+    full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
+
+    response = analyze_situation_rag(full_situation,k=10)
+    stream_response = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a helpful assistant who formats the list of resources provided in a nice Markdown format. Give the list of the most relevant resources along with explanations of why they are relevant. Try to make sure resources are relevant to the location'},
+                                                  {'role': 'user','content': response}],max_tokens=1000)
+    yield from stream_process_chatgpt_response(stream_response)
+
+def analyze_situation_rag(situation,k=5):
+    """Given a string, find the most similar resources using RAG
     
-    all_messages = [{"role": "system", "content": original_prompt}] + all_messages
-    all_messages.append({"role": "user", "content": full_situation})
+    Arguments:
+        situation: String, what the user requests
+        
+    Returns: A string, list of relevant resources"""
 
-    relevant_resources = call_chatgpt_api_all_chats(all_messages,stream=False)
-    all_messages = all_messages[1:-1]
+    query_embedding = model.encode(situation, convert_to_tensor=False)
+    _, I = main_index.search(np.array([query_embedding]), k=k)  # Retrieve top k resources
+    retrieved_resources = [f"{names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in I[0]]
+    return "\n".join(retrieved_resources)
 
-    # Encode the query using the Sentence Transformer model
-    query_embedding = model.encode(relevant_resources, convert_to_tensor=False)
-
-    # Search FAISS index to find the most relevant resources
-    _, I = index.search(np.array([query_embedding]), k=k)  # Retrieve top k resources
-    retrieved_resources = [f"{documents[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in I[0]]
-
-    # Prepare the retrieved text
-    retrieved_text = "\n".join(retrieved_resources)
+def analyze_situation_rag_guidance(situation,relevant_guidance,k=25):
+    """Given a string, and a list of external resources to use
+        find the most similar lines in the external resources
     
-    system_prompt = "You are a highly knowledgeable and empathetic assistant designed to offer personalized suggestions for resources based on a user’s specific situation. Your goal is to thoughtfully analyze the given context and recommend relevant resources that would be most effective in addressing the user’s needs. Ensure your response is clear, concise, and directly relevant to the user’s circumstances. Prioritize resources that are nearer the individual's location."
-    
-    prompt = f"The user is experiencing: {full_situation}"
-    
-    all_resources = (f"Here are some suggested resources:\n{retrieved_text}\n"
-        "Please explain why these resources are appropriate for the user's situation. "
-        "The only thing to put in bold (**) is the name of the place. Please also state the URL, and the phone number for the place, the responsible region of the service (name of the city or county, not the street address, and if the service does not specify the responsible location, just leave the answer blank), and description of the service"
-        "If a resource is not relevant, do NOT include it. Please sort by the relevance of the resource. Finally, group resources by type (e.g. housing, transportation, mental health, etc.). If the user has a question, then answer that question as well, and use all the messages so far to answer the user's question. If a user only asks a question, no need to provide resources."
-)
+    Arguments:
+        situation: String, what the user requests
+        relevant_guidance: Dictionary, mapping which 
+            documents to use (guidances, e.g. crisis)
+        
+    Returns: A string, list of relevant lines"""
 
-    all_messages = [{"role": "system", "content": system_prompt}] + all_messages
-    all_messages.append({"role": "user", "content": prompt})
-    all_messages.append({"role": "system", "content": all_resources})
+    ret = []
 
-    # Get the response from the ChatGPT API
-    response = call_chatgpt_api_all_chats(all_messages,stream=stream)
-    all_messages = all_messages[1:-1]
-    return response
+    for i in relevant_guidance:
+        if relevant_guidance[i]:
+            query_embedding = model.encode(situation, convert_to_tensor=False)
+            _, I = saved_models[i].search(np.array([query_embedding]), k=k)  # Retrieve top k resources
+            ret += [documents_by_guidance[i][j].split(":")[1].strip() for j in I[0]]            
+    return "\n".join(ret)
