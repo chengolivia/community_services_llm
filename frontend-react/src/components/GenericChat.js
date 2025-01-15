@@ -165,7 +165,7 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
       <div className={`left-section ${submitted ? 'submitted' : ''}`}>
         <h1 className="page-title">{title}</h1>
         <h2 className="instruction">
-          What is your service user’s needs and goals for today’s meeting?
+          What is the service user’s needs and goals for today’s meeting?
         </h2>
         <div className={`conversation-thread ${submitted ? 'visible' : ''}`}>
           {conversation.map((msg, index) => (
@@ -193,7 +193,7 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
             <textarea
               className="input-bar"
               ref={inputRef} // Attach the ref for dynamic height adjustment
-              placeholder={submitted ? 'Write a follow-up to update...' : 'Describe your service user’s situation...'}
+              placeholder={submitted ? 'Write a follow-up to update...' : 'Describe the service user’s situation...'}
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
