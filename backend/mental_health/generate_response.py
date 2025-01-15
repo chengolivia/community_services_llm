@@ -32,7 +32,8 @@ def get_questions_resources(situation,all_messages):
     Returns: String response, with resources and questions, 
         and a string, containing a dictionary on which 
         external resources to load """
-
+    
+    start = time.time() 
     all_message_list = [[{'role': 'system', 'content': mental_health_system_prompt}]+all_messages+[{"role": "user", "content": situation}]]
     all_message_list.append([{'role': 'system', 'content': question_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': resource_prompt}]+all_messages+[{"role": "user", "content": situation}])
@@ -41,6 +42,7 @@ def get_questions_resources(situation,all_messages):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
+    start = time.time()
 
     initial_responses = list(initial_responses)
 
@@ -49,7 +51,6 @@ def get_questions_resources(situation,all_messages):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         resources = list(executor.map(lambda s: analyze_situation_rag(s), matches))
-
     pattern = r"\[Situation\](.*?)\[/Situation\]"
     benefit_info = re.sub(
         pattern,
@@ -61,11 +62,11 @@ def get_questions_resources(situation,all_messages):
     if "Irrelevant" in benefit_info:
         benefit_info = ""
     else:
-        constructed_messages = [{'role': 'system', 'content': benefit_summary_prompt}] + all_messages
+        constructed_messages = [{'role': 'system', 'content': benefit_summary_prompt}] + [{'role': 'user', 'content': i['content'][:1000]} for i in all_messages if i['role'] == 'user']
         constructed_messages.append({'role': 'user', 'content': situation})
         constructed_messages.append({'role': 'user', 'content': 'Eligible Benefits: {}'.format(benefit_info)})
         benefit_info = call_chatgpt_api_all_chats(constructed_messages,stream=False)
- 
+
     resources = "\n\n\n".join(resources)
 
     response = "\n".join(["SMART Goals: {}\n\n\n".format(initial_responses[0]),
@@ -93,8 +94,10 @@ def analyze_mental_health_situation(situation, all_messages,model):
         yield from stream_process_chatgpt_response(response)
         return 
 
+    start = time.time()
     response, which_external_resources = get_questions_resources(situation,all_messages)
-
+    print("Took {} time for first".format(time.time()-start))
+    start = time.time()
     try:
         which_external_resources = json.loads(which_external_resources.strip()) 
     except:
@@ -102,6 +105,7 @@ def analyze_mental_health_situation(situation, all_messages,model):
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
     rag_info = analyze_situation_rag_guidance(full_situation,which_external_resources)
+    print("RAG took {}".format(time.time()-start))
 
     new_message = [{'role': 'system', 'content': summary_prompt}]
     new_message += [{'role': 'system', 'content': rag_info}]
