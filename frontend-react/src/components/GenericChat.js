@@ -173,7 +173,13 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
               key={index}
               className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}
             >
-              <ReactMarkdown children={msg.text} />
+              <ReactMarkdown children={msg.text} components={{
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              ),
+              }} />
             </div>
           ))}
         </div>

@@ -29,7 +29,7 @@ def eligibility_check(user_info: str) -> str:
     
     all_user_info = ast.literal_eval(cleaned_output)
 
-    if all_user_info['relevance'] == False:
+    if 'relevance' in all_user_info and all_user_info['relevance'] == False:
         return "Irrelevant"
 
     # Define benefit constraints with dynamic SSI conditions based on family and marital status
