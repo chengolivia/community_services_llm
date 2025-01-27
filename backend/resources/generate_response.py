@@ -47,14 +47,14 @@ def analyze_resource_situation(situation, all_messages,text_model):
     if text_model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
-        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=1000)
+        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
         yield from stream_process_chatgpt_response(response)
 
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
 
     response = analyze_situation_rag(full_situation,k=10)
     stream_response = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a helpful assistant who formats the list of resources provided in a nice Markdown format. Give the list of the most relevant resources along with explanations of why they are relevant. Try to make sure resources are relevant to the location'},
-                                                  {'role': 'user','content': response}],max_tokens=1000)
+                                                  {'role': 'user','content': response}],max_tokens=500)
     yield from stream_process_chatgpt_response(stream_response)
 
 def analyze_situation_rag(situation,k=5):

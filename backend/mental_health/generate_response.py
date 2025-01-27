@@ -90,7 +90,7 @@ def analyze_mental_health_situation(situation, all_messages,model):
     if model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         time.sleep(4)
-        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=1000)
+        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
         yield from stream_process_chatgpt_response(response)
         return 
 
@@ -110,5 +110,5 @@ def analyze_mental_health_situation(situation, all_messages,model):
     new_message = [{'role': 'system', 'content': summary_prompt}]
     new_message += [{'role': 'system', 'content': rag_info}]
     new_message += all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
-    response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=1000)
+    response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=750)
     yield from stream_process_chatgpt_response(response)

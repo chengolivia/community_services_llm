@@ -71,5 +71,5 @@ def analyze_benefits(situation, all_messages,model):
     constructed_messages.append({'role': 'user', 'content': situation})
     constructed_messages.append({'role': 'user', 'content': 'Eligible Benefits: {}'.format(eligibility_info)})
 
-    response = call_chatgpt_api_all_chats(constructed_messages,stream=True,max_tokens=1000)
+    response = call_chatgpt_api_all_chats(constructed_messages,stream=True,max_tokens=750)
     yield from stream_process_chatgpt_response(response)

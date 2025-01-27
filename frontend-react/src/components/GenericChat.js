@@ -1,4 +1,4 @@
-import React, { useRef, useContext, useEffect } from 'react';
+import React, { useRef, useContext, useEffect, useState } from 'react';
 import '../styles/feature.css';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
@@ -19,11 +19,19 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
 
   const inputRef = useRef(null); // Ref for the textarea to adjust height
   const latestMessageRef = useRef(newMessage);
+  const conversationEndRef = useRef(null);
+
+
+  const [isResponseComplete, setIsResponseComplete] = useState(true); // Track if the response is complete
+  const [isMidGeneration, setIsMidGeneration] = useState(false); // Track if generation was interrupted
+
+
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
     adjustTextareaHeight(e.target); // Adjust textarea height dynamically
   };
+
 
   const handleModelChange = (e) => setModel(e.target.value);
   const handleKeyDown = (e) => {
@@ -32,6 +40,49 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
       handleSubmit();
     }
   };
+
+  const resumeFetch = async () => {
+    if (isResponseComplete || !isMidGeneration) return; // Only resume if response is incomplete and interrupted
+  
+    setNewMessage(''); // Clear any leftover message content
+    const latestMessage = inputText.trim() + "\n Location: " + (inputLocationText.trim() || "New Jersey");
+    const botMessage = { sender: "bot", text: "Loading..." };
+  
+    setConversation((prev) => [...prev, botMessage]);
+  
+    try {
+      await fetchEventSource(baseUrl, {
+        method: "POST",
+        headers: { Accept: "text/event-stream", 'Content-Type': 'application/json' },
+        signal: abortController.signal,
+        body: JSON.stringify({ text: latestMessage, previous_text: chatConvo, model: modelSelect }),
+        onmessage(event) {
+          setNewMessage((prev) => {
+            const updatedMessage = prev + event.data.replaceAll("<br/>", "\n");
+            const botMessage = { sender: "bot", text: updatedMessage };
+            setConversation((convPrev) => {
+              if (convPrev.length > 0) {
+                return [...convPrev.slice(0, -1), botMessage];
+              }
+              return [botMessage];
+            });
+            return updatedMessage;
+          });
+        },
+        onclose() {
+          setIsResponseComplete(true); // Mark response as complete
+          setIsMidGeneration(false); // Reset mid-generation flag
+        },
+      });
+    } catch (err) {
+      console.error("Fetch was aborted or failed:", err);
+    }
+  };
+  
+  
+  
+  
+  
 
   const handleInputChangeLocation = (e) => setInputLocationText(e.target.value);
 
@@ -53,57 +104,61 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
   });
 
   const handleSubmit = async () => {
-    if (inputText.trim() && shouldFetch && !isRequestInProgress) {
+    if (inputText.trim() && !isRequestInProgress) {
+      if (abortController.signal.aborted) {
+        abortController = new AbortController();
+      }
+  
       const newMessage = inputText.trim() + "\n Location: " + (inputLocationText.trim() || "New Jersey");
       const userMessage = { sender: 'user', text: inputText.trim() };
       setConversation((prev) => [...prev, userMessage]);
       setInputText('');
-      setChatConvo((prev) => [...prev, { 'role': 'user', 'content': inputText.trim() }]);
+      setChatConvo((prev) => [...prev, { role: 'user', content: inputText.trim() }]);
       setNewMessage("");
-
+      setIsResponseComplete(false); // Mark response as incomplete
+      setIsMidGeneration(false); // Reset mid-generation flag
+  
       const botMessage = { sender: "bot", text: "Loading..." };
       setConversation((prev) => [...prev, botMessage]);
-      shouldFetch = false;
-
-      abortController.abort();
-      abortController = new AbortController();
+  
       isRequestInProgress = true;
-
-      await fetchEventSource(baseUrl, {
-        method: "POST",
-        headers: { Accept: "text/event-stream", 'Content-Type': 'application/json' },
-        signal: abortController.signal,
-        body: JSON.stringify({ "text": newMessage, "previous_text": chatConvo, "model": modelSelect }),
-        onopen(res) {
-          if (res.status >= 400 && res.status < 500 && res.status !== 429) {
-            console.log("Client-side error ", res);
-          }
-        },
-        onmessage(event) {
-          setNewMessage((prev) => {
-            const updatedMessage = prev + event.data.replaceAll("<br/>", "\n");
-            const botMessage = { sender: "bot", text: updatedMessage };
-            setConversation((convPrev) => {
-              if (convPrev.length > 0) {
-                return [...convPrev.slice(0, -1), botMessage];
-              }
-              return [botMessage];
+  
+      try {
+        await fetchEventSource(baseUrl, {
+          method: "POST",
+          headers: { Accept: "text/event-stream", 'Content-Type': 'application/json' },
+          signal: abortController.signal,
+          body: JSON.stringify({ text: newMessage, previous_text: chatConvo, model: modelSelect }),
+          onmessage(event) {
+            setNewMessage((prev) => {
+              const updatedMessage = prev + event.data.replaceAll("<br/>", "\n");
+              const botMessage = { sender: "bot", text: updatedMessage };
+              setConversation((convPrev) => {
+                if (convPrev.length > 0) {
+                  return [...convPrev.slice(0, -1), botMessage];
+                }
+                return [botMessage];
+              });
+              return updatedMessage;
             });
-            return updatedMessage;
-          });
-        },
-        onclose() {
-          setChatConvo((prev) => [...prev, { 'role': 'system', 'content': latestMessageRef.current }]);
-          shouldFetch = true;
-        },
-        onerror(err) {
-          shouldFetch = true;
-          console.log("There was an error from server", err);
-        },
-        retryInterval: 0
-      });
+          },
+          onclose() {
+            setIsResponseComplete(true); // Mark response as complete
+            setIsMidGeneration(false); // Reset mid-generation flag
+            isRequestInProgress = false;
+          },
+        });
+      } catch (err) {
+        console.error("Fetch was aborted or failed:", err);
+      } finally {
+        isRequestInProgress = false;
+      }
     }
   };
+  
+  
+
+  
 
   // Function to adjust the height of the textarea dynamically
   const adjustTextareaHeight = (textarea) => {
@@ -113,12 +168,46 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
     }
   };
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (!isResponseComplete && abortController.signal.aborted) {
+          setIsMidGeneration(true); // Mark as mid-generation
+          abortController = new AbortController(); // Reset the abort controller
+          resumeFetch(); // Resume fetching only if mid-generation
+        }
+      } else if (document.visibilityState === 'hidden') {
+        if (!isResponseComplete) {
+          setIsMidGeneration(true); // Mark as mid-generation
+        }
+        abortController.abort(); // Abort ongoing fetch
+      }
+    };
+  
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [chatConvo, inputText, isResponseComplete, isMidGeneration]); // Add isMidGeneration as a dependency
+  
+  
+   
+  
+
   // Adjust height of textarea on initial render and when `inputText` changes
   useEffect(() => {
     if (inputRef.current) {
       adjustTextareaHeight(inputRef.current);
     }
   }, [inputText]);
+
+  useEffect(() => {
+    if (conversationEndRef.current) {
+      conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [conversation]);
+  
 
   // Function to export chat history as PDF
   const exportChatToPDF = () => {
@@ -182,6 +271,7 @@ function GenericChat({ context, title, baseUrl, showLocation }) {
               }} />
             </div>
           ))}
+          <div ref={conversationEndRef} />
         </div>
         <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
           {showLocation && (
@@ -270,3 +360,5 @@ export const BenefitEligibility = () => (
 );
 
 export default GenericChat;
+
+
