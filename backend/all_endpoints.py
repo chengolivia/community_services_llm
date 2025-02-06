@@ -14,17 +14,14 @@ from benefits.generate_response import analyze_benefits
 
 import socketio
 
-# Global dictionary to store running generation tasks by session id.
 generation_tasks = {}
 
 
-# Set environment variables and suppress warnings.
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_DEBUG_CPU_TYPE"] = "5"
 warnings.filterwarnings("ignore", message=".*torchvision.*", category=UserWarning)
 
-# Create the FastAPI app.
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -45,7 +42,6 @@ class Item(BaseModel):
     previous_text: list
     model: str
 
-# (Optional) Original HTTP endpoints.
 @app.post("/benefit_response/")
 async def benefit_response(item: Item):
     return StreamingResponse(
@@ -71,72 +67,30 @@ sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 def process_raw_chunk(raw_chunk: str) -> str:
-    """
-    Remove the "data:" prefix (if present) and trim whitespace.
-    """
     if raw_chunk.startswith("data:"):
-        return raw_chunk[len("data:"):].strip()
+        return raw_chunk[len("data: "):].replace('\n','')
     return raw_chunk.strip()
 
-def finalize_text(text: str) -> str:
-    """
-    Final cleanup of the accumulated text:
-      1. Remove trailing "[DONE]" if present.
-      2. Collapse multiple spaces.
-      3. Ensure punctuation is followed by a space.
-      4. Insert a space between a lowercase letter and an uppercase letter.
-      5. Ensure Markdown headers have a space after the hashes.
-      6. Apply manual replacements for known token issues.
-    """
-    # Remove trailing "[DONE]"
-    text = re.sub(r'\s*\[DONE\]\s*$', '', text, flags=re.IGNORECASE).strip()
-    # Collapse multiple spaces.
-    text = re.sub(r'\s+', ' ', text)
-    # Insert a space after punctuation if missing.
-    text = re.sub(r'([,!.?])(?=\S)', r'\1 ', text)
-    # Insert a space between a lowercase letter and an uppercase letter.
-    text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
-    # Ensure Markdown headers have a space after the hashes.
-    text = re.sub(r'^(#{1,6})(\S)', r'\1 \2', text, flags=re.MULTILINE)
-    # Manual replacements for known issues.
-    replacements = {
-        "Me as urable": "Measurable",
-        "Ach ievable": "Achievable",
-        "Occup ational": "Occupational",
-        "Real istic": "Realistic",
-        "Tim ely": "Timely",
-        "Em otional": "Emotional",
-        "Int ellectual": "Intellectual",
-        "Sp iritual":"Spiritual"
-    }
-    for wrong, correct in replacements.items():
-        text = text.replace(wrong, correct)
-    return text.strip()
+
 
 def accumulate_chunks(generator):
-    """
-    Accumulates chunks from the generator into a single formatted string.
-    
-    For each new token produced by the generator:
-      - Process the token using process_raw_chunk.
-      - If the accumulated text is non-empty and its last character is alphanumeric
-        and the new token starts with an alphanumeric character, insert a space before concatenating.
-      - Otherwise, simply concatenate the token.
-      - Collapse multiple spaces.
-      - Yield the finalized accumulated text.
-    """
     accumulated = ""
     for raw_chunk in generator:
+        # print("before: {}".format(list(raw_chunk)))
         token = process_raw_chunk(raw_chunk)
-        if not token:
-            yield finalize_text(accumulated)
-            continue
-        if accumulated and accumulated[-1].isalnum() and token[0].isalnum():
-            accumulated += " " + token
-        else:
-            accumulated += token
-        accumulated = re.sub(r'\s+', ' ', accumulated)
-        yield finalize_text(accumulated)
+        # print("after: {}".format(token))
+        if token != "[DONE]":
+            if token.startswith('#'):
+                accumulated += '\n' + token
+            elif token.endswith('<br/>'):
+                accumulated += token + '\n' 
+            elif token == '<br/><br/>':
+                accumulated += '<br/>'
+            else:
+                accumulated += token
+        yield accumulated
+
+
 
 @sio.event
 async def connect(sid, environ):

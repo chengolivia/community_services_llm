@@ -69,7 +69,6 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
 
   const handleScroll = (e) => {
     const { scrollTop, clientHeight, scrollHeight } = e.target;
-    // If the user is within 50px of the bottom, enable auto-scroll.
     if (scrollTop + clientHeight >= scrollHeight - 50) {
       setAutoScrollEnabled(true);
     } else {
@@ -147,12 +146,11 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     }
   };
 
+  
   const handleNewSession = () => {
-    if (socket) {
-      socket.emit('reset_session');
-    }
-    resetContext();
+    window.location.reload();
   };
+  
 
   const exportChatToPDF = () => {
     const doc = new jsPDF({
@@ -271,6 +269,15 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             >
               Save Session History
             </button>
+            {tool === "wellness" && (
+              <button
+                className="submit-button"
+                style={{ width: '150px', height: '100%', marginLeft: '20px' }}
+                onClick={() => window.open('https://www.youtube.com/watch?v=4rg1wmo2Y8w', '_blank')}
+              >
+                Tutorial
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -278,7 +285,6 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   );
 }
 
-// Export components with the appropriate tool prop.
 export const ResourceRecommendation = () => (
   <GenericChat
     context={ResourceContext}
