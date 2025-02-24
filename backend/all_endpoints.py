@@ -74,6 +74,26 @@ def process_raw_chunk(raw_chunk: str) -> str:
 
 
 def accumulate_chunks(generator):
+    """
+    Accumulates and processes streaming text chunks from a generator.
+
+    This function iterates over a generator of raw text chunks, processes each chunk,
+    and appends it to an accumulated string with appropriate formatting. The function 
+    yields the progressively accumulated text after each chunk is processed.
+
+    Processing rules:
+    - If the token is "[DONE]", it is ignored.
+    - If the token starts with '#', a newline is prepended before adding it.
+    - If the token ends with '<br/>', a newline is appended after it.
+    - If the token is '<br/><br/>', it is replaced with a single '<br/>'.
+    - Otherwise, the token is appended to the accumulated text.
+
+    Parameters:
+    generator (iterator): An iterator that yields raw text chunks.
+
+    Yields:
+    str: The progressively accumulated text after processing each chunk.
+    """
     accumulated = ""
     for raw_chunk in generator:
         # print("before: {}".format(list(raw_chunk)))
@@ -90,8 +110,6 @@ def accumulate_chunks(generator):
                 accumulated += token
         yield accumulated
 
-
-
 @sio.event
 async def connect(sid, environ):
     print(f"[Socket.IO] Client connected: {sid}")
@@ -102,6 +120,28 @@ async def disconnect(sid):
     print(f"[Socket.IO] Client disconnected: {sid}")
 
 async def run_generation(sid, generator):
+    """
+    Handles real-time streaming of generated text chunks to a client via Socket.IO.
+
+    This function processes a generator that produces accumulated text chunks and 
+    asynchronously emits updates to the client. It ensures graceful handling of 
+    cancellations and errors.
+
+    Parameters:
+    sid (str): The session ID of the client.
+    generator (Iterator[str]): An iterator yielding progressively accumulated text chunks.
+
+    Behavior:
+    - Iterates through `accumulate_chunks(generator)`, emitting each chunk as a "generation_update".
+    - Introduces a small delay (`asyncio.sleep(0.1)`) to prevent overwhelming the client.
+    - Catches `asyncio.CancelledError` to handle task cancellation gracefully and notifies the client.
+    - Handles unexpected exceptions, logging errors and notifying the client.
+    - Ensures that the session ID is removed from `generation_tasks` upon completion.
+    - Sends a final "generation_complete" event to signal the end of text generation.
+
+    Returns:
+    None (asynchronous function).
+    """
     try:
         for accumulated_text in accumulate_chunks(generator):
             await sio.emit("generation_update", {"chunk": accumulated_text}, room=sid)
@@ -122,13 +162,31 @@ async def run_generation(sid, generator):
 @sio.event
 async def start_generation(sid, data):
     """
+    Initiates a text generation process based on the provided user input and tool type.
+
+    This function processes incoming data from a Socket.IO connection, determines the appropriate
+    analysis function based on the specified tool type, and starts an asynchronous generation task.
+    If a previous task exists for the given session ID (`sid`), it is canceled before starting a new one.
+
     Expected data format:
-      {
-        "text": "user input",
-        "previous_text": [...],
-        "model": "copilot" or "chatgpt",
-        "tool": "benefit" or "wellness" or "resource"
-      }
+    {
+        "text": str,          # User input text.
+        "previous_text": list, # List of previous messages for context.
+        "model": str,         # Model type ("copilot" or "chatgpt").
+        "tool": str           # Tool type ("benefit", "wellness", or "resource").
+    }
+
+    Parameters:
+    sid (str): The session ID associated with the request.
+    data (dict): A dictionary containing the input text, previous conversation history,
+                 selected model, and tool type.
+
+    Behavior:
+    - Calls the appropriate function (`analyze_benefits`, `analyze_mental_health_situation`, or
+      `analyze_resource_situation`) based on the `tool` value.
+    - Emits an error message if an invalid `tool` is provided.
+    - Cancels any existing generation task associated with the session ID before starting a new one.
+    - Creates an asynchronous task (`run_generation`) to process the generator and store it.
     """
     print(f"[Socket.IO] Received start_generation from {sid} with data: {data}")
 
@@ -153,15 +211,6 @@ async def start_generation(sid, data):
     task = asyncio.create_task(run_generation(sid, generator))
     generation_tasks[sid] = task
 
-    # try:
-    #     for accumulated_text in accumulate_chunks(generator):
-    #         await sio.emit("generation_update", {"chunk": accumulated_text}, room=sid)
-    #         await asyncio.sleep(0.1)
-    # except Exception as e:
-    #     print(f"[Socket.IO] Error during generation: {e}")
-    #     await sio.emit("generation_update", {"chunk": f"Error: {e}"}, room=sid)
-    
-    # await sio.emit("generation_complete", {"message": "Response generation complete."}, room=sid)
 
 @sio.event
 async def reset_session(sid):
