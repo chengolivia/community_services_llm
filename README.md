@@ -27,13 +27,57 @@ If you use our code for your research, please cite this as:
   journal={__}, 
   year={2025}
 }
-
+```
 
 ## Setup
 
-### Installation
+### Backend Installation
 
-To run experiments with **Peer Copilot**, first clone this repository:
+To set up the backend environment, first clone this repository:
 
 ```bash
 git clone https://github.com/naveenr414/community_services_llm.git
+```
+
+Then, navigate into the **backend** folder and install the dependencies:
+
+```bash
+cd backend
+conda env create --file env.yaml
+conda activate peer-copilot
+```
+
+### Backend Installation
+
+To set up the frontend, navigate into the **frontend-react** folder and install dependencies using npm:
+
+```bash
+cd frontend-react
+npm install
+```
+
+### Running the Application
+
+After installing dependencies for both the backend and frontend, follow these steps to run the application:
+
+#### Start the backend:
+```bash
+cd backend
+uvicorn all_endpoints:socket_app --reload --port 8000
+```
+
+#### Start the frontend:
+Open a new terminal and run:
+```bash
+cd frontend-react
+npm start
+```
+
+Once both services are running, the tool will be available at:
+
+http://localhost:3000/ 
+
+
+
+
+
