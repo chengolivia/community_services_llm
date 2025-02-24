@@ -47,7 +47,7 @@ conda env create --file env.yaml
 conda activate peer-copilot
 ```
 
-### Backend Installation
+### Frontend Installation
 
 To set up the frontend, navigate into the **frontend-react** folder and install dependencies using npm:
 
@@ -75,7 +75,7 @@ npm start
 
 Once both services are running, the tool will be available at:
 
-http://localhost:3000/ 
+[http://localhost:3000/] 
 
 
 
