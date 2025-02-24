@@ -75,8 +75,13 @@ npm start
 
 Once both services are running, the tool will be available at:
 
-[http://localhost:3000/] 
+http://localhost:3000/
 
+### PeerCoPilot User Tutorial 
+
+https://www.youtube.com/watch?v=4rg1wmo2Y8w
+
+[Tutorial](https://www.youtube.com/watch?v=4rg1wmo2Y8w)
 
 
 
