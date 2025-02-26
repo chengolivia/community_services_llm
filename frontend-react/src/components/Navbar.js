@@ -16,7 +16,7 @@ function Navbar() {
 
   return (
     <nav className="navbar">
-      <h1 className="navbar-title">CSPNJ Co-Pilot</h1>
+      <h1 className="navbar-title">PeerCoPilot</h1>
       <div className="hamburger" onClick={toggleMenu}>
         &#9776; {/* Hamburger icon */}
       </div>
@@ -37,7 +37,7 @@ function Navbar() {
           }`}
         >
           <img src={WellnessGoalsIcon} alt="Wellness Goals Icon" className="navbar-icon" />
-          Wellness Goals Assistant
+          Wellness Planner
         </Link>
         <Link
           to="/resource-database"

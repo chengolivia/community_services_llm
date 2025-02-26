@@ -14,7 +14,7 @@ function Home() {
       <div className="tiles-container">
         <Link to="/wellness-goals" className="tile">
           <span>Tool 1</span>
-          <h2>Wellness Goals Assistant</h2>
+          <h2>Wellness Planner</h2>
         </Link>
         <Link to="/resource-database" className="tile">
           <span>Tool 2</span>
