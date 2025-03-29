@@ -1,33 +1,25 @@
-# Peer Copilot: A Language Model-Powered Assistant for Behavioral Health Organizations
+# PeerCopilot: A Language Model-Powered Assistant for Behavioral Health Organizations
 
 ![Figure](./img/small_pull.png)  
 
 This repository contains the implementation for the paper **"Peer Copilot: A Language Model-Powered Assistant for Behavioral Health Organizations"**, published at __.
 
-This work was done by __.
+This work was done by Gao Mo*, Naveen Raman*, Megan Chai, Cindy Peng, Shannon Pagdon, Nev Jones, Hong Shen, Peggy Swarbrick, Fei Fang.
 
 **TL;DR**
 
-Peer-run behavioral health organizations offer holistic assistance for mental health illnesses and substance use disorders through peer supporters, who help service users obtain recovery and wellness resources. Unfortunately, staffing and expertise limitations significantly hinder the operations of behavioral health organizations, making it hard to match all service user needs. 
+Peer-run behavioral health organizations offer holistic wellness support by combining mental health services with assistance for needs such as housing, employment, and income. 
+However, staffing and expertise limitations hinder behavioral health organizations, making meeting all service user needs difficult. 
 
-We address this issue through **Peer Copilot**, a language model-powered assistant that helps peer supporters discover resources, navigate government benefit programs, and construct goals for service users.Because information reliability is critical for peer supporters, we designed Peer Copilot to rely on verified information sources and avoid hallucinations.  
+We address this issue through PeerCoPilot, a large language model (LLM)-powered assistant that helps peer providers create wellness plans, construct step-by-step goals, and find resources for these goals. 
 
-Empirically, we conducted human evaluations with 14 peer supporters and 6 service users and found that both groups overwhelmingly supported using Peer Copilot in practice. Peer Copilot is now used by a group of peer supporters in a large behavioral health organization, and we are actively expanding the use of Peer Copilot. 
+Because information reliability is critical for peer providers, we designed PeerCoPilot to rely on information verified by peer providers via retrieval augmented generation.  
 
+We conducted human evaluations with 15 peer providers and 6 service users and found that both groups overwhelmingly supported using PeerCoPilot. 
 
+We show that PeerCoPilot provides more reliable and specific information than a baseline LLM. 
+PeerCoPilot is now used by a group of peer providers at cspnj, a large behavioral health organization serving over 10,000 service users, and we are actively expanding PeerCoPilot's use.  
 
-## Citation
-
-If you use our code for your research, please cite this as:
-
-```bibtex
-@article{__,
-  title={Peer Copilot: A Language Model-Powered Assistant for Behavioral Health Organizations},
-  author={__},
-  journal={__}, 
-  year={2025}
-}
-```
 
 ## Setup
 
