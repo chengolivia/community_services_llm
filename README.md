@@ -2,7 +2,7 @@
 
 ![Figure](./img/small_pull.png)  
 
-This repository contains the implementation for the paper **"Peer Copilot: A Language Model-Powered Assistant for Behavioral Health Organizations"**, published at __.
+This repository contains the implementation for the paper **"PeerCopilot: A Language Model-Powered Assistant for Behavioral Health Organizations"**.
 
 This work was done by Gao Mo*, Naveen Raman*, Megan Chai, Cindy Peng, Shannon Pagdon, Nev Jones, Hong Shen, Peggy Swarbrick, Fei Fang.
 
