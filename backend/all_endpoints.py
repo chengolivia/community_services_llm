@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from mental_health.generate_response import analyze_mental_health_situation
 from resources.generate_response import analyze_resource_situation
 from benefits.generate_response import analyze_benefits
+from outreach.process_profiles import get_all_outreach, get_all_service_users
 
 import socketio
 
@@ -41,6 +42,14 @@ class Item(BaseModel):
     text: str
     previous_text: list
     model: str
+
+@app.get("/service_user_list/")
+async def service_user_list(name):
+    return get_all_service_users(name)
+
+@app.get("/outreach_list/")
+async def outreach_list(name):
+    return get_all_outreach(name)
 
 @app.post("/benefit_response/")
 async def benefit_response(item: Item):
