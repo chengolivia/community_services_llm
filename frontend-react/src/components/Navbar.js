@@ -5,6 +5,9 @@ import HomeIcon from '../icons/Home.png';
 import WellnessGoalsIcon from '../icons/WellnessGoalsAssistant.png';
 import ResourceDatabaseIcon from '../icons/ResourceRecommendation.png';
 import BenefitEligibilityIcon from '../icons/BenefitEligibilityChecker.png';
+import ProfileManagerIcon from '../icons/ProfileManager.png';
+import OutreachCalendarIcon from '../icons/OutreachCalendar.png';
+
 
 function Navbar() {
   const location = useLocation();
@@ -64,6 +67,32 @@ function Navbar() {
             className="navbar-icon"
           />
           Benefit Eligibility
+        </Link>
+        <Link
+          to="/profile-manager"
+          className={`navbar-button ${
+            location.pathname === '/profile-manager' ? 'active' : ''
+          }`}
+        >
+          <img
+            src={ProfileManagerIcon}
+            alt="Profile Manager Icon"
+            className="navbar-icon"
+          />
+          Profile Manager
+        </Link>
+        <Link
+          to="/outreach-calendar"
+          className={`navbar-button ${
+            location.pathname === '/outreach-calendar' ? 'active' : ''
+          }`}
+        >
+          <img
+            src={OutreachCalendarIcon}
+            alt="Outreach Calendar Icon"
+            className="navbar-icon"
+          />
+          Outreach Calendar
         </Link>
       </div>
     </nav>

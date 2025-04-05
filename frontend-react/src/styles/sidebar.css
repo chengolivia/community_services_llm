@@ -1,0 +1,15 @@
+.sidebar {
+  position: fixed;
+  top: 0;
+  right: -100%; /* Initially hidden off-screen */
+  width: 20%;
+  height: 100%;
+  background-color: #eee;
+  color: black;
+  padding: 20px;
+  transition: right 0.5s ease-in-out;
+}
+
+.sidebar.open {
+  right: 0; /* Slide in when open */
+}
