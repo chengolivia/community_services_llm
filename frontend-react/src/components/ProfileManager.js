@@ -25,8 +25,8 @@ const ProfileManager = () => {
   let updateSidebar = (d) => {
     setSidebar(prevState => !prevState);  // Use functional form to toggle the sidebar state
     setContent(<div> 
-        {d["service_user_name"]} <br />
-        {d["location"]} <br />
+        <h1> {d["service_user_name"]} </h1>
+        Location: {d["location"]} 
       </div> )
   }
 
@@ -35,7 +35,7 @@ const ProfileManager = () => {
     <input 
         type="text" 
         placeholder="Search Name, Date, etc." 
-        className="search-box" 
+        className="profile-search-box" 
         value={search}  // Set input value to the state
         onChange={handleSearchChange}  // Update state on change
       />  <table>

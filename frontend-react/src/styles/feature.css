@@ -215,3 +215,18 @@
 .main-content.shifted {
   margin-right: 20%;
 }
+table {
+  border-collapse: separate;
+  border-radius: 10px;
+  border: 1px solid #D5D5D5;
+  overflow: hidden; /* Ensures the border-radius works properly */
+}
+
+th {
+  text-align: left;
+  padding: 20px;
+}
+
+td {
+  padding: 20px;
+}

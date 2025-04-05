@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import '../styles/calendar.css';
 import Sidebar from './Sidebar';
 import '../styles/feature.css';
+import SearchIcon from '../icons/Search.png';
 
 const OutreachCalendar = () => {
     const [weekCode, setWeekCode] = useState(null);
@@ -50,7 +51,7 @@ const OutreachCalendar = () => {
             let day_of_week = "Sunday";  // You can calculate day_of_week if needed
             let month = all_months[week_start.getMonth()];
             let date = week_start.getDate();
-
+            
             // Filter the outreach list based on the search term
             const outreach_code = outreach_by_week[all_weeks[i]]
                 .filter((d) => d["name"].toLowerCase().includes(search.toLowerCase()))
@@ -96,22 +97,23 @@ const OutreachCalendar = () => {
     let updateSidebar = (d) => {
         setSidebar(prevState => !prevState);  // Use functional form to toggle the sidebar state
         setContent(<div> 
-            {d["name"]} <br />
+            <h1> {d["name"]} </h1> 
+            Last Session: {d["last_session"]}
         </div>);
     };
 
     return (
         <div className="container">
             <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
-                <div className="header">
-                    <h2>February 2025</h2>
-                    <input 
+                <div  className="header">
+                    <h2 style={{paddingRight: "20px"}}>February 2025</h2>                     <input 
                         type="text" 
-                        placeholder="Search Name, Date, etc." 
+                        placeholder="Search" 
                         className="search-box" 
                         value={search}  // Set input value to the state
                         onChange={handleSearchChange}  // Update state on change
                     /> 
+
                 </div>
             
                 <div className="schedule">

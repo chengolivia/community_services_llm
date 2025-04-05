@@ -15,12 +15,12 @@ body {
 }
 
 .search-box {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 20px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 16px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding-left: 25px;
+  background: url("../icons/Search.png") no-repeat left;
+  background-size: 20px;
 }
 
 table {
