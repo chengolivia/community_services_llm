@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import '../styles/sidebar.css';
 
-const Sidebar = ({isOpen,content}) => {
-    return  <div className={`sidebar ${isOpen ? 'open' : ''}`}>
-        {content}
-  </div>
-
+const Sidebar = ({isOpen, content}) => {
+  return (
+    <div className={`sidebar ${isOpen ? 'open' : 'closed'}`}>
+      {isOpen ? content : null}
+    </div>
+  );
 };
 
 export default Sidebar;

@@ -31,16 +31,22 @@ body {
 }
 
 .profile-search-box {
-  padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   padding-left: 25px;
   background: url("../icons/Search.png") no-repeat left;
   background-size: 20px;
   width: 80%;
-  margin-bottom: 20px;
   font-size: 16px;
+  height: 36px;
+  flex-grow: 1;  /* Make the input take up remaining space */
+  margin-right: 10%;
 }
+
+.add img {
+  margin-right: 8px;  /* Space between the icon and the text */
+}
+
 
 .schedule .day {
   margin-bottom: 20px;
