@@ -7,7 +7,6 @@ from utils import *
 from resources.rag_utils import *
 # from rag_utils import *
 # from secret import naveen_key as key 
-import torch
 import os 
 
 key = os.environ.get("SECRET_KEY")
@@ -17,11 +16,11 @@ openai.api_key = key
 # csv_file_path = "data/all_resources_2025.csv"
 csv_file_path = "resources/data/all_resources_2025.csv"
 
-if torch.cuda.is_available():
-    print("CUDA is available!")
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2',device='cuda')
-else:
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+# if torch.cuda.is_available():
+#     print("CUDA is available!")
+#     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2',device='cuda')
+# else:
+model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
 
 documents, names, descriptions, urls, phones = process_resources(csv_file_path)
 documents_by_guidance = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
