@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+python-socketio
+openai
+sentence-transformers
+torch
+pandas
+faiss-cpu
+scikit-learn
+numpy
