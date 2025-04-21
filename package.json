@@ -5,7 +5,7 @@
   },
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
-    "start": "cd backend && uvicorn backend.all_endpoints:socket_app"
+    "start": "cd backend && uvicorn app.all_endpoints:socket_app"
   }
 }
 
