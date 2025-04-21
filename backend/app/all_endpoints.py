@@ -1,7 +1,5 @@
 import asyncio
 import os
-import re
-import warnings
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,23 +7,18 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from mental_health.generate_response import analyze_mental_health_situation
-from resources.generate_response import analyze_resource_situation
-from benefits.generate_response import analyze_benefits
+from app.submodules import *
 
 import socketio
 
 generation_tasks = {}
 
-# Performance settings for HuggingFace/torch etc.
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_DEBUG_CPU_TYPE"] = "5"
-warnings.filterwarnings("ignore", message=".*torchvision.*", category=UserWarning)
 
 app = FastAPI()
 
-# Allow both local dev and Heroku domain
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -46,39 +39,22 @@ async def add_keep_alive_header(request: Request, call_next):
     return response
 
 # Mount static React files
-app.mount("/", StaticFiles(directory="frontend-react/build", html=True), name="static")
+app.mount("/", StaticFiles(directory="../frontend/build", html=True), name="static")
 
 # Optional catch-all route to support React routing (e.g. /about, /dashboard)
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
-    return FileResponse("frontend-react/build/index.html")
+    return FileResponse("../frontend/build/index.html")
 
-# ... your existing API endpoints go here ...
-# e.g., /api/analyze_mental_health_situation, etc.
-
-class Item(BaseModel):
+class Message(BaseModel):
     text: str
     previous_text: list
     model: str
 
-@app.post("/benefit_response/")
-async def benefit_response(item: Item):
-    return StreamingResponse(
-        analyze_benefits(item.text, item.previous_text, item.model),
-        media_type='text/event-stream'
-    )
-
 @app.post("/wellness_response/")
-async def wellness_response(item: Item):
+async def wellness_response(message: Message):
     return StreamingResponse(
-        analyze_mental_health_situation(item.text, item.previous_text, item.model),
-        media_type='text/event-stream'
-    )
-
-@app.post("/resource_response/")
-async def resource_response(item: Item):
-    return StreamingResponse(
-        analyze_resource_situation(item.text, item.previous_text, item.model),
+        analyze_mental_health_situation(message.text, message.previous_text, message.model),
         media_type='text/event-stream'
     )
 
@@ -89,8 +65,6 @@ def process_raw_chunk(raw_chunk: str) -> str:
     if raw_chunk.startswith("data:"):
         return raw_chunk[len("data: "):].replace('\n','')
     return raw_chunk.strip()
-
-
 
 def accumulate_chunks(generator):
     """
