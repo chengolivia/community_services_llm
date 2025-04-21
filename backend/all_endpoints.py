@@ -72,6 +72,31 @@ async def resource_response(item: Item):
         media_type='text/event-stream'
     )
 
+class NewWellness(BaseModel):
+    patientName: str
+    lastSession: str
+    nextCheckIn: str
+    followUpMessage: str
+
+@app.post("/new_checkin/")
+async def create_item(item: NewWellness):
+    print("CHECKIN! {}".format(item))
+
+    w = open("data/profiles.csv","a") 
+    w.write("naveen,{},{},\"Freehold, New Jersey\",Active\n".format(item.patientName.lower().replace(" ","_"),item.patientName))
+    w.close()
+
+    last_year,last_month,last_date = item.nextCheckIn.split("-")
+    check_in_year,check_in_month,check_in_date = item.nextCheckIn.split("-")
+
+    w = open("data/outreach_details.csv","a") 
+    print("Line","-1,{},{},{},\"{}\"".format(item.patientName.lower().replace(" ","_"),"{}-{}-{}".format(last_month,last_date,last_year),"{}-{}-{}".format(check_in_month,check_in_date,check_in_year),item.followUpMessage))
+    w.write("-1,{},{},{},\"{}\"\n".format(item.patientName.lower().replace(" ","_"),"{}-{}-{}".format(last_month,last_date,last_year),"{}-{}-{}".format(check_in_month,check_in_date,check_in_year),item.followUpMessage))
+    w.close()
+
+    return {"message": "Item received", "item": item}
+
+
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 

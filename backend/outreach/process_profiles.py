@@ -61,6 +61,16 @@ def get_all_service_users(user_name):
             Location"""
     
     all_users = csv_to_dictionary("data/profiles.csv")
+    all_outreach = csv_to_dictionary("data/outreach_details.csv")
+
     all_users = [i for i in all_users if i['provider'] == user_name]
+
+
+    for i in all_users:
+        for j in all_outreach:
+            if i['service_user_id'] == j['user_name']:
+                for k in ["last_session","check_in","follow_up_message"]:
+                    i[k] = j[k]
+
     print(all_users)
     return all_users 
