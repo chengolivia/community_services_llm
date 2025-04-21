@@ -1,27 +1,7 @@
 import openai
 import PyPDF2
-import pyttsx3
 from fpdf import FPDF
 
-
-def read_text(text):
-    """Read some text outloud
-    
-    Arguments:
-        text: String, some text to read
-    
-    Returns: Nothing
-    
-    Side Effects: Reads the text outloud"""
-
-    engine = pyttsx3.init()
-    
-    # Set properties, such as the speech rate
-    engine.setProperty('rate', 150)  # Adjust as needed
-    
-    # Speak the text
-    engine.say(text)
-    engine.runAndWait()
 
 def write_text_pdf(text,pdf_loc):
     """Save some text into a PDF
