@@ -5,7 +5,8 @@ import warnings
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from mental_health.generate_response import analyze_mental_health_situation
@@ -16,26 +17,44 @@ import socketio
 
 generation_tasks = {}
 
-
+# Performance settings for HuggingFace/torch etc.
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_DEBUG_CPU_TYPE"] = "5"
 warnings.filterwarnings("ignore", message=".*torchvision.*", category=UserWarning)
 
 app = FastAPI()
+
+# Allow both local dev and Heroku domain
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://feif-i7.isri.cmu.edu:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://feif-i7.isri.cmu.edu:3000",
+        "https://cspnj-17b2f187c833.herokuapp.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Keep-alive middleware
 @app.middleware("http")
 async def add_keep_alive_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["Connection"] = "keep-alive"
     return response
+
+# Mount static React files
+app.mount("/", StaticFiles(directory="frontend-react/build", html=True), name="static")
+
+# Optional catch-all route to support React routing (e.g. /about, /dashboard)
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    return FileResponse("frontend-react/build/index.html")
+
+# ... your existing API endpoints go here ...
+# e.g., /api/analyze_mental_health_situation, etc.
 
 class Item(BaseModel):
     text: str

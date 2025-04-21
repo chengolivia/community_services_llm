@@ -1,0 +1,1 @@
+web: uvicorn backend.all_endpoints:socket_app --host=0.0.0.0 --port=${PORT}

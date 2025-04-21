@@ -1,9 +1,12 @@
 import openai 
 from utils import call_chatgpt_api_all_chats, stream_process_chatgpt_response
-from secret import naveen_key as key 
+# from secret import naveen_key as key 
 import re 
 import time 
 from benefits.eligibility_check import eligibility_check
+import os 
+
+key = os.environ.get("SECRET_KEY")
 
 openai.api_key = key
 system_prompt = open("benefits/prompts/system_prompt.txt").read()

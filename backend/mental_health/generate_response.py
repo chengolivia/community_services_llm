@@ -1,12 +1,15 @@
 import openai 
 from utils import call_chatgpt_api_all_chats, stream_process_chatgpt_response
-from secret import naveen_key as key 
+# from secret import naveen_key as key 
 from resources.generate_response import analyze_situation_rag, analyze_situation_rag_guidance
 import concurrent.futures
 import re
 import time 
 import json 
 from benefits.eligibility_check import eligibility_check
+import os 
+
+key = os.environ.get("SECRET_KEY")
 
 openai.api_key = key
 

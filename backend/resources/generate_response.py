@@ -6,8 +6,11 @@ import time
 from utils import *
 from resources.rag_utils import *
 # from rag_utils import *
-from secret import naveen_key as key 
+# from secret import naveen_key as key 
 import torch
+import os 
+
+key = os.environ.get("SECRET_KEY")
 
 openai.api_key = key
 # csv_file_path = "resources/data/all_resources.csv"
