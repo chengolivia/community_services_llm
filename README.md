@@ -1,6 +1,6 @@
 # PeerCopilot: A Language Model-Powered Assistant for Behavioral Health Organizations
 
-![Figure](./img/small_pull.png | width=512 )  
+<img src="./img/small_pull.png" width="512">
 
 This repository contains the implementation for the paper **"PeerCopilot: A Language Model-Powered Assistant for Behavioral Health Organizations"**.
 
