@@ -1,4 +1,9 @@
-{ "scripts": {
-  "heroku-postbuild": "cd frontend-react && npm install && npm run build"
-}
+{
+  "scripts": {
+    "heroku-postbuild": "cd frontend-react && npm install && npm run build",
+    "start": "serve -s frontend-react/build"
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
 }
