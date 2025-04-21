@@ -12,3 +12,7 @@ backend/uploads
 node_modules/
 package-lock.json
 data_analysis/
+frontend-react/node_modules/
+frontend-react/build/
+backend/__pycache__/
+
