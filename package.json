@@ -1,9 +1,11 @@
 {
-  "scripts": {
-    "heroku-postbuild": "cd frontend-react && npm install && npm run build",
-    "start": "serve -s frontend-react/build"
+  "name": "community-services",
+  "engines": {
+    "node": "18.x"
   },
-  "dependencies": {
-    "serve": "^14.2.0"
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd backend && uvicorn backend.all_endpoints:socket_app"
   }
 }
+
