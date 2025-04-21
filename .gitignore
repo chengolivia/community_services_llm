@@ -11,3 +11,4 @@ backend/*/secret.py
 backend/uploads
 node_modules/
 package-lock.json
+data_analysis/
