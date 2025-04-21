@@ -1,3 +1,4 @@
-"scripts": {
+{ "scripts": {
   "heroku-postbuild": "cd frontend-react && npm install && npm run build"
+}
 }
