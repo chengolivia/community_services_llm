@@ -51,13 +51,6 @@ class Message(BaseModel):
     previous_text: list
     model: str
 
-@app.post("/wellness_response/")
-async def wellness_response(message: Message):
-    return StreamingResponse(
-        analyze_mental_health_situation(message.text, message.previous_text, message.model),
-        media_type='text/event-stream'
-    )
-
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
@@ -186,17 +179,8 @@ async def start_generation(sid, data):
     text = data.get("text", "")
     previous_text = data.get("previous_text", [])
     model = data.get("model")
-    tool = data.get("tool")
     
-    if tool == "benefit":
-        generator = analyze_benefits(text, previous_text, model)
-    elif tool == "wellness":
-        generator = analyze_mental_health_situation(text, previous_text, model)
-    elif tool == "resource":
-        generator = analyze_resource_situation(text, previous_text, model)
-    else:
-        await sio.emit("generation_update", {"chunk": "Error: Unknown tool."}, room=sid)
-        return
+    generator = analyze_mental_health_situation(text, previous_text, model)
     
     if sid in generation_tasks:
         generation_tasks[sid].cancel()

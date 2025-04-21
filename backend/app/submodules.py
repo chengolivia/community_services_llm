@@ -118,7 +118,6 @@ def get_questions_resources(situation,all_messages):
         and a string, containing a dictionary on which 
         external resources to load """
     
-    start = time.time() 
     all_message_list = [[{'role': 'system', 'content': mental_health_system_prompt}]+all_messages+[{"role": "user", "content": situation}]]
     all_message_list.append([{'role': 'system', 'content': question_prompt}]+all_messages+[{"role": "user", "content": situation}])
     all_message_list.append([{'role': 'system', 'content': resource_prompt}]+all_messages+[{"role": "user", "content": situation}])
@@ -127,7 +126,6 @@ def get_questions_resources(situation,all_messages):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
-    start = time.time()
 
     initial_responses = list(initial_responses)
 
@@ -174,7 +172,6 @@ def analyze_mental_health_situation(situation, all_messages,model):
     
     if model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
-        time.sleep(4)
         response = call_chatgpt_api_all_chats(all_message_list,max_tokens=750)
         yield from stream_process_chatgpt_response(response)
         return 
@@ -197,29 +194,6 @@ def analyze_mental_health_situation(situation, all_messages,model):
     new_message += all_messages+[{"role": "user", "content": situation}, {'role': 'user' , 'content': response}]
     response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=1000)
     yield from stream_process_chatgpt_response(response)
-
-def analyze_resource_situation(situation, all_messages,text_model):
-    """Process user situation + find the relevant resources.
-
-    Arguments:
-        situation: String, last message user sent
-        all_messages: List of dictionaries, with all the messages
-        text_model: String, either chatgpt or copilot 
-        
-    Returns: Streaming response in text"""
-
-    if text_model == 'chatgpt':
-        all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide resourecs to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
-        time.sleep(4)
-        response = call_chatgpt_api_all_chats(all_message_list,max_tokens=500)
-        yield from stream_process_chatgpt_response(response)
-
-    full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user']+[situation])
-
-    response = analyze_situation_rag(full_situation,k=10)
-    stream_response = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a helpful assistant who formats the list of resources provided in a nice Markdown format. Give the list of the most relevant resources along with explanations of why they are relevant. Try to make sure resources are relevant to the location'},
-                                                  {'role': 'user','content': response}],max_tokens=500)
-    yield from stream_process_chatgpt_response(stream_response)
 
 def analyze_situation_rag(situation,k=5):
     """Given a string, find the most similar resources using RAG
