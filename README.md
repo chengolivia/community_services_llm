@@ -1,6 +1,6 @@
 # PeerCopilot: A Language Model-Powered Assistant for Behavioral Health Organizations
 
-![Figure](./img/small_pull.png)  
+![Figure](./img/small_pull.png | width=512 )  
 
 This repository contains the implementation for the paper **"PeerCopilot: A Language Model-Powered Assistant for Behavioral Health Organizations"**.
 
@@ -39,6 +39,15 @@ conda env create --file env.yaml
 conda activate peer-copilot
 ```
 
+Finally, create a file called `secret.py` with the following contents: 
+```python
+new_key = 'sk-proj...'
+```
+
+Then in `benefits/generate_response.py`, `mental_health/generate_response.py`, and `resources/generate_response.py`, replace `from secret import naveen_key as key` with `from secret import new_key as key`. 
+
+
+
 ### Frontend Installation
 
 To set up the frontend, navigate into the **frontend-react** folder and install dependencies using npm:
@@ -68,11 +77,3 @@ npm start
 Once both services are running, the tool will be available at:
 
 http://localhost:3000/
-
-### PeerCoPilot User Tutorial 
-
-[Tutorial](https://www.youtube.com/watch?v=4rg1wmo2Y8w)
-
-
-
-

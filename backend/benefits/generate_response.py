@@ -1,6 +1,6 @@
 import openai 
 from utils import call_chatgpt_api_all_chats, stream_process_chatgpt_response
-from secret import gao_key as key 
+from secret import naveen_key as key 
 import re 
 import time 
 from benefits.eligibility_check import eligibility_check
@@ -59,7 +59,6 @@ def analyze_benefits(situation, all_messages,model):
     if model == 'chatgpt':
         print("Using ChatGPT")
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provide information on benefit eligibility'}] + all_messages + [{'role': 'user', 'content': situation}]
-        time.sleep(4)
 
         response = call_chatgpt_api_all_chats(all_message_list)
         yield from stream_process_chatgpt_response(response)
