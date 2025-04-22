@@ -3,11 +3,11 @@ import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.submodules import *
+from app.submodules import construct_response
 
 import socketio
 
@@ -23,28 +23,24 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://feif-i7.isri.cmu.edu:3000",
-        "https://cspnj-17b2f187c833.herokuapp.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Keep-alive middleware
+# Run the React frontend
 @app.middleware("http")
 async def add_keep_alive_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["Connection"] = "keep-alive"
     return response
-
-# Mount static React files
-app.mount("/", StaticFiles(directory="../frontend/build", html=True), name="static")
-
-# Optional catch-all route to support React routing (e.g. /about, /dashboard)
+app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
     return FileResponse("../frontend/build/index.html")
+
+# Handle Socket Messages
 
 class Message(BaseModel):
     text: str
@@ -180,7 +176,7 @@ async def start_generation(sid, data):
     previous_text = data.get("previous_text", [])
     model = data.get("model")
     
-    generator = analyze_mental_health_situation(text, previous_text, model)
+    generator = construct_response(text, previous_text, model)
     
     if sid in generation_tasks:
         generation_tasks[sid].cancel()
@@ -198,3 +194,6 @@ async def reset_session(sid):
     await sio.emit("reset_ack", {"message": "Session reset."}, room=sid)
 
 
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    return FileResponse("../frontend/build/index.html")

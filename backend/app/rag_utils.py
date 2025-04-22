@@ -2,6 +2,7 @@ import pandas as pd
 import faiss
 import os 
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
 def load_embeddings(file_path, documents, model):
     """Load or compute embeddings and save them
@@ -50,7 +51,7 @@ def process_guidance_resources(guidance_types):
 
     documents_by_guidance = {}
     for guidance in guidance_types:
-        with open(f"prompts/mental_health/resources/{guidance}.txt") as file:
+        with open(f"prompts/external/{guidance}.txt") as file:
             resource_data = [line for line in file.read().split("\n") if len(line) > 10]
             documents_by_guidance[guidance] = [f"{line}: {resource_data[i]}" for i, line in enumerate(resource_data)]
     return documents_by_guidance
@@ -66,3 +67,34 @@ def create_faiss_index(embeddings):
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
     return index
+
+
+def get_all_embeddings(resource_list):
+    """Get all the saved embeddings to run RAG
+    
+    Arguments:
+        resource_list: String, path to a CSV file with all the resources
+    
+    Returns: A SentenceTransforemr Model and a dictionary
+        mapping a string to an Index for different embeddins"""
+
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+
+    documents, names, urls, phones, descriptions = process_resources(resource_list)
+    formatted_documents = [f"Resource: {names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in range(len(descriptions))]
+
+    documents = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
+
+    saved_indices = {}
+    for guidance, doc_list in documents.items():
+        embeddings_file_path = f"saved_embeddings/saved_embedding_{guidance}.npy"
+        embeddings = load_embeddings(embeddings_file_path, doc_list, model)
+        saved_indices[guidance] = create_faiss_index(embeddings)
+
+    documents['resource'] = formatted_documents
+
+    file_path = "saved_embeddings/saved_embedding.npy"
+    embeddings = load_embeddings(file_path, documents, model)
+    saved_indices['resource'] = create_faiss_index(embeddings)
+
+    return model, saved_indices, documents

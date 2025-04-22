@@ -100,3 +100,26 @@ def stream_process_chatgpt_response(response):
             current_response = current_response.replace("\n", "<br/>")
             yield "data: " + current_response + "\n\n"
     yield "[DONE]\n\n" 
+
+
+def get_all_prompts():
+    """Load all the prompts
+    
+    Arguments: None
+    
+    Returns: Dictionary internal_prompts and external_prompts
+        mapping prompt name to a string"""
+
+    internal_prompt_names = ["benefit_system","benefit_extract","goal","followup_question","resource","orchestration","which_resource"]
+    external_prompt_names = ['human_resource','peer','crisis','trans']
+
+    internal_prompts = {}
+    external_prompts = {}
+
+    for i in internal_prompt_names:
+        internal_prompts[i] = open("prompts/internal/{}.txt".format(i)).read()
+
+    for i in external_prompt_names:
+        external_prompts[i] = open("prompts/external/{}.txt".format(i)).read()
+
+    return internal_prompts, external_prompts

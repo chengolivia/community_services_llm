@@ -14,7 +14,7 @@ Peer-run behavioral health organizations offer holistic wellness support by comb
 
 ## Setup
 
-### Backend Installation
+### Installation
 
 To set up the backend environment, first clone this repository:
 
@@ -22,49 +22,22 @@ To set up the backend environment, first clone this repository:
 git clone https://github.com/naveenr414/community_services_llm.git
 ```
 
-Then, navigate into the **backend** folder and install the dependencies:
+Then install dependencies and set your OpenAI key
 
 ```bash
-cd backend
-conda env create --file env.yaml
-conda activate peer-copilot
-```
-
-Finally, create a file called `secret.py` with the following contents: 
-```python
-new_key = 'sk-proj...'
-```
-
-Then in `benefits/generate_response.py`, `mental_health/generate_response.py`, and `resources/generate_response.py`, replace `from secret import naveen_key as key` with `from secret import new_key as key`. 
-
-
-
-### Frontend Installation
-
-To set up the frontend, navigate into the **frontend-react** folder and install dependencies using npm:
-
-```bash
-cd frontend-react
-npm install
+pip install -r requirements.txt
+npm run build
+export SECRET_KEY=...
 ```
 
 ### Running the Application
 
-After installing dependencies for both the backend and frontend, follow these steps to run the application:
+After installing dependencies run the app through the following:
 
-#### Start the backend:
 ```bash
-cd backend
-uvicorn all_endpoints:socket_app --reload --port 8000
+npm run build
+npm run start
 ```
+PeerCoPilot will then be available at:
 
-#### Start the frontend:
-Open a new terminal and run:
-```bash
-cd frontend-react
-npm start
-```
-
-Once both services are running, the tool will be available at:
-
-http://localhost:3000/
+http://127.0.0.1:8000/
