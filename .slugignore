@@ -1,0 +1,17 @@
+.DS_Store
+*/.ipynb_checkpoints
+*/.DS_Store
+database/results/*.npy
+*/__pycache__
+*/secret.py
+backend/mental_health/secret.py
+backend/__pycache__/
+backend/uploads
+backend/saved_embeddings/
+node_modules/
+package-lock.json
+data_analysis/
+frontend/node_modules/
+frontend/build/
+backend/__pycache__/
+
