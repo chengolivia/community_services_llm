@@ -13,6 +13,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     conversation, setConversation,
     submitted,
     chatConvo, setChatConvo,
+    organization,setOrganization,
   } = useContext(context);
 
   const inputRef = useRef(null);
@@ -127,6 +128,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
         text: messageText,
         previous_text: chatConvo,
         model: "A",
+        organization: organization, 
         tool,
       });
     } else {

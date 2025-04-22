@@ -46,6 +46,7 @@ class Message(BaseModel):
     text: str
     previous_text: list
     model: str
+    organization: str
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
@@ -175,8 +176,9 @@ async def start_generation(sid, data):
     text = data.get("text", "")
     previous_text = data.get("previous_text", [])
     model = data.get("model")
+    organization = data.get("organization")
     
-    generator = construct_response(text, previous_text, model)
+    generator = construct_response(text, previous_text, model,organization)
     
     if sid in generation_tasks:
         generation_tasks[sid].cancel()

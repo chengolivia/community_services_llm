@@ -23,7 +23,7 @@ def load_embeddings(file_path, documents, model):
         np.save(file_path, embeddings)
         return embeddings
 
-def process_resources(csv_file_path):
+def process_resources(resource_dict):
     """Load and process resources data into a list of strings
     
     Arguments:
@@ -32,13 +32,19 @@ def process_resources(csv_file_path):
     
     Returns: List of strings, each represents a document"""
 
-    resources_df = pd.read_csv(csv_file_path)
-    names = list(resources_df['service'])
-    descriptions = list(resources_df['description'])
-    urls = list(resources_df['url'])
-    phones = list(resources_df['phone'])
+    d = {}
+    for key in resource_dict:
+        csv_file_path = resource_dict[key]
+        resources_df = pd.read_csv(csv_file_path)
+        names = list(resources_df['service'])
+        descriptions = list(resources_df['description'])
+        urls = list(resources_df['url'])
+        phones = list(resources_df['phone'])
 
-    return ["{}: {}".format(names[i], descriptions[i]) for i in range(len(names))], names, descriptions, urls, phones
+        formatted_documents = [f"Resource: {names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in range(len(descriptions))]
+        d[key] = formatted_documents
+
+    return d
 
 def process_guidance_resources(guidance_types):
     """Load guidance-specific resources and process them
@@ -69,7 +75,7 @@ def create_faiss_index(embeddings):
     return index
 
 
-def get_all_embeddings(resource_list):
+def get_all_embeddings(resource_dict):
     """Get all the saved embeddings to run RAG
     
     Arguments:
@@ -80,8 +86,7 @@ def get_all_embeddings(resource_list):
 
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
 
-    documents, names, urls, phones, descriptions = process_resources(resource_list)
-    formatted_documents = [f"Resource: {names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in range(len(descriptions))]
+    org_resources = process_resources(resource_dict)
 
     documents = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
 
@@ -91,10 +96,10 @@ def get_all_embeddings(resource_list):
         embeddings = load_embeddings(embeddings_file_path, doc_list, model)
         saved_indices[guidance] = create_faiss_index(embeddings)
 
-    documents['resource'] = formatted_documents
-
-    file_path = "saved_embeddings/saved_embedding.npy"
-    embeddings = load_embeddings(file_path, documents, model)
-    saved_indices['resource'] = create_faiss_index(embeddings)
+    for key in org_resources:
+        documents[key] = org_resources[key]
+        file_path = "saved_embeddings/saved_embedding_{}.npy".format(key)
+        embeddings = load_embeddings(file_path, documents[key], model)
+        saved_indices['resource'] = create_faiss_index(embeddings)
 
     return model, saved_indices, documents

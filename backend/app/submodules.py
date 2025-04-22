@@ -12,9 +12,9 @@ from app.utils import call_chatgpt_api_all_chats, stream_process_chatgpt_respons
 openai.api_key = os.environ.get("SECRET_KEY")
 
 internal_prompts, external_prompts = get_all_prompts()
-model, saved_indices, documents = get_all_embeddings("data/all_resources_2025.csv")
+model, saved_indices, documents = get_all_embeddings({'cspnj': 'data/cspnj_2025.csv'})
 
-def construct_response(situation, all_messages,model):
+def construct_response(situation, all_messages,model,organization):
     """Process user situation + generate SMART goals, etc.
 
     Arguments:
@@ -23,7 +23,7 @@ def construct_response(situation, all_messages,model):
         model: String, either chatgpt or copilot 
         
     Returns: Streaming response in text"""
-    
+
     if model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
         response = call_chatgpt_api_all_chats(all_message_list,max_tokens=750)
@@ -31,7 +31,7 @@ def construct_response(situation, all_messages,model):
         return 
 
     # Initially extract information via prompting + trusted resources
-    initial_response, external_resources = get_questions_resources(situation,all_messages)
+    initial_response, external_resources = get_questions_resources(situation,all_messages,organization)
 
     # Combine these extracted information via the orchestration prompt/module
     new_message = [{'role': 'system', 'content': internal_prompts['orchestration']}]
@@ -40,7 +40,7 @@ def construct_response(situation, all_messages,model):
     response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=1000)
     yield from stream_process_chatgpt_response(response)
 
-def get_questions_resources(situation,all_messages):
+def get_questions_resources(situation,all_messages,organization):
     """Process user situation + generate questions and resources
 
     Arguments:
@@ -53,7 +53,7 @@ def get_questions_resources(situation,all_messages):
     
     all_message_list = []
     for prompt in ['goal','followup_question','resource','which_resource','benefit_extract']:
-        all_message_list.append([{'role': 'system', 'content': internal_prompts[prompt]}]+all_messages+[{"role": "user", "content": situation}])
+        all_message_list.append([{'role': 'system', 'content': internal_prompts[prompt].replace("[Organization]",organization)}]+all_messages+[{"role": "user", "content": situation}])
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
     initial_responses = list(initial_responses)
@@ -62,7 +62,7 @@ def get_questions_resources(situation,all_messages):
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(initial_responses[2]),flags=re.DOTALL)
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        resources = list(executor.map(lambda s: extract_resources(s,{'resource': True},k=5), matches))
+        resources = list(executor.map(lambda s: extract_resources(s,{'resource_{}'.format(organization): True},k=5), matches))
     
     # Combine prompts with external information on benefits
     pattern = r"\[Situation\](.*?)\[/Situation\]"
