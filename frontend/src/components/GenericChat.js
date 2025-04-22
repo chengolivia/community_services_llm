@@ -21,6 +21,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const newSocket = io(socketServerUrl, {
       transports: ['websocket'],
