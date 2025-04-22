@@ -97,9 +97,9 @@ def get_all_embeddings(resource_dict):
         saved_indices[guidance] = create_faiss_index(embeddings)
 
     for key in org_resources:
-        documents[key] = org_resources[key]
+        documents['resource_{}'.format(key)] = org_resources[key]
         file_path = "saved_embeddings/saved_embedding_{}.npy".format(key)
-        embeddings = load_embeddings(file_path, documents[key], model)
-        saved_indices['resource'] = create_faiss_index(embeddings)
+        embeddings = load_embeddings(file_path, documents['resource_{}'.format(key)], model)
+        saved_indices['resource_{}'.format(key)] = create_faiss_index(embeddings)
 
     return model, saved_indices, documents

@@ -41,3 +41,11 @@ npm run start
 PeerCoPilot will then be available at:
 
 http://127.0.0.1:8000/
+
+### Extending to New Organizations
+To extend this to new organizations, prepare a file called `<name>_resources.txt` in the backend/data folder
+Next, scrape the resources by running
+```bash
+python scrape_resources.py --org_name {name} --location "<location/state>"
+```
+Finally, add this new organization to `Home.js` and `submodules.py`. 

@@ -12,7 +12,7 @@ from app.utils import call_chatgpt_api_all_chats, stream_process_chatgpt_respons
 openai.api_key = os.environ.get("SECRET_KEY")
 
 internal_prompts, external_prompts = get_all_prompts()
-model, saved_indices, documents = get_all_embeddings({'cspnj': 'data/cspnj_2025.csv'})
+model, saved_indices, documents = get_all_embeddings({'cspnj': 'data/cspnj.csv','clhs': 'data/clhs.csv'})
 
 def construct_response(situation, all_messages,model,organization):
     """Process user situation + generate SMART goals, etc.
@@ -25,7 +25,7 @@ def construct_response(situation, all_messages,model,organization):
     Returns: Streaming response in text"""
 
     if model == 'chatgpt':
-        all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for CSPNJ, a peer-peer mental health organization. Please provider helpful responses to the client'}] + all_messages + [{'role': 'user', 'content': situation}]
+        all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for {}, a peer-peer mental health organization. Please provider helpful responses to the client'.format(organization)}] + all_messages + [{'role': 'user', 'content': situation}]
         response = call_chatgpt_api_all_chats(all_message_list,max_tokens=750)
         yield from stream_process_chatgpt_response(response)
         return 
