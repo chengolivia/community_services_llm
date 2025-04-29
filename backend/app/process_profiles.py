@@ -1,9 +1,12 @@
-import csv
 import sqlite3
+from app.generate_outreach import autogenerate_conversations
+
 DATABASE_PATH = "data/wellness_database.db"
 
 def get_all_service_users(provider_username):
     """Get all service users for a given provider with their latest outreach details."""
+    autogenerate_conversations(provider_username)
+
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row  # Return results as dictionaries
     cursor = conn.cursor()
@@ -27,6 +30,8 @@ def get_all_service_users(provider_username):
 
 def get_all_outreach(provider_username):
     """Get all outreach details for service users of a given provider."""
+    autogenerate_conversations(provider_username)
+    
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()

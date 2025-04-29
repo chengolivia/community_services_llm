@@ -70,6 +70,7 @@ def init_database():
         text TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+        outreach_generated BOOLEAN,
         UNIQUE(conversation_id, sender, text)
     )
     ''')
@@ -143,8 +144,8 @@ def update_conversation(metadata, previous_text):
     cursor.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,))
     if cursor.fetchone() is None:
         cursor.execute(
-            "INSERT INTO conversations (id, username) VALUES (?, ?)",
-            (conversation_id, username)
+            "INSERT INTO conversations (id, username,outreach_generated) VALUES (?, ?, ?)",
+            (conversation_id, username,False)
         )
 
     # Insert each message
@@ -160,3 +161,19 @@ def update_conversation(metadata, previous_text):
 
     conn.commit()
     conn.close()
+
+def add_outreach_column():
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    # Add the 'outreach_generated' column to the 'conversations' table if it doesn't exist
+    cursor.execute('''
+        ALTER TABLE conversations
+        ADD COLUMN outreach_generated BOOLEAN DEFAULT 0
+    ''')
+
+    conn.commit()
+    conn.close()
+
+
+
