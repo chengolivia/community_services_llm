@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,8 +9,10 @@ from pydantic import BaseModel
 
 from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
+from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 import socketio
+from datetime import timedelta
 
 generation_tasks = {}
 
@@ -67,6 +69,42 @@ async def create_item(item: NewWellness):
     w.close()
 
     return {"message": "Item received", "item": item}
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    role: str
+
+# Add this endpoint to your FastAPI app
+@app.post("/api/auth/login")
+async def login(login_data: LoginRequest):
+    print("Analyzing login_data {} {}".format(login_data.username,login_data.password))
+    success, message, role = authenticate_user(login_data.username, login_data.password)
+    
+    if not success:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": login_data.username, "role": role},
+        expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        role=role
+    )
+
 
 app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
 

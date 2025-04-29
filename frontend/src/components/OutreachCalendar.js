@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import '../styles/calendar.css';
 import Sidebar from './Sidebar';
 import '../styles/feature.css';
 import SidebarInformation from './SidebarInformation';
+import { WellnessContext } from './AppStateContextProvider';
 
 const OutreachCalendar = () => {
     const [weekCode, setWeekCode] = useState(null);
@@ -10,6 +11,8 @@ const OutreachCalendar = () => {
     const [search, setSearch] = useState('');
     const [allOutreach, setAllOutreach] = useState([]);
     const [currentPatient, setCurrentPatient] = useState({});
+    const { user } = useContext(WellnessContext);
+
     const all_months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     // Step 2: Create the handler for input changes
@@ -76,7 +79,7 @@ const OutreachCalendar = () => {
     };
 
     const getAllOutreach = async () => {
-        const response = await fetch(`http://${window.location.hostname}:8000/outreach_list/?name=naveen`);
+        const response = await fetch(`http://${window.location.hostname}:8000/outreach_list/?name=${user.username}`);
         response.json().then((res) => {
             setAllOutreach(res); // Save the fetched data
             updateOutreach(res); // Process the data

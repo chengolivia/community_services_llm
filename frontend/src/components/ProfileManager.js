@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import Sidebar from './Sidebar';
 import '../styles/feature.css';
 import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
+import { WellnessContext } from './AppStateContextProvider';
 
 const ProfileManager = () => {
   const [allNames, setAllNames] = useState([{}]);
   const [hasSidebar, setSidebar] = useState(false);
   const [search, setSearch] = useState('');
-  
+  const { user } = useContext(WellnessContext);
+
   // Form state
   const [currentPatient, setCurrentPatient] = useState({});
   const [isEditable, setIsEditable] = useState(false);
@@ -73,7 +75,7 @@ const ProfileManager = () => {
   };
 
   const getAllNames = async () => {
-    const response = await fetch(`http://${window.location.hostname}:8000/service_user_list/?name=naveen`);
+    const response = await fetch(`http://${window.location.hostname}:8000/service_user_list/?name=${user.username}`);
     response.json().then((res) => setAllNames(res));
   };
 

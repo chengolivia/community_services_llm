@@ -11,7 +11,7 @@ import { WellnessContext } from './AppStateContextProvider';
 function Navbar() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { organization } = useContext(WellnessContext);
+  const { organization, user } = useContext(WellnessContext);
   
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
@@ -24,6 +24,7 @@ function Navbar() {
     <nav className="navbar">
       <h1 className="navbar-title">PeerCoPilot</h1>
       <h3 className="navbar-subtitle">{displayOrganization}</h3>
+      <h3 className="navbar-subtitle">{user.username}</h3>
       <div className="hamburger" onClick={toggleMenu}>
         &#9776; {/* Hamburger icon */}
       </div>

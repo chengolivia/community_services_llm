@@ -1,12 +1,12 @@
 import React, { useContext, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import '../App.css';
 import Logo from '../icons/Logo.png';
 import {WellnessContext } from './AppStateContextProvider';
 
 function Home() {
-  const { organization, setOrganization } = useContext(WellnessContext);
-
+  const { organization, setOrganization, user } = useContext(WellnessContext);
+  
   const handleOrganizationChange = (e) => {
     const newOrg = e.target.value.toLowerCase();
     console.log("Setting organization to:", newOrg); // For debugging
@@ -17,13 +17,19 @@ function Home() {
     console.log("Current organization:", organization);
   }, [organization]);
 
+    
+  // Redirect to login if not authenticated
+  if (user.username === '' || !user.isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
   return (
     <div className="home-container">
       <div className="home-logo">
         <img src={Logo} alt="Logo" />
       </div>
       
-      <h1 className="home-heading">Welcome!</h1>
+      <h1 className="home-heading">Welcome, {user.username}!</h1>
       <p className="home-subheading">All Tools at One Glance:</p>
       <div className="tools">  
         <div className="tiles-container">
