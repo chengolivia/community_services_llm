@@ -1,6 +1,11 @@
 {
-  "dependencies": {
-    "jspdf": "^2.5.2",
-    "marked": "^15.0.4"
+  "name": "community-services",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd backend && python -m uvicorn app.all_endpoints:socket_app"
   }
 }
+

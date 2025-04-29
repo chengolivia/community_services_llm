@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+python-socketio
+openai
+pandas
+faiss-cpu
+scikit-learn
+numpy
+sentence-transformers==3.2.1
+PyPDF2
+fpdf

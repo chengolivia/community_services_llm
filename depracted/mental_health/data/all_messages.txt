@@ -1,3 +1,0 @@
-User: Hello
-
-Co-Pilot: Hello! It's great to hear from you. How are you doing today? If you have a situation you'd like to discuss or need help with, feel free to share!
