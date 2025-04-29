@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import '../styles/calendar.css';
 import Sidebar from './Sidebar';
 import '../styles/feature.css';
+import SidebarInformation from './SidebarInformation';
 
 const OutreachCalendar = () => {
     const [weekCode, setWeekCode] = useState(null);
     const [hasSidebar, setSidebar] = useState(false);
-    const [sidebarContent, setContent] = useState(null);
     const [search, setSearch] = useState('');
     const [allOutreach, setAllOutreach] = useState([]);
+    const [currentPatient, setCurrentPatient] = useState({});
+    const all_months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     // Step 2: Create the handler for input changes
     const handleSearchChange = (e) => {
@@ -43,7 +45,6 @@ const OutreachCalendar = () => {
         let all_weeks = Object.keys(outreach_by_week).sort();
         let week_code = [];
     
-        const all_months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     
         for (let i = 0; i < all_weeks.length; i++) {
             let week_start = new Date(all_weeks[i] * 1000);
@@ -93,33 +94,47 @@ const OutreachCalendar = () => {
         }
     }, [search, allOutreach]);  // Dependency array includes 'search' and 'allOutreach'
 
-    let updateSidebar = (d) => {
-        setSidebar(prevState => !prevState);  // Use functional form to toggle the sidebar state
-        setContent(<div> 
-            <h1> {d["name"]} </h1> 
-            Last Session: {d["last_session"]}
-        </div>);
+    let updateSidebar = (patient) => {
+        setCurrentPatient({
+            'service_user_name': patient.name || '', 
+            'last_session': patient.last_session || '', 
+            'check_in': patient.check_in || '', 
+            'follow_up_message': patient.follow_up_message || ''
+        });    
+        setSidebar(true);
     };
 
     return (
         <div className="container">
             <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
                 <div  className="header">
-                    <h2 style={{paddingRight: "20px"}}>February 2025</h2>                     <input 
+                    <h2 style={{paddingRight: "20px"}}>{all_months[new Date().getMonth()]} {new Date().getFullYear()}</h2>                    
+                     <input 
                         type="text" 
                         placeholder="Search" 
                         className="search-box" 
                         value={search}  // Set input value to the state
                         onChange={handleSearchChange}  // Update state on change
                     /> 
-
                 </div>
             
                 <div className="schedule">
                     {weekCode}
                 </div> 
             </div> 
-            <Sidebar isOpen={hasSidebar} content={sidebarContent} />
+            <Sidebar 
+            isOpen={hasSidebar}
+            content={
+                hasSidebar ? (
+                <SidebarInformation
+                    patient={currentPatient}
+                    isEditable={false}
+                    onSubmit={()=>{}}
+                    onClose={() => setSidebar(false)}
+                />
+                ) : null
+            }
+            />
         </div>
     );
 };

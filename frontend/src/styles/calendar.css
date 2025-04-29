@@ -19,6 +19,8 @@ body {
   display: flex;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: nowrap; /* <--- Prevent line break */
+  gap: 10px; /* Optional spacing */
 }
 
 .search-box {
@@ -28,6 +30,7 @@ body {
   padding-left: 25px;
   background: url("../icons/Search.png") no-repeat left;
   background-size: 20px;
+  width: 65%;
 }
 
 .profile-search-box {
@@ -36,7 +39,6 @@ body {
   padding-left: 25px;
   background: url("../icons/Search.png") no-repeat left;
   background-size: 20px;
-  width: 80%;
   font-size: 16px;
   height: 36px;
   flex-grow: 1;  /* Make the input take up remaining space */
