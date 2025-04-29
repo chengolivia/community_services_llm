@@ -1,76 +1,48 @@
 import csv
+import sqlite3
+DATABASE_PATH = "data/wellness_database.db"
 
-def csv_to_dictionary(file_name):
-    """Given a file name string, return the corresponding
-        CSV as a list of dictionaries
+def get_all_service_users(provider_username):
+    """Get all service users for a given provider with their latest outreach details."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row  # Return results as dictionaries
+    cursor = conn.cursor()
     
-    Arguments:
-        file_name: String
+    cursor.execute('''
+    SELECT p.service_user_id, p.service_user_name, p.location, p.status, 
+           o.last_session, o.check_in, o.follow_up_message
+    FROM profiles p
+    LEFT JOIN outreach_details o ON p.service_user_id = o.user_name
+    WHERE p.provider = ?
+    ''', (provider_username,))
     
-    Returns: List of dictionaries"""
-
-    with open(file_name) as f:
-        a = [{k: v for k, v in row.items()}
-            for row in csv.DictReader(f, skipinitialspace=True)]
-        return a
-
-
-def get_all_outreach(user_name):
-    """Return all the outreach for a given Peer Provider
+    rows = cursor.fetchall()
+    conn.close()
     
-    Arguments:
-        user_name: String, user name for the peer provider
+    result = []
+    for row in rows:
+        result.append(dict(row))
     
-    Returns: List of dictionaries
-        Each dictionary has
-            Service User Name
-            Last Session Date
-            Check In Date
-            Follow up Message"""
+    return result
+
+def get_all_outreach(provider_username):
+    """Get all outreach details for service users of a given provider."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
     
-    all_users = csv_to_dictionary("data/profiles.csv")
-    username_to_name = {}
-
-    for row in all_users:
-        if row['provider'] == user_name:
-            username_to_name[row['service_user_id']] = row['service_user_name']
+    cursor.execute('''
+    SELECT p.service_user_name as name, o.last_session, o.check_in, o.follow_up_message
+    FROM outreach_details o
+    JOIN profiles p ON o.user_name = p.service_user_id
+    WHERE p.provider = ?
+    ''', (provider_username,))
     
-    current_service_user_ids = set(list(username_to_name.keys()))
-
-    all_outreach = csv_to_dictionary("data/outreach_details.csv")
-    ret = []
-    for outreach in all_outreach:
-        if outreach['user_name'] in current_service_user_ids:
-            ret.append({'name': username_to_name[outreach['user_name']],
-                        'last_session': outreach['last_session'],
-                        'check_in': outreach['check_in'],
-                        'follow_up_message': outreach['follow_up_message']})
-
-    return ret 
+    rows = cursor.fetchall()
+    conn.close()
     
-
-def get_all_service_users(user_name):
-    """Return all the services users for a given Peer Provider
+    result = []
+    for row in rows:
+        result.append(dict(row))
     
-    Arguments:
-        user_name: String, user name for the peer provider
-    
-    Returns: List of dictionaries
-        Each dictionary has
-            Service User Name
-            Location"""
-    
-    all_users = csv_to_dictionary("data/profiles.csv")
-    all_outreach = csv_to_dictionary("data/outreach_details.csv")
-
-    all_users = [i for i in all_users if i['provider'] == user_name]
-
-
-    for i in all_users:
-        for j in all_outreach:
-            if i['service_user_id'] == j['user_name']:
-                for k in ["last_session","check_in","follow_up_message"]:
-                    i[k] = j[k]
-
-    print(all_users)
-    return all_users 
+    return result
