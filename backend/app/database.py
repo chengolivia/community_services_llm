@@ -2,19 +2,21 @@ import sqlite3
 import csv
 from pathlib import Path
 
-# Database setup
 DATABASE_PATH = "data/wellness_database.db"
 
 def init_database():
-    """Create the database and tables if they don't exist."""
-    # Create data directory if it doesn't exist
-    Path("data").mkdir(exist_ok=True)
+    """Initialize all the tables in database
+     
+    Arguments: None
+     
+    Returns: None
     
-    # Create database connection and cursor
+    Side Effects: Initialize all the databases"""
+
+    Path("data").mkdir(exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
-    # Create users table for authentication
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +28,6 @@ def init_database():
     )
     ''')
     
-    # Create profiles table (equivalent to profiles.csv)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +40,6 @@ def init_database():
     )
     ''')
     
-    # Create outreach_details table (equivalent to outreach_details.csv)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS outreach_details (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,7 +52,6 @@ def init_database():
     )
     ''')
 
-    # Conversations table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS conversations (
         id TEXT PRIMARY KEY,
@@ -61,7 +60,6 @@ def init_database():
     )
     ''')
 
-    # Messages table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,16 +73,21 @@ def init_database():
     )
     ''')
     
-    # Commit changes and close connection
     conn.commit()
     conn.close()
 
 def migrate_data_from_csv():
-    """Migrate existing CSV data to SQLite database."""
+    """Transfer all the data from the CSV into databases
+    
+    Arguments: None
+    
+    Returns: None
+    
+    Side Effects: Loops through CSV and adds the data into database"""
+
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
-    # Migrate profiles data
     try:
         with open("data/profiles.csv", 'r') as f:
             reader = csv.DictReader(f, skipinitialspace=True)
@@ -98,7 +101,6 @@ def migrate_data_from_csv():
     except FileNotFoundError:
         print("profiles.csv not found, skipping migration")
     
-    # Migrate outreach details data
     try:
         with open("data/outreach_details.csv", 'r') as f:
             reader = csv.DictReader(f, skipinitialspace=True)
@@ -114,33 +116,29 @@ def migrate_data_from_csv():
     
     conn.commit()
     conn.close()
-    print("Data migration complete")
-
 
 def update_conversation(metadata, previous_text):
     """
-    Save the messages in `previous_text` to the database under the conversation and user specified in `metadata`.
+    Update the information in the conversations database
+        Based on a new message
 
-    `metadata` should include:
-        - 'username': str
-        - 'conversation_id': str
-        - 'model': str (optional)
-        - 'organization': str (optional)
+    Arguments:
+        metadata: Dictionary with username and conversation_id
+        previous_text: List of dictionaries with sender and text
+    
+    Returns: None
 
-    `previous_text` should be a list of dicts like:
-        [{"sender": "user", "text": "Hello"}, {"sender": "assistant", "text": "Hi"}]
+    Side Effects: Writes the text in previous_text to the database
     """
     username = metadata.get("username")
     conversation_id = metadata.get("conversation_id")
 
     if username == "" or conversation_id == "":
-        print("[update_conversation] Skipping: missing username or conversation_id.")
         return
 
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
-    # Insert conversation row if it doesn't already exist
     cursor.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,))
     if cursor.fetchone() is None:
         cursor.execute(
@@ -148,12 +146,10 @@ def update_conversation(metadata, previous_text):
             (conversation_id, username,False)
         )
 
-    # Insert each message
     for msg in previous_text:
         sender = msg["role"]
         text = msg["content"]
         if sender and text:
-            print("Inserting {} {}".format(sender,text))
             cursor.execute(
                 "INSERT OR IGNORE INTO messages (conversation_id, sender, text) VALUES (?, ?, ?)",
                 (conversation_id, sender, text)
@@ -162,18 +158,41 @@ def update_conversation(metadata, previous_text):
     conn.commit()
     conn.close()
 
-def add_outreach_column():
+def add_new_wellness_checkin(provider_username, patient_name, last_session, next_checkin, followup_message):
+    """Create a new entry for a new provider-service user combo, along with a followup message
+    
+    Arguments:
+        provider_username: string, username of the peer provider
+        patient_name: string, username of the service user
+        last_session: string, date of the last session
+        next_checkin: string, date for the next recommended checkin
+        followup_message: string, suggested message to send the 
+            service user"""
+    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-
-    # Add the 'outreach_generated' column to the 'conversations' table if it doesn't exist
-    cursor.execute('''
-        ALTER TABLE conversations
-        ADD COLUMN outreach_generated BOOLEAN DEFAULT 0
-    ''')
-
-    conn.commit()
-    conn.close()
-
+    
+    try:
+        service_user_id = patient_name.lower().replace(" ", "_")
+        cursor.execute('''
+        SELECT service_user_id FROM profiles WHERE service_user_id = ?
+        ''', (service_user_id,))
+        
+        if not cursor.fetchone():
+            cursor.execute('''
+            INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
+        
+        cursor.execute('''
+        INSERT OR REPLACE INTO outreach_details 
+        (user_name, last_session, check_in, follow_up_message)
+        VALUES (?, ?, ?, ?)
+        ''', (service_user_id, last_session, next_checkin, followup_message))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
 
 

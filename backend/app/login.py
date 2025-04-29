@@ -11,33 +11,50 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
 def hash_password(password):
-    """Create secure password hash with salt."""
+    """Create secure password hash with salt
+    
+    Arguments:
+        password: string, password to hash
+    
+    Returns: a secret salt and a hashed password under that salt"""
     salt = secrets.token_hex(16)
     pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), 
                                  salt.encode('utf-8'), 100000)
     return salt, pwdhash.hex()
 
 def verify_password(stored_password, stored_salt, provided_password):
-    """Verify password against stored hash."""
+    """Verify password against stored hash
+    
+    Arguments:
+        stored_password: string, some stored password
+        stored_salt: Corresponding salt for that password
+        provided_password: What the user entered
+    
+    Returns: Boolean, whether the provided_password = stored password"""
     pwdhash = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'), 
                                 stored_salt.encode('utf-8'), 100000)
     return pwdhash.hex() == stored_password
 
 def create_user(username, password, role='provider'):
-    """Create a new user with secure password storage."""
+    """Create a new user with secure password storage
+    
+    Arguments:
+        username: string, username
+        password: string, password
+    
+    Returns: Boolean success and string message 
+    
+    Side Effects: Create a new username + password"""
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
-    # Check if user already exists
     cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
     if cursor.fetchone():
         conn.close()
         return False, "Username already exists"
     
-    # Hash password
     salt, password_hash = hash_password(password)
     
-    # Insert new user
     try:
         cursor.execute('''
         INSERT INTO users (username, password_hash, salt, role)
@@ -52,7 +69,16 @@ def create_user(username, password, role='provider'):
         return False, f"Error creating user: {str(e)}"
 
 def authenticate_user(username, password):
-    """Authenticate a user based on username and password."""
+    """Authenticate a username + password combo
+    
+    Arguments:
+        username: string, username
+        password: string, password
+    
+    Returns: Boolean success and string message 
+    
+    Side Effects: Checks if a username-password combo is valid"""
+
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
@@ -67,20 +93,21 @@ def authenticate_user(username, password):
     if not user:
         return False, "Invalid username or password", None
     
-    stored_username, stored_password, stored_salt, role = user
+    _, stored_password, stored_salt, role = user
     
     if verify_password(stored_password, stored_salt, password):
         return True, "Authentication successful", role
     else:
         return False, "Invalid username or password", None
 
-def verify_password(stored_password, stored_salt, provided_password):
-    """Verify password against stored hash."""
-    pwdhash = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'),
-                                 stored_salt.encode('utf-8'), 100000)
-    return pwdhash.hex() == stored_password
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create a JWT token for a given set of information
+    
+    Arguments:
+        data: Username/authentication to encode
+    
+    Returns: Encoded version of data via JWT"""
+    
     to_encode = data.copy()
     
     if expires_delta:

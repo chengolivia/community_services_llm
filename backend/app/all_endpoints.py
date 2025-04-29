@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.database import update_conversation
+from app.database import update_conversation, add_new_wellness_checkin
 
 import socketio
 from datetime import timedelta
@@ -42,36 +42,6 @@ async def add_keep_alive_header(request: Request, call_next):
     response.headers["Connection"] = "keep-alive"
     return response
 
-class NewWellness(BaseModel):
-    patientName: str
-    lastSession: str
-    nextCheckIn: str
-    followUpMessage: str
-
-@app.get("/service_user_list/")
-async def service_user_list(name):
-    return get_all_service_users(name)
-
-@app.get("/outreach_list/")
-async def outreach_list(name):
-    return get_all_outreach(name)
-
-@app.post("/new_checkin/")
-async def create_item(item: NewWellness):
-    w = open("data/profiles.csv","a") 
-    w.write("naveen,{},{},\"Freehold, New Jersey\",Active\n".format(item.patientName.lower().replace(" ","_"),item.patientName))
-    w.close()
-
-    last_year,last_month,last_date = item.nextCheckIn.split("-")
-    check_in_year,check_in_month,check_in_date = item.nextCheckIn.split("-")
-
-    w = open("data/outreach_details.csv","a") 
-    print("Line","-1,{},{},{},\"{}\"".format(item.patientName.lower().replace(" ","_"),"{}-{}-{}".format(last_month,last_date,last_year),"{}-{}-{}".format(check_in_month,check_in_date,check_in_year),item.followUpMessage))
-    w.write("-1,{},{},{},\"{}\"\n".format(item.patientName.lower().replace(" ","_"),"{}-{}-{}".format(last_month,last_date,last_year),"{}-{}-{}".format(check_in_month,check_in_date,check_in_year),item.followUpMessage))
-    w.close()
-
-    return {"message": "Item received", "item": item}
-
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -85,7 +55,7 @@ class Token(BaseModel):
 @app.post("/api/auth/login")
 async def login(login_data: LoginRequest):
     print("Analyzing login_data {} {}".format(login_data.username,login_data.password))
-    success, message, role = authenticate_user(login_data.username, login_data.password)
+    success, _, role = authenticate_user(login_data.username, login_data.password)
     
     if not success:
         raise HTTPException(
@@ -106,6 +76,35 @@ async def login(login_data: LoginRequest):
         token_type="bearer",
         role=role
     )
+
+class NewWellness(BaseModel):
+    patientName: str
+    lastSession: str
+    nextCheckIn: str
+    followUpMessage: str
+
+@app.get("/service_user_list/")
+async def service_user_list(name):
+    return get_all_service_users(name)
+
+@app.get("/outreach_list/")
+async def outreach_list(name):
+    return get_all_outreach(name)
+
+@app.post("/new_checkin/")
+async def create_item(item: NewWellness, current_user: str = Depends(get_current_user)):
+    success, message = add_new_wellness_checkin(
+        current_user, 
+        item.patientName, 
+        item.lastSession, 
+        item.nextCheckIn, 
+        item.followUpMessage
+    )
+    
+    if success:
+        return {"message": "Check-in added successfully", "item": item}
+    else:
+        raise HTTPException(status_code=400, detail=message)
 
 
 app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
