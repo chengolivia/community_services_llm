@@ -51,19 +51,26 @@ def init_database():
         FOREIGN KEY (user_name) REFERENCES profiles(service_user_id)
     )
     ''')
-    
-    # Create session_records table for PDF tracking
+
+    # Conversations table
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS session_records (
+    CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # Messages table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        provider_username TEXT NOT NULL,
-        service_user_id TEXT NOT NULL,
-        session_date TIMESTAMP NOT NULL,
-        pdf_path TEXT,
-        notes TEXT,
+        conversation_id TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        text TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (provider_username) REFERENCES users(username),
-        FOREIGN KEY (service_user_id) REFERENCES profiles(service_user_id)
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+        UNIQUE(conversation_id, sender, text)
     )
     ''')
     
@@ -108,3 +115,48 @@ def migrate_data_from_csv():
     conn.close()
     print("Data migration complete")
 
+
+def update_conversation(metadata, previous_text):
+    """
+    Save the messages in `previous_text` to the database under the conversation and user specified in `metadata`.
+
+    `metadata` should include:
+        - 'username': str
+        - 'conversation_id': str
+        - 'model': str (optional)
+        - 'organization': str (optional)
+
+    `previous_text` should be a list of dicts like:
+        [{"sender": "user", "text": "Hello"}, {"sender": "assistant", "text": "Hi"}]
+    """
+    username = metadata.get("username")
+    conversation_id = metadata.get("conversation_id")
+
+    if username == "" or conversation_id == "":
+        print("[update_conversation] Skipping: missing username or conversation_id.")
+        return
+
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    # Insert conversation row if it doesn't already exist
+    cursor.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,))
+    if cursor.fetchone() is None:
+        cursor.execute(
+            "INSERT INTO conversations (id, username) VALUES (?, ?)",
+            (conversation_id, username)
+        )
+
+    # Insert each message
+    for msg in previous_text:
+        sender = msg["role"]
+        text = msg["content"]
+        if sender and text:
+            print("Inserting {} {}".format(sender,text))
+            cursor.execute(
+                "INSERT OR IGNORE INTO messages (conversation_id, sender, text) VALUES (?, ?, ?)",
+                (conversation_id, sender, text)
+            )
+
+    conn.commit()
+    conn.close()

@@ -10,9 +10,11 @@ from pydantic import BaseModel
 from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.database import update_conversation
 
 import socketio
 from datetime import timedelta
+import secrets
 
 generation_tasks = {}
 
@@ -115,6 +117,8 @@ class Message(BaseModel):
     previous_text: list
     model: str
     organization: str
+    conversation_id: str
+    username: str
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
@@ -170,7 +174,7 @@ async def connect(sid, environ):
 async def disconnect(sid):
     print(f"[Socket.IO] Client disconnected: {sid}")
 
-async def run_generation(sid, generator):
+async def run_generation(sid, generator,text,metadata):
     """
     Handles real-time streaming of generated text chunks to a client via Socket.IO.
 
@@ -194,9 +198,12 @@ async def run_generation(sid, generator):
     None (asynchronous function).
     """
     try:
+        total_text = ""
         for accumulated_text in accumulate_chunks(generator):
             await sio.emit("generation_update", {"chunk": accumulated_text}, room=sid)
             await asyncio.sleep(0.1)
+            total_text = accumulated_text
+        update_conversation(metadata,[{'role': 'user', 'content': text}, {'role': 'system', 'content': total_text}])
     except asyncio.CancelledError:
         print(f"[Socket.IO] Generation task for {sid} was cancelled.")
         await sio.emit("generation_update", {"chunk": "Generation cancelled."}, room=sid)
@@ -245,13 +252,18 @@ async def start_generation(sid, data):
     previous_text = data.get("previous_text", [])
     model = data.get("model")
     organization = data.get("organization")
-    
+    conversation_id = data.get("conversation_id","")
+    if conversation_id == "":
+        conversation_id = secrets.token_hex(16)
+        await sio.emit("conversation_id", {"conversation_id": conversation_id}, room=sid)
+    username = data.get("username","")
+
     generator = construct_response(text, previous_text, model,organization)
     
     if sid in generation_tasks:
         generation_tasks[sid].cancel()
 
-    task = asyncio.create_task(run_generation(sid, generator))
+    task = asyncio.create_task(run_generation(sid, generator,text,{'conversation_id': conversation_id, 'username': username}))
     generation_tasks[sid] = task
 
 

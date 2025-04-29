@@ -33,7 +33,7 @@ function Login() {
         setUser({
           username: username,
           role: data.role,
-          isAuthenticated: true
+          isAuthenticated: true, 
         });
                 
         // Redirect to home page after successful login
