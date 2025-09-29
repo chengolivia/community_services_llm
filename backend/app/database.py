@@ -132,6 +132,11 @@ def update_conversation(metadata, previous_text):
     """
     username = metadata.get("username")
     conversation_id = metadata.get("conversation_id")
+    
+    if not conversation_id:
+        import uuid
+        conversation_id = str(uuid.uuid4())
+        print(f"[DB] Generated new conversation_id: {conversation_id}")
 
     if username == "" or conversation_id == "":
         return

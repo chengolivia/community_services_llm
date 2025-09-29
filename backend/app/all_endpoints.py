@@ -92,7 +92,7 @@ async def outreach_list(name):
     return get_all_outreach(name)
 
 @app.post("/new_checkin/")
-async def create_item(item: NewWellness, current_user: str = Depends(get_current_user)):
+async def create_item(item: NewWellness, current_user: str):
     success, message = add_new_wellness_checkin(
         current_user, 
         item.patientName, 
