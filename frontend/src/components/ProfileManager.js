@@ -4,6 +4,7 @@ import '../styles/feature.css';
 import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
+import { API_URL } from '../config';
 
 const ProfileManager = () => {
   const [allNames, setAllNames] = useState([{}]);
@@ -28,7 +29,7 @@ const ProfileManager = () => {
     console.log();
     
     try {
-      const response = await fetch("http://localhost:8000/new_checkin/", {
+      const response = await fetch(`${API_URL}/new_checkin/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -75,7 +76,7 @@ const ProfileManager = () => {
   };
 
   const getAllNames = async () => {
-    const response = await fetch(`http://${window.location.hostname}:8000/service_user_list/?name=${user.username}`);
+    const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
     response.json().then((res) => setAllNames(res));
   };
 

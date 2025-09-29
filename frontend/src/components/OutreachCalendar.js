@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import '../styles/feature.css';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
+import { API_URL } from '../config';
 
 const OutreachCalendar = () => {
     const [weekCode, setWeekCode] = useState(null);
@@ -79,7 +80,7 @@ const OutreachCalendar = () => {
     };
 
     const getAllOutreach = async () => {
-        const response = await fetch(`http://${window.location.hostname}:8000/outreach_list/?name=${user.username}`);
+        const response = await fetch(`${API_URL}/outreach_list/?name=${user.username}`);
         response.json().then((res) => {
             setAllOutreach(res); // Save the fetched data
             updateOutreach(res); // Process the data
