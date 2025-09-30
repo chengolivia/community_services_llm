@@ -2,7 +2,24 @@ import pandas as pd
 import faiss
 import os 
 import numpy as np
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
 from sentence_transformers import SentenceTransformer
+
+# lazy loading
+_model = None
+_saved_indices = None
+_documents = None
+
+def get_model_and_indices():
+    global _model, _saved_indices, _documents
+    if _model is None:
+        _model, _saved_indices, _documents = get_all_embeddings({
+            'cspnj': 'data/cspnj.csv',
+            'clhs': 'data/clhs.csv'
+        })
+    return _model, _saved_indices, _documents
 
 def load_embeddings(file_path, documents, model):
     """Load or compute embeddings and save them

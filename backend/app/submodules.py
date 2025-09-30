@@ -6,13 +6,13 @@ import os
 import numpy as np
 
 from app.eligibility_check import eligibility_check
-from app.rag_utils import get_all_embeddings
+# from app.rag_utils import get_all_embeddings
 from app.utils import call_chatgpt_api_all_chats, stream_process_chatgpt_response, get_all_prompts
 
 openai.api_key = os.environ.get("SECRET_KEY")
 
 internal_prompts, external_prompts = get_all_prompts()
-model, saved_indices, documents = get_all_embeddings({'cspnj': 'data/cspnj.csv','clhs': 'data/clhs.csv'})
+# model, saved_indices, documents = get_all_embeddings({'cspnj': 'data/cspnj.csv','clhs': 'data/clhs.csv'})
 
 def construct_response(situation, all_messages,model,organization):
     """Process user situation + generate SMART goals, etc.
@@ -23,6 +23,10 @@ def construct_response(situation, all_messages,model,organization):
         model: String, either chatgpt or copilot 
         
     Returns: Streaming response in text"""
+    
+    # Lazy load embeddings on first use
+    from app.rag_utils import get_model_and_indices
+    _, _, _ = get_model_and_indices()  # Ensures embeddings are loaded
 
     if model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for {}, a peer-peer mental health organization. Please provider helpful responses to the client'.format(organization)}] + all_messages + [{'role': 'user', 'content': situation}]
