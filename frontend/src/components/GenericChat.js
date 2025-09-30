@@ -28,8 +28,9 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
 
   useEffect(() => {
     const newSocket = io(socketServerUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       reconnectionAttempts: 5,
+      timeout: 20000,
     });
     setSocket(newSocket);
 
