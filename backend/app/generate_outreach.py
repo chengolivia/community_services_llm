@@ -18,7 +18,7 @@ def generate_followup_message(messages):
         
     Returns: Dictionary, with two keys: follow_up_message and follow_up date"""
 
-    all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for {}, \ a peer-peer mental health organization. Please provider 1) A followup message (if applicable) and a followup date (if applicabe). Do this in a JSON format: {"follow_up_message": "Hello", "follow_up_date": "2024-01-31"}'}]
+    all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for {}, a peer-peer mental health organization. Please provider 1) A followup message (if applicable) and a followup date (if applicabe). Do this in a JSON format: {"follow_up_message": "Hello", "follow_up_date": "2024-01-31"}'}]
     prior_messages = []
     for m in messages:
         prior_messages.append({'role': m['sender'],'content': m['text']})

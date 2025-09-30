@@ -109,7 +109,7 @@ async def create_item(item: NewWellness, current_user: str):
         raise HTTPException(status_code=400, detail=message)
 
 
-app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
+# app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
 
 # Handle Socket Messages
 
