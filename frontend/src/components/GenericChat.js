@@ -68,6 +68,10 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       console.error('[Socket.io] Error:', error);
     });
 
+    newSocket.on('disconnect', (reason) => {
+      console.log('[Socket.io] Disconnected:', reason);
+    });
+
     return () => {
       newSocket.disconnect();
     };
