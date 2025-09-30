@@ -78,6 +78,14 @@ async def login(login_data: LoginRequest):
         token_type="bearer",
         role=role
     )
+    
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "PeerCopilot Backend Running"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 class NewWellness(BaseModel):
     patientName: str
