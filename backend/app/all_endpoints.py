@@ -277,6 +277,6 @@ async def reset_session(sid):
     await sio.emit("reset_ack", {"message": "Session reset."}, room=sid)
 
 
-@app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
-    return FileResponse("../frontend/build/index.html")
+# @app.get("/{full_path:path}")
+# async def serve_react_app(full_path: str):
+#     return FileResponse("../frontend/build/index.html")
