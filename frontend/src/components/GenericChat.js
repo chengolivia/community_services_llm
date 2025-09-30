@@ -5,6 +5,8 @@ import { jsPDF } from 'jspdf';
 import io from 'socket.io-client';
 import '../styles/feature.css';
 import {WellnessContext } from './AppStateContextProvider';
+import { API_URL } from '../config';
+
 
 function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const {
@@ -276,7 +278,7 @@ export const WellnessGoals = () => (
   <GenericChat
     context={WellnessContext}
     title="Wellness Goals"
-    socketServerUrl={`http://${window.location.hostname}:8000`}
+    socketServerUrl={`${API_URL}`}
     showLocation={false}
     tool="wellness"
   />
