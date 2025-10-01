@@ -26,7 +26,7 @@ def construct_response(situation, all_messages,model,organization):
     
     # Lazy load embeddings on first use
     from app.rag_utils import get_model_and_indices
-    _, _, _ = get_model_and_indices()  # Ensures embeddings are loaded
+    embedding_model, saved_indices, documents = get_model_and_indices()  # Ensures embeddings are loaded
 
     if model == 'chatgpt':
         all_message_list = [{'role': 'system', 'content': 'You are a Co-Pilot tool for {}, a peer-peer mental health organization. Please provider helpful responses to the client'.format(organization)}] + all_messages + [{'role': 'user', 'content': situation}]
@@ -35,7 +35,7 @@ def construct_response(situation, all_messages,model,organization):
         return 
 
     # Initially extract information via prompting + trusted resources
-    initial_response, external_resources = get_questions_resources(situation,all_messages,organization)
+    initial_response, external_resources = get_questions_resources(situation,all_messages,embedding_model,saved_indices,documents,organization)
 
     # Combine these extracted information via the orchestration prompt/module
     new_message = [{'role': 'system', 'content': internal_prompts['orchestration']}]
@@ -44,7 +44,7 @@ def construct_response(situation, all_messages,model,organization):
     response = call_chatgpt_api_all_chats(new_message,stream=True,max_tokens=1000)
     yield from stream_process_chatgpt_response(response)
 
-def get_questions_resources(situation,all_messages,organization):
+def get_questions_resources(situation,all_messages,embedding_model,saved_indices,documents,organization):
     """Process user situation + generate questions and resources
 
     Arguments:
@@ -66,7 +66,7 @@ def get_questions_resources(situation,all_messages,organization):
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(initial_responses[2]),flags=re.DOTALL)
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        resources = list(executor.map(lambda s: extract_resources(s,{'resource_{}'.format(organization): True},k=5), matches))
+        resources = list(executor.map(lambda s: extract_resources(s,embedding_model,saved_indices,documents,{'resource_{}'.format(organization): True},k=5), matches))
     
     # Combine prompts with external information on benefits
     pattern = r"\[Situation\](.*?)\[/Situation\]"
@@ -91,7 +91,7 @@ def get_questions_resources(situation,all_messages,organization):
     except:
         which_external_resources = {}
     full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
-    external_resources = extract_resources(full_situation,which_external_resources)
+    external_resources = extract_resources(full_situation,embedding_model,saved_indices,documents,which_external_resources)
 
 
     response = "\n".join(["SMART Goals: {}\n\n\n".format(initial_responses[0]),
@@ -100,7 +100,7 @@ def get_questions_resources(situation,all_messages,organization):
                           "Benefit Info: {}".format(benefit_info)])
     return response, external_resources
 
-def extract_resources(situation,which_indices,k=25):
+def extract_resources(situation,embedding_model,saved_indices,documents,which_indices,k=25):
     """Given a string, and a list of external resources to use
         find the most similar lines in the external resources
     
@@ -114,7 +114,7 @@ def extract_resources(situation,which_indices,k=25):
 
     for i in which_indices:
         if which_indices[i]:
-            query_embedding = model.encode(situation, convert_to_tensor=False)
+            query_embedding = embedding_model.encode(situation, convert_to_tensor=False)
             _, I = saved_indices[i].search(np.array([query_embedding]), k=k)  # Retrieve top k resources
             ret += [":".join(documents[i][j].split(":")[1:]).strip() for j in I[0]]            
     return "\n".join(ret)
