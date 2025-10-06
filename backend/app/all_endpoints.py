@@ -6,8 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import threading
+import json
 
-from app.submodules import construct_response
+from app.submodules import (
+    get_questions_resources,
+    construct_response,
+    call_chatgpt_api_all_chats,
+    fetch_goals_and_resources,
+    internal_prompts,
+)
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.database import update_conversation, add_new_wellness_checkin
@@ -305,18 +313,76 @@ async def start_generation(sid, data):
     model = data.get("model")
     organization = data.get("organization")
     conversation_id = data.get("conversation_id","")
-    if conversation_id == "":
-        conversation_id = secrets.token_hex(16)
-        await sio.emit("conversation_id", {"conversation_id": conversation_id}, room=sid)
-    username = data.get("username","")
-
-    generator = construct_response(text, previous_text, model,organization)
     
-    if sid in generation_tasks:
-        generation_tasks[sid].cancel()
+        # 1) Offload the small “intent check” to a thread so we don't block
+    loop = asyncio.get_running_loop()
+    intent_msgs = [
+      {
+        "role": "system",
+        "content": (
+          "You’re a request analyzer.  "
+          "Given one user message, answer **strictly** in JSON with two keys:\n"
+          '  • "needs_goals": true if they want advice or help or concrete next steps;\n'
+          '  • "verbosity": one of "brief","medium","deep".\n'
+          "Return only valid JSON, no extra commentary."
+        )
+      },
+      {"role": "user", "content": text}
+    ]
+    try:
+        meta_resp = await loop.run_in_executor(
+          None,
+          call_chatgpt_api_all_chats,
+          intent_msgs,
+          False,
+          40
+        )
+        meta = json.loads(meta_resp.strip())
+        needs_goals = bool(meta.get("needs_goals", False))
+    except Exception as e:
+        print(f"[Socket.IO] Error parsing needs_goals: {e}")
+        needs_goals = False
 
-    task = asyncio.create_task(run_generation(sid, generator,text,{'conversation_id': conversation_id, 'username': username}))
-    generation_tasks[sid] = task
+    # 2) If goals are needed, fetch & emit them
+    #if the goals are not nneeded then emit them and remove them and delete them 
+    #If the goals are not needed then emit them and discard them and delete them 
+    if needs_goals:
+        # Use shared helper so we only run the pipeline once
+        loop = asyncio.get_running_loop()
+        goals, resources = await loop.run_in_executor(
+            None,
+            fetch_goals_and_resources,
+            text,
+            previous_text,
+            organization
+        )
+
+        await sio.emit(
+          "goals_update",
+          {"goals": goals, "resources": resources},
+          room=sid
+        )
+
+
+    # 3) Offload the rest of the chat‐stream to a background thread
+    loop = asyncio.get_running_loop()
+    threading.Thread(
+        target=_background_stream,
+        args=(sid, text, previous_text, model, organization, loop),
+        daemon=True
+    ).start()
+    # if conversation_id == "":
+    #     conversation_id = secrets.token_hex(16)
+    #     await sio.emit("conversation_id", {"conversation_id": conversation_id}, room=sid)
+    # username = data.get("username","")
+
+    # generator = construct_response(text, previous_text, model,organization)
+    
+    # if sid in generation_tasks:
+    #     generation_tasks[sid].cancel()
+
+    # task = asyncio.create_task(run_generation(sid, generator,text,{'conversation_id': conversation_id, 'username': username}))
+    # generation_tasks[sid] = task
 
 
 @sio.event

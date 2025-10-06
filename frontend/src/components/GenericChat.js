@@ -1,6 +1,7 @@
 import React, { useRef, useContext, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import { jsPDF } from 'jspdf';
 import io from 'socket.io-client';
 import '../styles/feature.css';
@@ -25,6 +26,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [conversationID, setConversationID] = useState("");
+  const [goalsList, setGoalsList] = useState([]);
+  const [resourcesList, setResourcesList] = useState([]);
 
   useEffect(() => {
     const newSocket = io(socketServerUrl, {
@@ -48,15 +51,31 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
 
     newSocket.on('generation_update', (data) => {
       console.log('[Socket.io] Received generation update:', data);
-      setConversation((prev) => {
-        if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
-          const updated = [...prev];
-          updated[updated.length - 1].text = data.chunk;
-          return updated;
-        } else {
+      if (typeof data.chunk === 'string') {
+        setConversation(prev => {
+          if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
+            const updated = [...prev];
+            updated[updated.length - 1].text = data.chunk;
+            return updated;
+          }
           return [...prev, { sender: 'bot', text: data.chunk }];
-        }
-      });
+        });
+      }
+      // setConversation((prev) => {
+      //   if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
+      //     const updated = [...prev];
+      //     updated[updated.length - 1].text = data.chunk;
+      //     return updated;
+      //   } else {
+      //     return [...prev, { sender: 'bot', text: data.chunk }];
+      //   }
+      // });
+    });
+
+    newSocket.on('goals_update', ({ goals, resources }) => {
+      console.log('[Socket.io] goals_update:', goals, resources);
+      setGoalsList(goals);
+      setResourcesList(resources);
     });
 
     newSocket.on('generation_complete', (data) => {
@@ -276,9 +295,9 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
         </div>
       </div>
       {/* ← NEW: Right‐hand panel containing two empty boxes */}
-      {/* <div className="right-section"> */}
+      <div className="right-section">
       {/* Goals panel */}
-      {/* <div className="goals-box" style={{ height: '400px' }}>
+      <div className="goals-box" style={{ height: '400px' }}>
         <h3>Goals</h3>
         <div className="scroll-container">
           {goalsList.map((goal, idx) => (
@@ -302,7 +321,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       </div>
 
         {/* Resources panel */}
-        {/* <div className="resources-box" style={{ height: '500px' }}>
+        <div className="resources-box" style={{ height: '500px' }}>
           <h3>Resources</h3>
           <div className="scroll-container">
             {resourcesList.map((res, idx) => {
@@ -339,7 +358,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             })}
           </div>
         </div>
-      </div> */} 
+      </div> 
     </div>
   );
 }
