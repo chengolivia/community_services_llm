@@ -2,7 +2,24 @@ import pandas as pd
 import faiss
 import os 
 import numpy as np
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
 from sentence_transformers import SentenceTransformer
+
+# lazy loading
+_model = None
+_saved_indices = None
+_documents = None
+
+def get_model_and_indices():
+    global _model, _saved_indices, _documents
+    if _model is None:
+        _model, _saved_indices, _documents = get_all_embeddings({
+            'cspnj': 'data/cspnj.csv',
+            'clhs': 'data/clhs.csv'
+        })
+    return _model, _saved_indices, _documents
 
 def load_embeddings(file_path, documents, model):
     """Load or compute embeddings and save them
@@ -57,7 +74,7 @@ def process_guidance_resources(guidance_types):
 
     documents_by_guidance = {}
     for guidance in guidance_types:
-        with open(f"prompts/external/{guidance}.txt", encoding="utf-8") as file:
+        with open(f"prompts/external/{guidance}.txt") as file:
             resource_data = [line for line in file.read().split("\n") if len(line) > 10]
             documents_by_guidance[guidance] = [f"{line}: {resource_data[i]}" for i, line in enumerate(resource_data)]
     return documents_by_guidance

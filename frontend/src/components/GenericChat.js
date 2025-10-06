@@ -1,12 +1,12 @@
 import React, { useRef, useContext, useEffect, useState } from 'react';
-import './GenericChat.css';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import remarkGfm from 'remark-gfm';
 import { jsPDF } from 'jspdf';
 import io from 'socket.io-client';
 import '../styles/feature.css';
 import {WellnessContext } from './AppStateContextProvider';
+import { API_URL } from '../config';
+
 
 function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const {
@@ -16,6 +16,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     submitted,
     chatConvo, setChatConvo,
     organization,setOrganization,
+    user
   } = useContext(context);
 
   const inputRef = useRef(null);
@@ -23,13 +24,13 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [socket, setSocket] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
-  const [goalsList, setGoalsList] = useState([]);
-  const [resourcesList, setResourcesList] = useState([]);
+  const [conversationID, setConversationID] = useState("");
 
   useEffect(() => {
     const newSocket = io(socketServerUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       reconnectionAttempts: 5,
+      timeout: 20000,
     });
     setSocket(newSocket);
 
@@ -37,30 +38,25 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       console.log('[Socket.io] Connected to server');
     });
 
+    newSocket.on("conversation_id", (data) => {
+      setConversationID(data.conversation_id)
+    }); 
+
     newSocket.on('welcome', (data) => {
       console.log('[Socket.io] Received welcome message:', data);
     });
 
-    // ─── Chat streaming ───────────────────────────────────────────────
     newSocket.on('generation_update', (data) => {
-      console.log('[Socket.io] generation_update:', data);
-      if (typeof data.chunk === 'string') {
-        setConversation(prev => {
-          if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
-            const updated = [...prev];
-            updated[updated.length - 1].text = data.chunk;
-            return updated;
-          }
+      console.log('[Socket.io] Received generation update:', data);
+      setConversation((prev) => {
+        if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
+          const updated = [...prev];
+          updated[updated.length - 1].text = data.chunk;
+          return updated;
+        } else {
           return [...prev, { sender: 'bot', text: data.chunk }];
-        });
-      }
-    });
-
-    // ─── Goals/Resources metadata ────────────────────────────────────
-    newSocket.on('goals_update', ({ goals, resources }) => {
-      console.log('[Socket.io] goals_update:', goals, resources);
-      setGoalsList(goals);
-      setResourcesList(resources);
+        }
+      });
     });
 
     newSocket.on('generation_complete', (data) => {
@@ -70,6 +66,10 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
 
     newSocket.on('error', (error) => {
       console.error('[Socket.io] Error:', error);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('[Socket.io] Disconnected:', reason);
     });
 
     return () => {
@@ -137,12 +137,15 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
 
     if (socket) {
       console.log('[GenericChat] Emitting start_generation event');
+      console.log(user.username);
       socket.emit('start_generation', {
         text: messageText,
         previous_text: chatConvo,
         model: "A",
         organization: organization, 
         tool,
+        conversation_id: conversationID,
+        username: user.username
       });
     } else {
       console.error('[GenericChat] Socket is not connected.');
@@ -345,7 +348,7 @@ export const WellnessGoals = () => (
   <GenericChat
     context={WellnessContext}
     title="Wellness Goals"
-    socketServerUrl={`http://${window.location.hostname}:8000`}
+    socketServerUrl={`${API_URL}`}
     showLocation={false}
     tool="wellness"
   />
