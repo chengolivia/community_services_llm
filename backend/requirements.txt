@@ -10,3 +10,4 @@ sentence-transformers==3.2.1
 PyPDF2
 fpdf
 PyJWT
+Psycopg

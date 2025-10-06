@@ -1,12 +1,12 @@
-import sqlite3
+import psycopg
 import os 
 import openai 
 import uuid
 import json 
 from datetime import datetime
 from app.utils import call_chatgpt_api_all_chats
+from app.database import CONNECTION_STRING
 
-DATABASE_PATH = "data/wellness_database.db"
 openai.api_key = os.environ.get("SECRET_KEY")
 
 
@@ -35,12 +35,12 @@ def load_messages_for_conversation(conversation_id):
     Returns: List of dictionaries with sender, text, and created_at
 
     """
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
 
     cursor.execute('''
         SELECT sender, text, created_at FROM messages
-        WHERE conversation_id = ?
+        WHERE conversation_id = %s
         ORDER BY created_at ASC
     ''', (conversation_id,))
 
@@ -60,11 +60,11 @@ def autogenerate_conversations(username):
     
     Side Effects: Writes new outreach events to the calendar"""
 
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     cursor.execute('''
         SELECT id FROM conversations
-        WHERE username = ? AND outreach_generated = 0
+        WHERE username = %s AND outreach_generated = 0
     ''', (username,))
     conversation_ids = cursor.fetchall()
 
@@ -76,12 +76,12 @@ def autogenerate_conversations(username):
         if followup['follow_up_date'] and followup['follow_up_message']:
             cursor.execute('''
                 INSERT OR IGNORE INTO profiles (service_user_id, service_user_name, provider, location, status)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             ''', (username, service_user_name, username, "Freehold, NJ", "Active"))
             today_str = datetime.now().strftime("%Y-%m-%d")
             cursor.execute('''
                 INSERT INTO outreach_details (user_name, last_session, check_in, follow_up_message)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
             ''', (
                 service_user_name,
                 today_str,
@@ -92,7 +92,7 @@ def autogenerate_conversations(username):
         cursor.execute('''
             UPDATE conversations
             SET outreach_generated = 1
-            WHERE id = ?
+            WHERE id = %s
         ''', (conv_id,))
 
     conn.commit()

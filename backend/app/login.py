@@ -1,12 +1,13 @@
-import sqlite3
+import psycopg
 import hashlib
 import secrets
 from datetime import datetime, timedelta
 import jwt
 from typing import Optional
+import os
+from app.database import CONNECTION_STRING
 
-DATABASE_PATH = "data/wellness_database.db"
-SECRET_KEY = "your_secret_key_here"  # Change this in production
+SECRET_KEY = os.getenv("SECRET_KEY")  # Change this in production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
@@ -45,10 +46,10 @@ def create_user(username, password, role='provider'):
     Returns: Boolean success and string message 
     
     Side Effects: Create a new username + password"""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT username FROM users WHERE username = %s", (username,))
     if cursor.fetchone():
         conn.close()
         return False, "Username already exists"
@@ -58,7 +59,7 @@ def create_user(username, password, role='provider'):
     try:
         cursor.execute('''
         INSERT INTO users (username, password_hash, salt, role)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
         ''', (username, password_hash, salt, role))
         conn.commit()
         conn.close()
@@ -79,12 +80,12 @@ def authenticate_user(username, password):
     
     Side Effects: Checks if a username-password combo is valid"""
 
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     
     cursor.execute('''
     SELECT username, password_hash, salt, role FROM users 
-    WHERE username = ?
+    WHERE username = %s
     ''', (username,))
     
     user = cursor.fetchone()

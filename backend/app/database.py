@@ -1,8 +1,10 @@
-import sqlite3
+import psycopg
 import csv
 from pathlib import Path
+import os
 
-DATABASE_PATH = "data/wellness_database.db"
+CONNECTION_STRING = os.getenv("DATABASE_URL")
+
 
 def init_database():
     """Initialize all the tables in database
@@ -14,7 +16,7 @@ def init_database():
     Side Effects: Initialize all the databases"""
 
     Path("data").mkdir(exist_ok=True)
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -85,7 +87,7 @@ def migrate_data_from_csv():
     
     Side Effects: Loops through CSV and adds the data into database"""
 
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     
     try:
@@ -95,7 +97,7 @@ def migrate_data_from_csv():
                 cursor.execute('''
                 INSERT OR IGNORE INTO profiles 
                 (service_user_id, service_user_name, provider, location, status)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 ''', (row['service_user_id'], row['service_user_name'], 
                       row['provider'], row.get('location', ''), row.get('status', 'Active')))
     except FileNotFoundError:
@@ -108,7 +110,7 @@ def migrate_data_from_csv():
                 cursor.execute('''
                 INSERT OR IGNORE INTO outreach_details
                 (user_name, last_session, check_in, follow_up_message)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
                 ''', (row['user_name'], row['last_session'], 
                       row['check_in'], row['follow_up_message']))
     except FileNotFoundError:
@@ -141,13 +143,13 @@ def update_conversation(metadata, previous_text):
     if username == "" or conversation_id == "":
         return
 
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM conversations WHERE id = ?", (conversation_id,))
+    cursor.execute("SELECT id FROM conversations WHERE id = %s", (conversation_id,))
     if cursor.fetchone() is None:
         cursor.execute(
-            "INSERT INTO conversations (id, username,outreach_generated) VALUES (?, ?, ?)",
+            "INSERT INTO conversations (id, username,outreach_generated) VALUES (%s, %s, %s)",
             (conversation_id, username,False)
         )
 
@@ -156,7 +158,7 @@ def update_conversation(metadata, previous_text):
         text = msg["content"]
         if sender and text:
             cursor.execute(
-                "INSERT OR IGNORE INTO messages (conversation_id, sender, text) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO messages (conversation_id, sender, text) VALUES (%s, %s, %s)",
                 (conversation_id, sender, text)
             )
 
@@ -174,25 +176,25 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
         followup_message: string, suggested message to send the 
             service user"""
     
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     
     try:
         service_user_id = patient_name.lower().replace(" ", "_")
         cursor.execute('''
-        SELECT service_user_id FROM profiles WHERE service_user_id = ?
+        SELECT service_user_id FROM profiles WHERE service_user_id = %s
         ''', (service_user_id,))
         
         if not cursor.fetchone():
             cursor.execute('''
             INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
         
         cursor.execute('''
         INSERT OR REPLACE INTO outreach_details 
         (user_name, last_session, check_in, follow_up_message)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
         ''', (service_user_id, last_session, next_checkin, followup_message))
         conn.commit()
         conn.close()
