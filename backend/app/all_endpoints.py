@@ -29,7 +29,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000", # local development
          os.environ.get("FRONTEND_URL", ""),  # production frontend
-        "https://yourapp-frontend.onrender.com",  # Render URL (backup)
+        "https://peercopilot.com",  # Render URL (backup)
+        "https://www.peercopilot.com",  # Render URL (backup)
     ],
     allow_credentials=True,
     allow_methods=["*"],
