@@ -276,9 +276,9 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
         </div>
       </div>
       {/* ← NEW: Right‐hand panel containing two empty boxes */}
-      <div className="right-section">
+      {/* <div className="right-section"> */}
       {/* Goals panel */}
-      <div className="goals-box" style={{ height: '400px' }}>
+      {/* <div className="goals-box" style={{ height: '400px' }}>
         <h3>Goals</h3>
         <div className="scroll-container">
           {goalsList.map((goal, idx) => (
@@ -302,7 +302,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       </div>
 
         {/* Resources panel */}
-        <div className="resources-box" style={{ height: '500px' }}>
+        {/* <div className="resources-box" style={{ height: '500px' }}>
           <h3>Resources</h3>
           <div className="scroll-container">
             {resourcesList.map((res, idx) => {
@@ -339,7 +339,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             })}
           </div>
         </div>
-      </div>
+      </div> */} 
     </div>
   );
 }
