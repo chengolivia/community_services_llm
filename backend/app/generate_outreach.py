@@ -64,7 +64,7 @@ def autogenerate_conversations(username):
     cursor = conn.cursor()
     cursor.execute('''
         SELECT id FROM conversations
-        WHERE username = %s AND outreach_generated = 0
+        WHERE username = %s AND outreach_generated = FALSE
     ''', (username,))
     conversation_ids = cursor.fetchall()
 
@@ -91,7 +91,7 @@ def autogenerate_conversations(username):
 
         cursor.execute('''
             UPDATE conversations
-            SET outreach_generated = 1
+            SET outreach_generated = TRUE
             WHERE id = %s
         ''', (conv_id,))
 
