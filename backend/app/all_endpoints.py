@@ -175,6 +175,48 @@ def accumulate_chunks(generator):
                 accumulated += token
         yield accumulated
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BACKGROUND STREAM HELPER
+# ─────────────────────────────────────────────────────────────────────────────
+def _background_stream(sid, text, previous_text, model, organization, loop):
+    """
+    Runs construct_response in its own OS thread.
+    Uses run_coroutine_threadsafe so .emit() coroutines are correctly awaited.
+    """
+    import time
+    try:
+        # 1) Build your response generator (this may block, but only this thread)
+        gen = construct_response(text, previous_text, model, organization)
+
+        # 2) Stream chunks
+        for accumulated_text in accumulate_chunks(gen):
+            # Schedule the async emit on the main asyncio loop
+            asyncio.run_coroutine_threadsafe(
+                sio.emit("generation_update", {"chunk": accumulated_text}, room=sid),
+                loop
+            )
+            time.sleep(0.1)
+
+    except Exception as e:
+        # Log server‐side...
+        print(f"[BackgroundStream] Error during streaming: {e}")
+        # And send a friendly error message into the chat pane
+        asyncio.run_coroutine_threadsafe(
+            sio.emit(
+              "generation_update",
+              {"chunk": f"Sorry, something went wrong: {e}"},
+              room=sid
+            ),
+            loop
+        )
+
+    finally:
+        # Always tell the client we’re done
+        asyncio.run_coroutine_threadsafe(
+            sio.emit("generation_complete", {"message": "Response generation complete."}, room=sid),
+            loop
+        )
+
 @sio.event
 async def connect(sid, environ):
     print(f"[Socket.IO] Client connected: {sid}")
