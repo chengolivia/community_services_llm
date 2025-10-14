@@ -1,5 +1,6 @@
 from copy import deepcopy 
 import re
+from utils import BASE_DIR
 
 def is_date(line):
     """Determine if a line is in the date format MM/DD/YYYY
@@ -51,7 +52,7 @@ def raw_cspnj_to_list(file_loc):
             curr_field_idx = 0
     return [i['name'] for i in all_entries]
 
-all_entries = raw_cspnj_to_list("data/raw_cspnj.txt")
-w = open("data/cspnj_resources.txt","w")
+all_entries = raw_cspnj_to_list(f"{BASE_DIR}/data/raw_cspnj.txt")
+w = open(BASE_DIR / "data/cspnj_resources.txt","w")
 w.write("\n".join(all_entries))
 w.close()
