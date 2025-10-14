@@ -275,6 +275,71 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
           </div>
         </div>
       </div>
+      {/* ← NEW: Right‐hand panel containing two empty boxes */}
+      {/* <div className="right-section"> */}
+      {/* Goals panel */}
+      {/* <div className="goals-box" style={{ height: '400px' }}>
+        <h3>Goals</h3>
+        <div className="scroll-container">
+          {goalsList.map((goal, idx) => (
+            <div key={idx} className="resource-item">
+              <ReactMarkdown
+                children={goal}
+                skipHtml={false}
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
+                components={{
+                  a: ({ href, children }) => (
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      {children}
+                    </a>
+                  ),
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+        {/* Resources panel */}
+        {/* <div className="resources-box" style={{ height: '500px' }}>
+          <h3>Resources</h3>
+          <div className="scroll-container">
+            {resourcesList.map((res, idx) => {
+              // Parse the backend’s flat “Name — [Link](url) (Action: act)” string
+              // into a pretty markdown with name bold, link & action on their own lines.
+              const regex = /^(.*?)\s+—\s+\[Link\]\((.*?)\)\s*(?:\(Action:\s*(.*?)\))?$/;
+              const match = res.match(regex);
+              let mdString = res;
+              if (match) {
+                const [, name, linkUrl, action] = match;
+                mdString =
+                  `**${name}**  \n` +     // bold name + linebreak
+                  `[Link](${linkUrl})  \n` + // link + linebreak
+                  `**Action:** ${action}`;   // action
+              }
+
+              return (
+                <div key={idx} className="resource-item">
+                  <ReactMarkdown
+                    children={mdString}
+                    skipHtml={false}
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer">
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div> */} 
     </div>
   );
 }

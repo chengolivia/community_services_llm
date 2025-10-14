@@ -21,7 +21,7 @@ def init_database():
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY SERIAL,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         salt TEXT NOT NULL,
@@ -32,9 +32,9 @@ def init_database():
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS profiles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY SERIAL,
         service_user_id TEXT UNIQUE NOT NULL,
-        service_user_name TEXT NOT NULL,
+        service_user_name TEXT NOT NULL UNIQUE,
         provider TEXT NOT NULL,
         location TEXT,
         status TEXT,
@@ -44,7 +44,7 @@ def init_database():
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS outreach_details (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY SERIAL,
         user_name TEXT NOT NULL,
         last_session TEXT,
         check_in TEXT,
@@ -64,7 +64,7 @@ def init_database():
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY SERIAL,
         conversation_id TEXT NOT NULL,
         sender TEXT NOT NULL,
         text TEXT NOT NULL,
@@ -95,11 +95,12 @@ def migrate_data_from_csv():
             reader = csv.DictReader(f, skipinitialspace=True)
             for row in reader:
                 cursor.execute('''
-                INSERT OR IGNORE INTO profiles 
+                INSERT INTO profiles 
                 (service_user_id, service_user_name, provider, location, status)
                 VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (service_user_id) DO NOTHING
                 ''', (row['service_user_id'], row['service_user_name'], 
-                      row['provider'], row.get('location', ''), row.get('status', 'Active')))
+                    row['provider'], row.get('location', ''), row.get('status', 'Active')))
     except FileNotFoundError:
         print("profiles.csv not found, skipping migration")
     
@@ -108,11 +109,12 @@ def migrate_data_from_csv():
             reader = csv.DictReader(f, skipinitialspace=True)
             for row in reader:
                 cursor.execute('''
-                INSERT OR IGNORE INTO outreach_details
+                INSERT INTO outreach_details
                 (user_name, last_session, check_in, follow_up_message)
                 VALUES (%s, %s, %s, %s)
+                ON CONFLICT (user_name) DO NOTHING
                 ''', (row['user_name'], row['last_session'], 
-                      row['check_in'], row['follow_up_message']))
+                    row['check_in'], row['follow_up_message']))
     except FileNotFoundError:
         print("outreach_details.csv not found, skipping migration")
     
@@ -158,7 +160,7 @@ def update_conversation(metadata, previous_text):
         text = msg["content"]
         if sender and text:
             cursor.execute(
-                "INSERT OR IGNORE INTO messages (conversation_id, sender, text) VALUES (%s, %s, %s)",
+                "INSERT INTO messages (conversation_id, sender, text) VALUES (%s, %s, %s) ON CONFLICT (conversation_id, sender, text) DO NOTHING",
                 (conversation_id, sender, text)
             )
 
@@ -192,8 +194,12 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
             ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
         
         cursor.execute('''
-        INSERT OR REPLACE INTO outreach_details 
+        INSERT INTO outreach_details 
         (user_name, last_session, check_in, follow_up_message)
+        ON CONFLICT (user_name) DO UPDATE SET
+        last_session = EXCLUDED.last_session,
+        check_in = EXCLUDED.check_in,
+        follow_up_message = EXCLUDED.follow_up_message
         VALUES (%s, %s, %s, %s)
         ''', (service_user_id, last_session, next_checkin, followup_message))
         conn.commit()
