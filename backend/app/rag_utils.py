@@ -101,7 +101,7 @@ def get_all_embeddings(resource_dict):
     Returns: A SentenceTransforemr Model and a dictionary
         mapping a string to an Index for different embeddins"""
 
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2', token=os.getenv('HF_TOKEN'))
 
     org_resources = process_resources(resource_dict)
 
