@@ -17,8 +17,8 @@ def get_model_and_indices():
     global _model, _saved_indices, _documents
     if _model is None:
         _model, _saved_indices, _documents = get_all_embeddings({
-            'cspnj': 'data/cspnj.csv',
-            'clhs': 'data/clhs.csv'
+            'cspnj': f'{BASE_DIR}/data/cspnj.csv',
+            'clhs': f'{BASE_DIR}/data/clhs.csv'
         })
     return _model, _saved_indices, _documents
 
