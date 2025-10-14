@@ -1,7 +1,9 @@
 import openai
 import PyPDF2
 from fpdf import FPDF
+from pathlib import Path
 
+BASE_DIR = Path(__file__).parent.parent
 
 def write_text_pdf(text,pdf_loc):
     """Save some text into a PDF
@@ -127,10 +129,10 @@ def get_all_prompts():
     external_prompts = {}
 
     for i in internal_prompt_names:
-        internal_prompts[i] = open("prompts/internal/{}.txt".format(i), encoding="utf-8").read()
+        internal_prompts[i] = open(BASE_DIR / "prompts/internal/{}.txt".format(i), encoding="utf-8").read()
 
     for i in external_prompt_names:
-        external_prompts[i] = open("prompts/external/{}.txt".format(i), encoding="utf-8").read()
+        external_prompts[i] = open(BASE_DIR / "prompts/external/{}.txt".format(i), encoding="utf-8").read()
 
     return internal_prompts, external_prompts
 
