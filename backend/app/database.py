@@ -2,6 +2,7 @@ import psycopg
 import csv
 from pathlib import Path
 import os
+from .utils import BASE_DIR
 
 CONNECTION_STRING = os.getenv("DATABASE_URL")
 
@@ -91,7 +92,7 @@ def migrate_data_from_csv():
     cursor = conn.cursor()
     
     try:
-        with open("data/profiles.csv", 'r') as f:
+        with open(BASE_DIR / "data/profiles.csv", 'r') as f:
             reader = csv.DictReader(f, skipinitialspace=True)
             for row in reader:
                 cursor.execute('''
@@ -105,7 +106,7 @@ def migrate_data_from_csv():
         print("profiles.csv not found, skipping migration")
     
     try:
-        with open("data/outreach_details.csv", 'r') as f:
+        with open(BASE_DIR / "data/outreach_details.csv", 'r') as f:
             reader = csv.DictReader(f, skipinitialspace=True)
             for row in reader:
                 cursor.execute('''
