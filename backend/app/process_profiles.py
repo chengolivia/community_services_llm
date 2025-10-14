@@ -1,5 +1,6 @@
 import os
 import psycopg
+from psycopg.rows import dict_row
 from app.generate_outreach import autogenerate_conversations
 from app.database import CONNECTION_STRING
 
@@ -8,7 +9,7 @@ def get_all_service_users(provider_username):
     autogenerate_conversations(provider_username)
 
     conn = psycopg.connect(CONNECTION_STRING)
-    conn.row_factory = psycopg.Row  # Return results as dictionaries
+    conn.row_factory = dict_row  # Return results as dictionaries
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -33,7 +34,7 @@ def get_all_outreach(provider_username):
     autogenerate_conversations(provider_username)
     
     conn = psycopg.connect(CONNECTION_STRING)
-    conn.row_factory = psycopg.Row
+    conn.row_factory = dict_row
     cursor = conn.cursor()
     
     cursor.execute('''
