@@ -75,9 +75,10 @@ def autogenerate_conversations(username):
         service_user_name = f"User-{uuid.uuid4().hex[:8]}"
         if followup['follow_up_date'] and followup['follow_up_message']:
             cursor.execute('''
-                INSERT OR IGNORE INTO profiles (service_user_id, service_user_name, provider, location, status)
-                VALUES (%s, %s, %s, %s, %s)
-            ''', (username, service_user_name, username, "Freehold, NJ", "Active"))
+                    INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (service_user_id) DO NOTHING
+            ''', (service_user_name, service_user_name, username, "Freehold, NJ", "Active"))
             today_str = datetime.now().strftime("%Y-%m-%d")
             cursor.execute('''
                 INSERT INTO outreach_details (user_name, last_session, check_in, follow_up_message)
