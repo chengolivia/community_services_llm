@@ -1,5 +1,5 @@
 import openai
-from utils import call_chatgpt_api
+from utils import call_chatgpt_api, BASE_DIR
 from googlesearch import search
 import requests
 from bs4 import BeautifulSoup
@@ -105,7 +105,7 @@ def process_entry(name):
     return row
 
 if __name__ == "__main__":
-    all_entries = open(f"C:/Users/KARAN/Desktop/AISOC/community_services_llm/community_services_llm/backend/data/{org_name}_resources.txt", "r").read().strip().split("\n")
+    all_entries = open(BASE_DIR / "data/{org_name}_resources.txt", "r").read().strip().split("\n")
     print(f"There are {len(all_entries)} entries")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:

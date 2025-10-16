@@ -11,4 +11,5 @@ PyPDF2
 fpdf
 PyJWT
 Psycopg
+pgvector
 scikit-learn
