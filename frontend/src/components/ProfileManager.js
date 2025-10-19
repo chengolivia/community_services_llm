@@ -24,9 +24,13 @@ const ProfileManager = () => {
     setSearch(e.target.value);
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
   const handleSubmit = async () => {
     // Process form data
-    console.log();
+    console.log('[Submit] Starting:', { patientName, lastSession, nextCheckIn });
+    setIsSubmitting(true);
     
     try {
       const response = await fetch(`${API_URL}/new_checkin/`, {
@@ -35,21 +39,39 @@ const ProfileManager = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          patientName, lastSession, nextCheckIn, followUpMessage }),
+          patientName,
+          lastSession,
+          nextCheckIn,
+          followUpMessage,
+          username: user.username
+        }),
       });
   
       const result = await response.json();
-      console.log("Response:", result);
+      console.log("[Submit] Response:", result);
+
+    
+    if (!response.ok) {
+      throw new Error(result.detail || 'Failed to save')
+    }
+
+    alert('Check-in saved!');
+
+    // Refresh list
+    await getAllNames();
+    
+    // Close and reset
+    setSidebar(false);
+    setPatientName('');
+    setLastSession('');
+    setNextCheckIn('');
+    setFollowUpMessage('');
     } catch (error) {
       console.error("Error:", error);
+      alert(`Failed: ${error.followUpMessage}`)
+    } finally {
+      setIsSubmitting(false);
     }
-  
-
-    // Here you would typically save the data to your backend
-    // savePatientData({ patientName, lastSession, nextCheckIn, followUpMessage });
-    
-    // Close sidebar after submission
-    setSidebar(false);
   };
 
   const openSidebar = (patient, editable) => {
@@ -75,14 +97,25 @@ const ProfileManager = () => {
     setSidebar(true);
   };
 
+  
   const getAllNames = async () => {
-    const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
-    response.json().then((res) => setAllNames(res));
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
+      const res = await response.json()
+      setAllNames(res);
+      console.log('[Load] Got', res.length, 'profiles');
+    } catch (error) {
+      console.error('[Load] Error:', error);
+      setAllNames([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     getAllNames();
-  }, []);
+  }, [user.username]);
 
   return (
     <div className="container">
@@ -99,7 +132,7 @@ const ProfileManager = () => {
             <img src={AddIcon} alt="Add Icon" /> Add
           </button>
         </div>
-        
+        <div className="table-wrapper">
         <table>
           <thead>
             <tr>
@@ -125,6 +158,7 @@ const ProfileManager = () => {
             ) : null)}      
           </tbody>
         </table>
+        </div>
       </div>
       
       <Sidebar 
@@ -134,6 +168,7 @@ const ProfileManager = () => {
           <SidebarInformation
             patient={currentPatient}
             isEditable={isEditable}
+            isSubmitting={isSubmitting}
             onSubmit={handleSubmit}
             onClose={() => setSidebar(false)}
             patientName={patientName}

@@ -26,10 +26,17 @@
   align-items: center;  /* Vertically align input and button */
   margin-bottom: 10px; 
   width: 50%;
+  flex-shrink: 0;
 }
 
 table {
   width: 50%;
+}
+
+.table-wrapper {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .left-section {
@@ -236,6 +243,10 @@ table {
   width: 100%; 
   padding: 20px;
   transition: margin-right 0.3s ease-in-out; 
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .main-content.shifted {
