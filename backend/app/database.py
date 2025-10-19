@@ -46,12 +46,12 @@ def init_database():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS outreach_details (
         id INTEGER PRIMARY KEY SERIAL,
-        user_name TEXT NOT NULL,
+        user_name TEXT NOT NULL UNIQUE,
         last_session TEXT,
         check_in TEXT,
         follow_up_message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_name) REFERENCES profiles(service_user_id)
+        FOREIGN KEY (user_name) REFERENCES profiles(service_user_id) ON DELETE CASCADE
     )
     ''')
 
@@ -59,6 +59,7 @@ def init_database():
     CREATE TABLE IF NOT EXISTS conversations (
         id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
+        outreach_generated BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
@@ -70,8 +71,8 @@ def init_database():
         sender TEXT NOT NULL,
         text TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        outreach_generated BOOLEAN DEFAULT FALSE,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-        outreach_generated BOOLEAN,
         UNIQUE(conversation_id, sender, text)
     )
     ''')
@@ -183,6 +184,32 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
     cursor = conn.cursor()
     
     try:
+        # Generate user ID
+        base_id = f"{provider_username}_{patient_name.lower().replace(' ', '_')}"
+        
+        # Check for existing IDs with same base
+        cursor.execute('''
+        SELECT service_user_id FROM profiles 
+        WHERE service_user_id LIKE %s
+        ORDER BY service_user_id
+        ''', (f"{base_id}%",))
+        
+        existing_ids = [row[0] for row in cursor.fetchall()]
+        
+        # Determine new ID
+        if not existing_ids:
+            service_user_id = base_id
+        elif base_id in existing_ids:
+            counter = 2
+            while f"{base_id}_{counter}" in existing_ids:
+                counter += 1
+            service_user_id = f"{base_id}_{counter}"
+        else:
+            service_user_id = base_id
+        
+        print(f"[DEBUG] Generated ID: {service_user_id}")
+        
+        # Insert user id
         service_user_id = patient_name.lower().replace(" ", "_")
         cursor.execute('''
         SELECT service_user_id FROM profiles WHERE service_user_id = %s
@@ -197,16 +224,19 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
         cursor.execute('''
         INSERT INTO outreach_details 
         (user_name, last_session, check_in, follow_up_message)
-        ON CONFLICT (user_name) DO UPDATE SET
-        last_session = EXCLUDED.last_session,
-        check_in = EXCLUDED.check_in,
-        follow_up_message = EXCLUDED.follow_up_message
         VALUES (%s, %s, %s, %s)
+        ON CONFLICT (user_name) DO UPDATE SET
+            last_session = EXCLUDED.last_session,
+            check_in = EXCLUDED.check_in,
+            follow_up_message = EXCLUDED.follow_up_message
         ''', (service_user_id, last_session, next_checkin, followup_message))
         conn.commit()
-        conn.close()
+        return True, f"Check-in saved successfully (ID: {service_user_id})"
     except Exception as e:
         conn.rollback()
+        print(f"[DB Error] {e}")
+        return False, f"Database error: {str(e)}"
+    finally:
         conn.close()
 
 

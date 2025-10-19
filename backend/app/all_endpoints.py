@@ -93,6 +93,7 @@ class NewWellness(BaseModel):
     lastSession: str
     nextCheckIn: str
     followUpMessage: str
+    username: str
 
 @app.get("/service_user_list/")
 async def service_user_list(name):
@@ -103,17 +104,18 @@ async def outreach_list(name):
     return get_all_outreach(name)
 
 @app.post("/new_checkin/")
-async def create_item(item: NewWellness, current_user: str):
+async def create_item(item: NewWellness):
+    print(f"[API] Received: {item.dict()}")
     success, message = add_new_wellness_checkin(
-        current_user, 
+        item.username,
         item.patientName, 
         item.lastSession, 
         item.nextCheckIn, 
         item.followUpMessage
     )
-    
+    print(f"[API] Result: {success}, {message}")
     if success:
-        return {"message": "Check-in added successfully", "item": item}
+        return {"success": True, "message": message, "item": item}
     else:
         raise HTTPException(status_code=400, detail=message)
 

@@ -7,7 +7,8 @@ import ProfileIcon from '../icons/Profile.png';
 // New PatientSidebar component
 const SidebarInformation = ({ 
   patient = {}, 
-  isEditable = false, 
+  isEditable = false,
+  isSubmitting = false, 
   onSubmit, 
   onClose,
   patientName, 
@@ -131,7 +132,7 @@ const SidebarInformation = ({
         
         {isEditable && (
           <div className="save-button-container">
-            <button type="submit" className="save-button">Save</button>
+            <button onClick={onSubmit} disabled={isSubmitting || !patientName} type="submit" className="save-button">{isSubmitting ? 'Saving...' : 'Save Check-in'}</button>
           </div>
         )}
       </div>
