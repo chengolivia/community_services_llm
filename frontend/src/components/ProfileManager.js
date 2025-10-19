@@ -24,6 +24,9 @@ const ProfileManager = () => {
     setSearch(e.target.value);
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
   const handleSubmit = async () => {
     // Process form data
     console.log('[Submit] Starting:', { patientName, lastSession, nextCheckIn });
@@ -94,11 +97,11 @@ const ProfileManager = () => {
     setSidebar(true);
   };
 
-
+  
   const getAllNames = async () => {
     setIsLoading(true);
     try {
-    const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
+      const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
       const res = await response.json()
       setAllNames(res);
       console.log('[Load] Got', res.length, 'profiles');
@@ -129,7 +132,7 @@ const ProfileManager = () => {
             <img src={AddIcon} alt="Add Icon" /> Add
           </button>
         </div>
-        
+        <div className="table-wrapper">
         <table>
           <thead>
             <tr>
@@ -155,6 +158,7 @@ const ProfileManager = () => {
             ) : null)}      
           </tbody>
         </table>
+        </div>
       </div>
       
       <Sidebar 
@@ -164,6 +168,7 @@ const ProfileManager = () => {
           <SidebarInformation
             patient={currentPatient}
             isEditable={isEditable}
+            isSubmitting={isSubmitting}
             onSubmit={handleSubmit}
             onClose={() => setSidebar(false)}
             patientName={patientName}
