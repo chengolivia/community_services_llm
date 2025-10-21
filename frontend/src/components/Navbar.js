@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import '../App.css';
 import HomeIcon from '../icons/Home.png';
@@ -12,6 +12,7 @@ function Navbar() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { organization, user } = useContext(WellnessContext);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
@@ -20,6 +21,27 @@ function Navbar() {
   // Convert organization to uppercase for display
   const displayOrganization = organization ? organization.toUpperCase() : '';
   
+  if (!user.isAuthenticated) {
+    return (
+      <nav className="navbar">
+        <h1 className="navbar-title">PeerCoPilot</h1>
+        <div className="hamburger" onClick={toggleMenu}>
+          &#9776; {/* Hamburger icon */}
+        </div>
+        <div className={`navbar-links ${menuOpen ? 'active' : ''}`}>
+          <Link
+            to="/"
+            className={`navbar-button ${location.pathname === '/' ? 'active' : ''}`}
+          >
+            <img src={HomeIcon} alt="Home Icon" className="navbar-icon" />
+            Home
+          </Link>
+        </div>
+      </nav>
+    );
+
+  }
+
   return (
     <nav className="navbar">
       <h1 className="navbar-title">PeerCoPilot</h1>
