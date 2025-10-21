@@ -6,6 +6,7 @@ import WellnessGoalsIcon from '../icons/WellnessGoalsAssistant.png';
 import ProfileManagerIcon from '../icons/ProfileManager.png';
 import OutreachCalendarIcon from '../icons/OutreachCalendar.png';
 import { WellnessContext } from './AppStateContextProvider';
+import Logout from "./Logout.js"
 
 
 function Navbar() {
@@ -25,18 +26,7 @@ function Navbar() {
     return (
       <nav className="navbar">
         <h1 className="navbar-title">PeerCoPilot</h1>
-        <div className="hamburger" onClick={toggleMenu}>
-          &#9776; {/* Hamburger icon */}
-        </div>
-        <div className={`navbar-links ${menuOpen ? 'active' : ''}`}>
-          <Link
-            to="/"
-            className={`navbar-button ${location.pathname === '/' ? 'active' : ''}`}
-          >
-            <img src={HomeIcon} alt="Home Icon" className="navbar-icon" />
-            Home
-          </Link>
-        </div>
+
       </nav>
     );
 
@@ -95,7 +85,10 @@ function Navbar() {
           />
           Outreach Calendar
         </Link>
+
       </div>
+      <div className="navbar-spacer"></div>
+      <Logout />
     </nav>
   );
 }
