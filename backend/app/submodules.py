@@ -5,6 +5,7 @@ import json
 import os 
 import numpy as np
 from copy import deepcopy
+import time
 
 from app.eligibility_check import eligibility_check
 from app.utils import (
@@ -18,12 +19,14 @@ openai.api_key = os.environ.get("SECRET_KEY")
 
 internal_prompts, external_prompts = get_all_prompts()
 
-def get_questions_resources(situation,all_messages,organization,k: int = 5):
+def get_questions_resources(situation,all_messages,organization,k: int = 5, track_time=False):
     """Process user situation + generate questions and resources
 
     Arguments:
         situation: String, last message user sent
         all_messages: List of dictionaries, with all the messages
+        k: for orchestration
+        track_time: whether or not to include timing info for debugging purposes
 
     Returns: String response, with resources and questions, 
         and a string, containing a dictionary on which 
@@ -35,26 +38,39 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
     
     
     all_message_list = []
-    
+    if track_time: 
+        timings = {}
+        start_total = time.time()
     for prompt in ['goal','followup_question','resource']:#,'which_resource','benefit_extract']:
         all_message_list.append([{'role': 'system', 'content': internal_prompts[prompt].replace("[Organization]",organization)}]+all_messages+[{"role": "user", "content": situation}])
     print("All messages",all_message_list[1])
-
+    
+    if track_time:
+        start = time.time()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
     initial_responses = deepcopy(list(initial_responses))
+    if track_time:
+        timings['initial_llm_calls'] = time.time() - start
     print("Initial",initial_responses)
 
     # Combine prompts with external information on resources
+    if track_time:
+        start = time.time()
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(initial_responses[2]),flags=re.DOTALL)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         resources = list(executor.map(lambda s: extract_resources(embedding_model, saved_indices, documents, s, {'resource_{}'.format(organization): True},k=k), matches))
+    if track_time:
+        timings['rag_search'] = time.time() - start
     
     ## Debuggin 10/16
+    if track_time:
+        start = time.time()
     all_resources = "\n".join(resources)
     all_resources = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a highly knowledgable system that assists {}, a peer support organization, with finding the correct resources. Out of this large list of resources, return a nicely formatted list, with phones/addresses (ONLY USE THE INFORMATION PROVIDED) of the most relevant and diverse resources for the following situation: {}'.format(organization,situation)},{'role': 'user', 'content': all_resources}], stream=False)
-
+    if track_time:
+        timings['resource_formatting'] = time.time() - start
     # # Combine prompts with external information on benefits
     # pattern = r"\[Situation\](.*?)\[/Situation\]"
     # benefit_info = re.sub(
@@ -98,6 +114,9 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
     # 1) the string we already had, 
     # 2) the RAG hits, 
     # 3) the raw resource prompt
+    if track_time:
+        timings['retrieval_total'] = time.time() - start_total
+        return response, external_resources, raw_resource_prompt, timings
     return response, external_resources, raw_resource_prompt
 
 def format_resources_for_user(situation, all_messages, organization, max_items: int = 3):
@@ -223,13 +242,19 @@ def fetch_goals_and_resources(situation, all_messages, organization, k: int = 25
 
 
 #NEW PLANNER APPROACH
-def construct_response(situation, all_messages, model, organization):
+def construct_response(situation, all_messages, model, organization, track_time=False):
     """
     1) Ask the model: is this a substantive request that needs SMART goals?
        -> JSON: {"needs_goals": true/false}
     2a) If false: one-shot vanilla chat (no goals).
     2b) If true: your existing SMART-goals + orchestration pipeline.
     """
+    if track_time:
+        overall_timings = {}
+        start_total = time.time()
+        
+        # Time intent check
+        start = time.time()
 
 
     # -- 1) INTENT & verbosity CHECK tiny LLM call --
@@ -257,7 +282,8 @@ def construct_response(situation, all_messages, model, organization):
         max_tokens=40
     ).strip()
 
-    
+    if track_time:
+        overall_timings['intent_check'] = time.time() - start
 
     try:
         meta = json.loads(meta_resp)
@@ -324,11 +350,16 @@ def construct_response(situation, all_messages, model, organization):
 
     # the existing copilot pipeline:
     print("[DEBUG] copilot pipeline branch (SMART goals + orchestration)")
-    initial_response, external_resources, raw_resource_prompt = get_questions_resources(
-        situation, all_messages, organization, k=full_k
-    )
-
-
+    if track_time:
+        initial_response, external_resources, raw_resource_prompt, retrieval_times = get_questions_resources(
+            situation, all_messages, organization, k=full_k, track_time=True
+        )
+        overall_timings.update(retrieval_times)
+    else:
+        initial_response, external_resources, raw_resource_prompt = get_questions_resources(
+            situation, all_messages, organization, k=full_k
+        )
+    
     new_message = [{'role': 'system', 'content': internal_prompts['orchestration']}]
     new_message += [{'role': 'system', 'content': external_resources}]
     new_message += all_messages + [
@@ -339,8 +370,22 @@ def construct_response(situation, all_messages, model, organization):
     print(initial_response)
 
     # 1) stream the main orchestration 
+    if track_time:
+        start = time.time()
     response = call_chatgpt_api_all_chats(new_message, stream=True, max_tokens=1000)
-    yield from stream_process_chatgpt_response(response)
+    
+    if track_time:
+        # Yield from the stream
+        for chunk in stream_process_chatgpt_response(response):
+            yield chunk
+        
+        overall_timings['orchestration'] = time.time() - start
+        overall_timings['total'] = time.time() - start_total
+        
+        # Yield timing info as a special marker
+        yield f"\n\n<!--TIMINGS:{json.dumps(overall_timings)}-->"
+    else:
+        yield from stream_process_chatgpt_response(response)
 
 
 
