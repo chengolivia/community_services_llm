@@ -188,7 +188,6 @@ def fetch_goals_and_resources(situation, all_messages, organization, k: int = 25
 
     if m:
         section = m.group(1).strip()
-        goals = []
         for line in section.splitlines():
             text = line.strip().lstrip("•").strip()
             if text:
