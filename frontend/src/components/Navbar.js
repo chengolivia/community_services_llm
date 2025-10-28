@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import '../App.css';
 import HomeIcon from '../icons/Home.png';
@@ -6,12 +6,14 @@ import WellnessGoalsIcon from '../icons/WellnessGoalsAssistant.png';
 import ProfileManagerIcon from '../icons/ProfileManager.png';
 import OutreachCalendarIcon from '../icons/OutreachCalendar.png';
 import { WellnessContext } from './AppStateContextProvider';
+import Logout from "./Logout.js"
 
 
 function Navbar() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { organization, user } = useContext(WellnessContext);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
@@ -20,6 +22,16 @@ function Navbar() {
   // Convert organization to uppercase for display
   const displayOrganization = organization ? organization.toUpperCase() : '';
   
+  if (!user.isAuthenticated) {
+    return (
+      <nav className="navbar">
+        <h1 className="navbar-title">PeerCoPilot</h1>
+
+      </nav>
+    );
+
+  }
+
   return (
     <nav className="navbar">
       <h1 className="navbar-title">PeerCoPilot</h1>
@@ -73,7 +85,10 @@ function Navbar() {
           />
           Outreach Calendar
         </Link>
+
       </div>
+      <div className="navbar-spacer"></div>
+      <Logout />
     </nav>
   );
 }
