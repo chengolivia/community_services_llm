@@ -121,10 +121,11 @@ const OutreachCalendar = () => {
                         onChange={handleSearchChange}  // Update state on change
                     /> 
                 </div>
-            
+                <div className="table-wrapper">
                 <div className="schedule">
                     {weekCode}
                 </div> 
+                </div>
             </div> 
             <Sidebar 
             isOpen={hasSidebar}

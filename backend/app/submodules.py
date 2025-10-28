@@ -4,6 +4,7 @@ import re
 import json 
 import os 
 import numpy as np
+from copy import deepcopy
 
 from app.eligibility_check import eligibility_check
 from app.utils import (
@@ -17,7 +18,7 @@ openai.api_key = os.environ.get("SECRET_KEY")
 
 internal_prompts, external_prompts = get_all_prompts()
 
-def get_questions_resources(situation,all_messages,organization,k: int = 25):
+def get_questions_resources(situation,all_messages,organization,k: int = 5):
     """Process user situation + generate questions and resources
 
     Arguments:
@@ -35,11 +36,14 @@ def get_questions_resources(situation,all_messages,organization,k: int = 25):
     
     all_message_list = []
     
-    for prompt in ['goal','followup_question','resource','which_resource','benefit_extract']:
+    for prompt in ['goal','followup_question','resource']:#,'which_resource','benefit_extract']:
         all_message_list.append([{'role': 'system', 'content': internal_prompts[prompt].replace("[Organization]",organization)}]+all_messages+[{"role": "user", "content": situation}])
+    print("All messages",all_message_list[1])
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
-    initial_responses = list(initial_responses)
+    initial_responses = deepcopy(list(initial_responses))
+    print("Initial",initial_responses)
 
     # Combine prompts with external information on resources
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
@@ -47,31 +51,35 @@ def get_questions_resources(situation,all_messages,organization,k: int = 25):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         resources = list(executor.map(lambda s: extract_resources(embedding_model, saved_indices, documents, s, {'resource_{}'.format(organization): True},k=k), matches))
     
-    # Combine prompts with external information on benefits
-    pattern = r"\[Situation\](.*?)\[/Situation\]"
-    benefit_info = re.sub(
-        pattern,
-        lambda m: eligibility_check(m.group()),  # Pass the matched content as a string
-        initial_responses[4],
-        flags=re.DOTALL
-    )
-    if "Irrelevant" in benefit_info:
-        benefit_info = ""
-    else:
-        constructed_messages = [{'role': 'system', 'content': internal_prompts['benefit_system']}] + [{'role': 'user', 'content': i['content'][:1000]} for i in all_messages if i['role'] == 'user']
-        constructed_messages.append({'role': 'user', 'content': situation})
-        constructed_messages.append({'role': 'user', 'content': 'Eligible Benefits: {}'.format(benefit_info)})
-        benefit_info = call_chatgpt_api_all_chats(constructed_messages,stream=False)
+    ## Debuggin 10/16
+    all_resources = "\n".join(resources)
+    all_resources = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a highly knowledgable system that assists {}, a peer support organization, with finding the correct resources. Out of this large list of resources, return a nicely formatted list, with phones/addresses (ONLY USE THE INFORMATION PROVIDED) of the most relevant and diverse resources for the following situation: {}'.format(organization,situation)},{'role': 'user', 'content': all_resources}], stream=False)
+
+    # # Combine prompts with external information on benefits
+    # pattern = r"\[Situation\](.*?)\[/Situation\]"
+    # benefit_info = re.sub(
+    #     pattern,
+    #     lambda m: eligibility_check(m.group()),  # Pass the matched content as a string
+    #     initial_responses[4],
+    #     flags=re.DOTALL
+    # )
+    # if "Irrelevant" in benefit_info:
+    #     benefit_info = ""
+    # else:
+    #     constructed_messages = [{'role': 'system', 'content': internal_prompts['benefit_system']}] + [{'role': 'user', 'content': i['content'][:1000]} for i in all_messages if i['role'] == 'user']
+    #     constructed_messages.append({'role': 'user', 'content': situation})
+    #     constructed_messages.append({'role': 'user', 'content': 'Eligible Benefits: {}'.format(benefit_info)})
+    #     benefit_info = call_chatgpt_api_all_chats(constructed_messages,stream=False)
 
     # Call modules with additional extra information
-    which_external_resources = initial_responses[3]
-    try:
-        which_external_resources = json.loads(which_external_resources.strip()) 
-    except:
-        which_external_resources = {}
-    full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
-    external_resources = extract_resources(embedding_model, saved_indices, documents, full_situation,which_external_resources,k=k)
-
+    # which_external_resources = initial_responses[3]
+    # try:
+    #     which_external_resources = json.loads(which_external_resources.strip()) 
+    # except:
+    #     which_external_resources = {}
+    # full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
+    # external_resources = extract_resources(embedding_model, saved_indices, documents, full_situation,which_external_resources,k=k)
+    external_resources = ""
 
     # capture the raw "[Resource]...[/Resource]" output
     raw_resource_prompt = initial_responses[2]
@@ -82,8 +90,8 @@ def get_questions_resources(situation,all_messages,organization,k: int = 25):
     response = "\n".join([
         f"SMART Goals: {initial_responses[0]}",
         f"Questions: {initial_responses[1]}",
-        "Resources (use only these resources):\n" + sep.join(resources),
-        f"Benefit Info: {benefit_info}"
+        "Resources (use only these resources):\n" + all_resources, #TODO: Remove this, from debugging 
+        # f"Benefit Info: {benefit_info}"
     ])
 
     # now return three things: 
@@ -294,8 +302,8 @@ def construct_response(situation, all_messages, model, organization):
         print("[DEBUG] verbosity=deep → using full orchestration with k=50")
         full_k = 50
     else: 
-        print("[DEBUG] verbosity=medium → using standard orchestration with k=25")
-        full_k = 25
+        print("[DEBUG] verbosity=medium → using standard orchestration with k=5")
+        full_k = 5
 
 
     # -- 2b) otherwise: we run our full SMART-goals + orchestration pipeline --
@@ -326,6 +334,8 @@ def construct_response(situation, all_messages, model, organization):
         {"role": "user",    "content": situation},
         {"role": "user",    "content": initial_response}
     ]
+
+    print(initial_response)
 
     # 1) stream the main orchestration 
     response = call_chatgpt_api_all_chats(new_message, stream=True, max_tokens=1000)
