@@ -207,158 +207,159 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
 
   return (
     <div className="resource-recommendation-container">
-      <div className={`left-section ${submitted ? 'submitted' : ''}`}>
-        <h1 className="page-title">{title}</h1>
-        <h2 className="instruction">
-          What is the service user’s needs and goals for today’s meeting?
-        </h2>
-        <div 
-          className={`conversation-thread ${submitted ? 'visible' : ''}`}
-          onScroll={handleScroll}
-          style={{ overflowY: 'auto', maxHeight: '80vh' }} // ensure the container is scrollable
-        >
-          {conversation.map((msg, index) => (
-            <div key={index} className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}>
-              <ReactMarkdown
-                children={msg.text}
-                skipHtml={false}
-                rehypePlugins={[rehypeRaw]}
-                components={{
-                  a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer">
-                      {children}
-                    </a>
-                  ),
-                }}
-              />
-            </div>
-          ))}
-          <div ref={conversationEndRef} />
+      <div className="content-area">
+        <div className={`left-section ${submitted ? 'submitted' : ''}`}>
+          <h1 className="page-title">{title}</h1>
+          <h2 className="instruction">
+            What is the service user’s needs and goals for today’s meeting?
+          </h2>
+          <div 
+            className={`conversation-thread ${submitted ? 'visible' : ''}`}
+            onScroll={handleScroll}
+            style={{ overflowY: 'auto', maxHeight: '80vh' }} // ensure the container is scrollable
+          >
+            {conversation.map((msg, index) => (
+              <div key={index} className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}>
+                <ReactMarkdown
+                  children={msg.text}
+                  skipHtml={false}
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer">
+                        {children}
+                      </a>
+                    ),
+                  }}
+                />
+              </div>
+            ))}
+            <div ref={conversationEndRef} />
+          </div>
+          </div>
+          {/* ← NEW: Right‐hand panel containing two empty boxes */}
+        <div className="right-section">
+        {/* Goals panel */}
+        <div className="goals-box" style={{ height: '400px' }}>
+          <h3>Goals</h3>
+          <div className="scroll-container">
+            {goalsList.map((goal, idx) => (
+              <div key={idx} className="resource-item">
+                <ReactMarkdown
+                  children={goal}
+                  skipHtml={false}
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer">
+                        {children}
+                      </a>
+                    ),
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
-          {showLocation && (
-            <div className="input-box">
-              <textarea
-                className="input-bar"
-                placeholder="Enter location (city or county)"
-                value={inputLocationText}
-                onChange={handleInputChangeLocation}
-                rows={1}
-              />
+          {/* Resources panel */}
+          <div className="resources-box" style={{ height: '500px' }}>
+            <h3>Resources</h3>
+            <div className="scroll-container">
+              {resourcesList.map((res, idx) => {
+                // Parse the backend’s flat “Name — [Link](url) (Action: act)” string
+                // into a pretty markdown with name bold, link & action on their own lines.
+                const regex = /^(.*?)\s+—\s+\[Link\]\((.*?)\)\s*(?:\(Action:\s*(.*?)\))?$/;
+                const match = res.match(regex);
+                let mdString = res;
+                if (match) {
+                  const [, name, linkUrl, action] = match;
+                  mdString =
+                    `**${name}**  \n` +     // bold name + linebreak
+                    `[Link](${linkUrl})  \n` + // link + linebreak
+                    `**Action:** ${action}`;   // action
+                }
+
+                return (
+                  <div key={idx} className="resource-item">
+                    <ReactMarkdown
+                      children={mdString}
+                      skipHtml={false}
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                      components={{
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer">
+                            {children}
+                          </a>
+                        ),
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
+        </div> 
+      </div>
+      <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
+        {showLocation && (
           <div className="input-box">
             <textarea
               className="input-bar"
-              ref={inputRef}
-              placeholder={
-                submitted
-                  ? 'Write a follow-up to update...'
-                  : 'Describe the service user’s situation...'
-              }
-              value={inputText}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
+              placeholder="Enter location (city or county)"
+              value={inputLocationText}
+              onChange={handleInputChangeLocation}
               rows={1}
-              style={{ overflow: 'hidden', resize: 'none' }}
             />
-            <button className="submit-button" onClick={handleSubmit}>
-              ➤
-            </button>
           </div>
-          <div className="backend-selector-div">
+        )}
+        <div className="input-box">
+          <textarea
+            className="input-bar"
+            ref={inputRef}
+            placeholder={
+              submitted
+                ? 'Write a follow-up to update...'
+                : 'Describe the service user’s situation...'
+            }
+            value={inputText}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            style={{ overflow: 'hidden', resize: 'none' }}
+          />
+          <button className="submit-button" onClick={handleSubmit}>
+            ➤
+          </button>
+        </div>
+        <div className="backend-selector-div">
+          <button
+            className="submit-button"
+            style={{ width: '60px', height: '100%', marginLeft: '20px' }}
+            onClick={handleNewSession}
+          >
+            Reset Session
+          </button>
+          <button
+            className="submit-button"
+            style={{ width: '60px', height: '100%', marginLeft: '20px' }}
+            onClick={exportChatToPDF}
+          >
+            Save Session History
+          </button>
+          {tool === "wellness" && (
             <button
               className="submit-button"
-              style={{ width: '100px', height: '100%', marginLeft: '20px' }}
-              onClick={handleNewSession}
+              style={{ width: '60px', height: '100%', marginLeft: '20px' }}
+              onClick={() => window.open('https://www.youtube.com/watch?v=4rg1wmo2Y8w', '_blank')}
             >
-              Reset Session
+              Tutorial
             </button>
-            <button
-              className="submit-button"
-              style={{ width: '150px', height: '100%', marginLeft: '20px' }}
-              onClick={exportChatToPDF}
-            >
-              Save Session History
-            </button>
-            {tool === "wellness" && (
-              <button
-                className="submit-button"
-                style={{ width: '150px', height: '100%', marginLeft: '20px' }}
-                onClick={() => window.open('https://www.youtube.com/watch?v=4rg1wmo2Y8w', '_blank')}
-              >
-                Tutorial
-              </button>
-            )}
-          </div>
+          )}
         </div>
-      </div>
-      {/* ← NEW: Right‐hand panel containing two empty boxes */}
-      <div className="right-section">
-      {/* Goals panel */}
-      <div className="goals-box" style={{ height: '400px' }}>
-        <h3>Goals</h3>
-        <div className="scroll-container">
-          {goalsList.map((goal, idx) => (
-            <div key={idx} className="resource-item">
-              <ReactMarkdown
-                children={goal}
-                skipHtml={false}
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw]}
-                components={{
-                  a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer">
-                      {children}
-                    </a>
-                  ),
-                }}
-              />
-            </div>
-          ))}
         </div>
-      </div>
-
-        {/* Resources panel */}
-        <div className="resources-box" style={{ height: '500px' }}>
-          <h3>Resources</h3>
-          <div className="scroll-container">
-            {resourcesList.map((res, idx) => {
-              // Parse the backend’s flat “Name — [Link](url) (Action: act)” string
-              // into a pretty markdown with name bold, link & action on their own lines.
-              const regex = /^(.*?)\s+—\s+\[Link\]\((.*?)\)\s*(?:\(Action:\s*(.*?)\))?$/;
-              const match = res.match(regex);
-              let mdString = res;
-              if (match) {
-                const [, name, linkUrl, action] = match;
-                mdString =
-                  `**${name}**  \n` +     // bold name + linebreak
-                  `[Link](${linkUrl})  \n` + // link + linebreak
-                  `**Action:** ${action}`;   // action
-              }
-
-              return (
-                <div key={idx} className="resource-item">
-                  <ReactMarkdown
-                    children={mdString}
-                    skipHtml={false}
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw]}
-                    components={{
-                      a: ({ href, children }) => (
-                        <a href={href} target="_blank" rel="noopener noreferrer">
-                          {children}
-                        </a>
-                      ),
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div> 
     </div>
   );
 }
