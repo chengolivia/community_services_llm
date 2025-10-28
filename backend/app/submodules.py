@@ -326,13 +326,16 @@ def construct_response(situation, all_messages, model, organization):
     initial_response, external_resources, raw_resource_prompt = get_questions_resources(
         situation, all_messages, organization, k=full_k
     )
-
+    
+    # Extract ONLY the questions part for orchestration
+    questions_only = initial_response[1] if len(initial_response) > 1 else ""
 
     new_message = [{'role': 'system', 'content': internal_prompts['orchestration']}]
     new_message += [{'role': 'system', 'content': external_resources}]
     new_message += all_messages + [
         {"role": "user",    "content": situation},
-        {"role": "user",    "content": initial_response}
+        # {"role": "user",    "content": initial_response}
+        {"role": "user", "content": f"Follow-up questions:\n{questions_only}"}  # Only pass questions
     ]
 
     print(initial_response)
