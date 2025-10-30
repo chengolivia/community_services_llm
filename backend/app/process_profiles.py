@@ -6,7 +6,7 @@ from app.database import CONNECTION_STRING
 
 def get_all_service_users(provider_username):
     """Get all service users for a given provider with their latest outreach details."""
-    autogenerate_conversations(provider_username)
+    # autogenerate_conversations(provider_username)
 
     conn = psycopg.connect(CONNECTION_STRING)
     conn.row_factory = dict_row  # Return results as dictionaries
@@ -31,7 +31,7 @@ def get_all_service_users(provider_username):
 
 def get_all_outreach(provider_username):
     """Get all outreach details for service users of a given provider."""
-    autogenerate_conversations(provider_username)
+    # autogenerate_conversations(provider_username)
     
     conn = psycopg.connect(CONNECTION_STRING)
     conn.row_factory = dict_row
