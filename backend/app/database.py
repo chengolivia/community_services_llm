@@ -22,7 +22,7 @@ def init_database():
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY SERIAL,
+        id SERIAL PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         salt TEXT NOT NULL,
@@ -33,7 +33,7 @@ def init_database():
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS profiles (
-        id INTEGER PRIMARY KEY SERIAL,
+        id SERIAL PRIMARY KEY,
         service_user_id TEXT UNIQUE NOT NULL,
         service_user_name TEXT NOT NULL UNIQUE,
         provider TEXT NOT NULL,
@@ -45,13 +45,13 @@ def init_database():
     
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS outreach_details (
-        id INTEGER PRIMARY KEY SERIAL,
-        user_name TEXT NOT NULL UNIQUE,
+        id SERIAL PRIMARY KEY,
+        service_user_id TEXT NOT NULL UNIQUE,
         last_session TEXT,
         check_in TEXT,
         follow_up_message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_name) REFERENCES profiles(service_user_id) ON DELETE CASCADE
+        FOREIGN KEY (service_user_id) REFERENCES profiles(service_user_id) ON DELETE CASCADE
     )
     ''')
 
@@ -66,7 +66,7 @@ def init_database():
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY SERIAL,
+        id SERIAL PRIMARY KEY,
         conversation_id TEXT NOT NULL,
         sender TEXT NOT NULL,
         text TEXT NOT NULL,
@@ -210,7 +210,6 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
         print(f"[DEBUG] Generated ID: {service_user_id}")
         
         # Insert user id
-        service_user_id = patient_name.lower().replace(" ", "_")
         cursor.execute('''
         SELECT service_user_id FROM profiles WHERE service_user_id = %s
         ''', (service_user_id,))
@@ -223,9 +222,9 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
         
         cursor.execute('''
         INSERT INTO outreach_details 
-        (user_name, last_session, check_in, follow_up_message)
+        (service_user_id, last_session, check_in, follow_up_message)
         VALUES (%s, %s, %s, %s)
-        ON CONFLICT (user_name) DO UPDATE SET
+        ON CONFLICT (service_user_id) DO UPDATE SET
             last_session = EXCLUDED.last_session,
             check_in = EXCLUDED.check_in,
             follow_up_message = EXCLUDED.follow_up_message
