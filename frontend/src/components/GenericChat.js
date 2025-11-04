@@ -331,31 +331,41 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
           {/* ← NEW: Right‐hand panel containing two empty boxes */}
         <div className="right-section">
         {/* Goals panel */}
-        <div className="goals-box" style={{ height: '400px' }}>
+        <div className="goals-box">
           <h3>Goals</h3>
           <div className="scroll-container">
-            {goalsList.map((goal, idx) => (
-              <div key={idx} className="resource-item">
-                <ReactMarkdown
-                  children={goal}
-                  skipHtml={false}
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={{
-                    a: ({ href, children }) => (
-                      <a href={href} target="_blank" rel="noopener noreferrer">
-                        {children}
-                      </a>
-                    ),
-                  }}
-                />
-              </div>
-            ))}
+          {goalsList.map((goal, idx) => {
+              // Get the first visible word (strip Markdown and trim)
+              const firstWord = goal.trim().split(/\s+/)[0].replace(/[*_#>-]/g, '');
+              const showTopBorder = ['Goal', 'Resource'].includes(firstWord);
+
+              return (
+                <div
+                  key={idx}
+                  className={`resource-item ${showTopBorder ? 'with-top-border' : ''}`}
+                >
+                  <ReactMarkdown
+                    children={goal}
+                    skipHtml={false}
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer">
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  />
+                </div>
+              );
+            })}
+
           </div>
         </div>
 
           {/* Resources panel */}
-          <div className="resources-box" style={{ height: '500px' }}>
+          <div className="resources-box">
             <h3>Resources</h3>
             <div className="scroll-container">
               {resourcesList.map((res, idx) => {
