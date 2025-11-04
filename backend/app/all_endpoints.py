@@ -18,7 +18,7 @@ from app.submodules import (
 )
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.database import update_conversation, add_new_wellness_checkin
+from app.database import update_conversation, add_new_service_user
 
 import socketio
 from datetime import timedelta
@@ -111,10 +111,10 @@ async def service_user_list(name):
 async def outreach_list(name):
     return get_all_outreach(name)
 
-@app.post("/new_checkin/")
+@app.post("/new_service_user/")
 async def create_item(item: NewWellness):
     print(f"[API] Received: {item.dict()}")
-    success, message = add_new_wellness_checkin(
+    success, message = add_new_service_user(
         item.username,
         item.patientName, 
         item.lastSession, 
@@ -139,6 +139,7 @@ class Message(BaseModel):
     organization: str
     conversation_id: str
     username: str
+    service_user_id: str | None = None 
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
@@ -188,7 +189,7 @@ def accumulate_chunks(generator):
 # ─────────────────────────────────────────────────────────────────────────────
 # BACKGROUND STREAM HELPER
 # ─────────────────────────────────────────────────────────────────────────────
-def _background_stream(sid, text, previous_text, model, organization, loop):
+def _background_stream(sid, text, previous_text, model, organization, loop, metadata, service_user_id):
     """
     Runs construct_response in its own OS thread.
     Uses run_coroutine_threadsafe so .emit() coroutines are correctly awaited.
@@ -197,7 +198,6 @@ def _background_stream(sid, text, previous_text, model, organization, loop):
     try:
         # 1) Build your response generator (this may block, but only this thread)
         gen = construct_response(text, previous_text, model, organization)
-
         # 2) Stream chunks
         for accumulated_text in accumulate_chunks(gen):
             # Schedule the async emit on the main asyncio loop
@@ -206,6 +206,15 @@ def _background_stream(sid, text, previous_text, model, organization, loop):
                 loop
             )
             time.sleep(0.1)
+        print(f"[DB Update] Updating conversation for username: {metadata.get('username')}, service_user_id: {service_user_id}, conversation_id: {metadata.get('conversation_id')}")
+        update_conversation(
+            metadata,
+            [
+                {'role': 'user', 'content': text},
+                {'role': 'system', 'content': accumulated_text}
+            ],
+            service_user_id
+        )
 
     except Exception as e:
         # Log server‐side...
@@ -235,49 +244,6 @@ async def connect(sid, environ):
 @sio.event
 async def disconnect(sid):
     print(f"[Socket.IO] Client disconnected: {sid}")
-
-async def run_generation(sid, generator,text,metadata):
-    """
-    Handles real-time streaming of generated text chunks to a client via Socket.IO.
-
-    This function processes a generator that produces accumulated text chunks and 
-    asynchronously emits updates to the client. It ensures graceful handling of 
-    cancellations and errors.
-
-    Parameters:
-    sid (str): The session ID of the client.
-    generator (Iterator[str]): An iterator yielding progressively accumulated text chunks.
-
-    Behavior:
-    - Iterates through `accumulate_chunks(generator)`, emitting each chunk as a "generation_update".
-    - Introduces a small delay (`asyncio.sleep(0.1)`) to prevent overwhelming the client.
-    - Catches `asyncio.CancelledError` to handle task cancellation gracefully and notifies the client.
-    - Handles unexpected exceptions, logging errors and notifying the client.
-    - Ensures that the session ID is removed from `generation_tasks` upon completion.
-    - Sends a final "generation_complete" event to signal the end of text generation.
-
-    Returns:
-    None (asynchronous function).
-    """
-    try:
-        total_text = ""
-        for accumulated_text in accumulate_chunks(generator):
-            await sio.emit("generation_update", {"chunk": accumulated_text}, room=sid)
-            await asyncio.sleep(0.1)
-            total_text = accumulated_text
-        update_conversation(metadata,[{'role': 'user', 'content': text}, {'role': 'system', 'content': total_text}])
-    except asyncio.CancelledError:
-        print(f"[Socket.IO] Generation task for {sid} was cancelled.")
-        await sio.emit("generation_update", {"chunk": "Generation cancelled."}, room=sid)
-        raise
-    except Exception as e:
-        print(f"[Socket.IO] Error during generation: {e}")
-        await sio.emit("generation_update", {"chunk": f"Error: {e}"}, room=sid)
-    finally:
-        if sid in generation_tasks:
-            del generation_tasks[sid]
-        await sio.emit("generation_complete", {"message": "Response generation complete."}, room=sid)
-
 
 @sio.event
 async def start_generation(sid, data):
@@ -315,6 +281,16 @@ async def start_generation(sid, data):
     model = data.get("model")
     organization = data.get("organization")
     conversation_id = data.get("conversation_id","")
+    username = data.get("username")
+    service_user_id = data.get("service_user_id")
+    
+    if conversation_id == "":
+        conversation_id = secrets.token_hex(16)
+        await sio.emit("conversation_id", {"conversation_id": conversation_id}, room=sid)
+    metadata = {
+        'conversation_id': conversation_id,
+        'username': username
+    }
     
         # 1) Offload the small “intent check” to a thread so we don't block
     loop = asyncio.get_running_loop()
@@ -370,7 +346,7 @@ async def start_generation(sid, data):
     loop = asyncio.get_running_loop()
     threading.Thread(
         target=_background_stream,
-        args=(sid, text, previous_text, model, organization, loop),
+        args=(sid, text, previous_text, model, organization, loop, metadata, service_user_id),
         daemon=True
     ).start()
     # if conversation_id == "":
@@ -388,14 +364,21 @@ async def start_generation(sid, data):
 
 
 @sio.event
-async def reset_session(sid):
+async def reset_session(sid, data):
     print(f"[Socket.IO] Reset session for client: {sid}")
+    print(f"[Socket.IO] Reset reason: {data.get('reason')}")
+    print(f"[Socket.IO] Previous service user: {data.get('previous_service_user_id')}")
+    print(f"[Socket.IO] New service user: {data.get('new_service_user_id')}")
+    
     if sid in generation_tasks:
         generation_tasks[sid].cancel()
         del generation_tasks[sid]
-    await sio.emit("reset_ack", {"message": "Session reset."}, room=sid)
-
-
+    
+    await sio.emit("reset_ack", {
+        "message": "Session reset.",
+        "previous_service_user_id": data.get('previous_service_user_id'),
+        "new_service_user_id": data.get('new_service_user_id')
+    }, room=sid)
 # @app.get("/{full_path:path}")
 # async def serve_react_app(full_path: str):
 #     return FileResponse("../frontend/build/index.html")
