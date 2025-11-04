@@ -100,19 +100,18 @@ async def health():
 
 def warmup_models():
     """Background task to load embeddings after server starts"""
-    time.sleep(10)  # Wait for server to be fully ready
+    time.sleep(30)  # Wait for server to be fully ready
     try:
         print("[Warmup] Loading embeddings...")
         from app.rag_utils import get_model_and_indices
         get_model_and_indices()
-        _warmup_complete = True
         print("[Warmup] Embeddings loaded successfully")
     except Exception as e:
         print(f"[Warmup] Failed to load embeddings: {e}")
 
 threading.Thread(target=warmup_models, daemon=True).start()
 
-class NewWellness(BaseModel):
+class NewServiceUser(BaseModel):
     patientName: str
     lastSession: str
     nextCheckIn: str
@@ -128,7 +127,7 @@ async def outreach_list(name):
     return get_all_outreach(name)
 
 @app.post("/new_service_user/")
-async def create_item(item: NewWellness):
+async def create_item(item: NewServiceUser):
     print(f"[API] Received: {item.dict()}")
     success, message = add_new_service_user(
         item.username,
@@ -146,15 +145,6 @@ async def create_item(item: NewWellness):
 
 
 # Handle Socket Messages
-
-class Message(BaseModel):
-    text: str
-    previous_text: list
-    model: str
-    organization: str
-    conversation_id: str
-    username: str
-    service_user_id: str | None = None 
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
