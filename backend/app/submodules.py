@@ -195,14 +195,18 @@ def fetch_goals_and_resources(situation, all_messages, organization, k: int = 25
 
     # 3) First, include the RAG-based hits from external_resources
     resources = []
-    # resources.append(external_resources)
-    # m = re.search(
-    #     r'(?ms)^\#{3}(?!\#)[ \t]*.*?\bResources?\b.*\r?\n([\s\S]*?)(?=^\#{3}(?!\#)|\Z)',
-    #     full_response
-    # )
-    # if m:
-    #     resources_block = m.group(1).strip()
-    #     print(resources_block)
+    resources.append(external_resources)
+    m = re.search(
+        r'Resources[\s\S]*?:\s*\n([\s\S]*)',
+        full_response
+    )
+
+    if m:
+        section = m.group(1).strip()
+        for line in section.splitlines():
+            text = line.strip().lstrip("•").strip()
+            if text:
+                resources.append(text)
 
     # 4) Then append the “Additional Resources” parsed from the raw prompt
     addl = format_additional_resources(raw_prompt, max_items=k)
