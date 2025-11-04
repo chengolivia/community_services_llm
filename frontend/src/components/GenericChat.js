@@ -28,7 +28,32 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [conversationID, setConversationID] = useState("");
   const [goalsList, setGoalsList] = useState([]);
   const [resourcesList, setResourcesList] = useState([]);
+  const [serviceUsers, setServiceUsers] = useState([]);
+  const [selectedServiceUser, setSelectedServiceUser] = useState(''); // '' for general, or user ID
+  const [pendingServiceUser, setPendingServiceUser] = useState(null);
+  const [showResetWarning, setShowResetWarning] = useState(false);
 
+  useEffect(() => {
+  if (!user?.username) {
+    console.log('[Dropdown] No username available yet');
+    return;
+  }
+  
+  console.log('[Dropdown] Fetching service users for:', user.username);
+  
+  fetch(`${API_URL}/service_user_list/?name=${user.username}`)
+    .then(res => {
+      console.log('[Dropdown] Response status:', res.status);
+      return res.json();
+    })
+    .then(data => {
+      console.log('[Dropdown] Received data:', data);
+      setServiceUsers(data);
+    })
+    .catch(error => {
+      console.error('[Dropdown] Error:', error);
+    });
+}, [user?.username]);
   useEffect(() => {
     const newSocket = io(socketServerUrl, {
       transports: ['polling', 'websocket'],
@@ -95,6 +120,13 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       newSocket.disconnect();
     };
   }, [socketServerUrl]);
+
+  useEffect(() => {
+  fetch(`${API_URL}/service_user_list/?name=${user.username}`)  
+    .then(res => res.json())
+    .then(setServiceUsers)
+    .catch(console.error);
+}, [user.username]); 
 
   const handleScroll = (e) => {
     const { scrollTop, clientHeight, scrollHeight } = e.target;
@@ -164,7 +196,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
         organization: organization, 
         tool,
         conversation_id: conversationID,
-        username: user.username
+        username: user.username,
+        service_user_id: user.service_user_id || null,
       });
     } else {
       console.error('[GenericChat] Socket is not connected.');
@@ -205,11 +238,69 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     doc.save('Chat_History.pdf');
   };
 
+  const handleServiceUserChange = (e) => {
+    const newUserId = e.target.value; // '' for general, or actual user ID
+    
+    // If there's an active conversation, show warning before switching
+    if (chatConvo.length > 0 && selectedServiceUser !== newUserId) {
+      setPendingServiceUser(newUserId);
+      setShowResetWarning(true);
+    } else {
+      // No conversation yet, just switch
+      setSelectedServiceUser(newUserId);
+    }
+  };
+
+  // Confirm the switch and reset
+  const confirmServiceUserSwitch = () => {
+    setConversation([]);   
+    setChatConvo([]);
+    setConversationID('');
+    
+    setGoalsList([]);       
+    setResourcesList([]);   
+    
+    // Emit reset to backend
+    if (socket) {
+      socket.emit('reset_session', { 
+        reason: 'service_user_switch',
+        previous_service_user_id: selectedServiceUser || 'general',
+        new_service_user_id: pendingServiceUser || 'general'
+      });
+    }
+    
+    // Switch to new selection
+    setSelectedServiceUser(pendingServiceUser);
+    setPendingServiceUser(null);
+    setShowResetWarning(false);
+    
+    console.log('[Chat] Switched service user context, chat reset');
+  };
+
+  // Cancel the switch
+  const cancelServiceUserSwitch = () => {
+    setPendingServiceUser(null);
+    setShowResetWarning(false);
+  };
+
   return (
     <div className="resource-recommendation-container">
       <div className="content-area">
         <div className={`left-section ${submitted ? 'submitted' : ''}`}>
           <h1 className="page-title">{title}</h1>
+          <select 
+              value={selectedServiceUser} 
+              onChange={handleServiceUserChange}
+          >
+              <option value="">General Inquiry (not user-specific)</option>
+              <optgroup label="Service Users">
+                {serviceUsers.map(user => (
+                  <option key={user.service_user_id} value={user.service_user_id}>
+                    {user.service_user_name}
+                  </option>
+                ))}
+              </optgroup>
+          </select>
           <h2 className="instruction">
             What is the service user’s needs and goals for today’s meeting?
           </h2>
@@ -334,6 +425,35 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             ➤
           </button>
         </div>
+              {showResetWarning && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Switch Context?</h3>
+            <p>
+              {pendingServiceUser ? (
+                <>Switching to <strong>{serviceUsers.find(u => u.service_user_id === pendingServiceUser)?.service_user_name}</strong> will clear the current conversation.</>
+              ) : (
+                <>Switching to <strong>General Inquiry</strong> will clear the current conversation.</>
+              )}
+            </p>
+            <p>This action cannot be undone.</p>
+            <div className="modal-buttons">
+              <button 
+                onClick={cancelServiceUserSwitch}
+                className="btn-cancel"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmServiceUserSwitch}
+                className="btn-confirm"
+              >
+                Switch & Reset Chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         <div className="backend-selector-div">
           <button
             className="submit-button"

@@ -1,3 +1,4 @@
+import hashlib
 import psycopg
 import csv
 from pathlib import Path
@@ -123,7 +124,7 @@ def migrate_data_from_csv():
     conn.commit()
     conn.close()
 
-def update_conversation(metadata, previous_text):
+def update_conversation(metadata, previous_text, service_user_id):
     """
     Update the information in the conversations database
         Based on a new message
@@ -162,64 +163,41 @@ def update_conversation(metadata, previous_text):
         text = msg["content"]
         if sender and text:
             cursor.execute(
-                "INSERT INTO messages (conversation_id, sender, text) VALUES (%s, %s, %s) ON CONFLICT (conversation_id, sender, text) DO NOTHING",
-                (conversation_id, sender, text)
+                "INSERT INTO messages (conversation_id, sender, text, service_user_id) VALUES (%s, %s, %s, %s) ON CONFLICT (conversation_id, sender, text) DO NOTHING",
+                (conversation_id, sender, text, service_user_id)
             )
 
     conn.commit()
     conn.close()
 
-def add_new_wellness_checkin(provider_username, patient_name, last_session, next_checkin, followup_message):
-    """Create a new entry for a new provider-service user combo, along with a followup message
-    
-    Arguments:
-        provider_username: string, username of the peer provider
-        patient_name: string, username of the service user
-        last_session: string, date of the last session
-        next_checkin: string, date for the next recommended checkin
-        followup_message: string, suggested message to send the 
-            service user"""
+def generate_service_user_id(provider_username: str, patient_name: str) -> str:
+    """
+    Deterministically generate a pseudonymous service user ID
+    based on the provider and service user's names.
+    """
+    raw = f"{provider_username.strip().lower()}::{patient_name.strip().lower()}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]  # short, unique, anonymized
+
+
+def add_new_service_user(provider_username, patient_name, last_session, next_checkin, followup_message):
+    """Create or update a service user's record using a deterministic hashed ID."""
     
     conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
-    
+
     try:
-        # Generate user ID
-        base_id = f"{provider_username}_{patient_name.lower().replace(' ', '_')}"
-        
-        # Check for existing IDs with same base
+        # Generate deterministic, anonymized ID
+        service_user_id = generate_service_user_id(provider_username, patient_name)
+        print(f"[DEBUG] Deterministic ID for {provider_username}/{patient_name}: {service_user_id}")
+
+        # Insert into profiles if not exists
         cursor.execute('''
-        SELECT service_user_id FROM profiles 
-        WHERE service_user_id LIKE %s
-        ORDER BY service_user_id
-        ''', (f"{base_id}%",))
-        
-        existing_ids = [row[0] for row in cursor.fetchall()]
-        
-        # Determine new ID
-        if not existing_ids:
-            service_user_id = base_id
-        elif base_id in existing_ids:
-            counter = 2
-            while f"{base_id}_{counter}" in existing_ids:
-                counter += 1
-            service_user_id = f"{base_id}_{counter}"
-        else:
-            service_user_id = base_id
-        
-        print(f"[DEBUG] Generated ID: {service_user_id}")
-        
-        # Insert user id
-        cursor.execute('''
-        SELECT service_user_id FROM profiles WHERE service_user_id = %s
-        ''', (service_user_id,))
-        
-        if not cursor.fetchone():
-            cursor.execute('''
-            INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
-            VALUES (%s, %s, %s, %s, %s)
-            ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
-        
+        INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (service_user_id) DO NOTHING
+        ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
+
+        # Insert or update outreach details
         cursor.execute('''
         INSERT INTO outreach_details 
         (service_user_id, last_session, check_in, follow_up_message)
@@ -229,8 +207,10 @@ def add_new_wellness_checkin(provider_username, patient_name, last_session, next
             check_in = EXCLUDED.check_in,
             follow_up_message = EXCLUDED.follow_up_message
         ''', (service_user_id, last_session, next_checkin, followup_message))
+
         conn.commit()
         return True, f"Check-in saved successfully (ID: {service_user_id})"
+
     except Exception as e:
         conn.rollback()
         print(f"[DB Error] {e}")

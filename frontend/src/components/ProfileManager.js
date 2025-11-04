@@ -33,7 +33,7 @@ const ProfileManager = () => {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`${API_URL}/new_checkin/`, {
+      const response = await fetch(`${API_URL}/new_service_user/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
