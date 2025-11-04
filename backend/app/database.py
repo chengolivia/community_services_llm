@@ -154,8 +154,8 @@ def update_conversation(metadata, previous_text, service_user_id):
     cursor.execute("SELECT id FROM conversations WHERE id = %s", (conversation_id,))
     if cursor.fetchone() is None:
         cursor.execute(
-            "INSERT INTO conversations (id, username,outreach_generated) VALUES (%s, %s, %s)",
-            (conversation_id, username,False)
+            "INSERT INTO conversations (id, username,outreach_generated, service_user_id) VALUES (%s, %s, %s, %s)",
+            (conversation_id, username,False, service_user_id)
         )
 
     for msg in previous_text:
