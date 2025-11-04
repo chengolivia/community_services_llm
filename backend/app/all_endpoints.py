@@ -102,6 +102,7 @@ class NewWellness(BaseModel):
     nextCheckIn: str
     followUpMessage: str
     username: str
+    location: str
 
 @app.get("/service_user_list/")
 async def service_user_list(name):
@@ -119,6 +120,7 @@ async def create_item(item: NewWellness):
         item.patientName, 
         item.lastSession, 
         item.nextCheckIn, 
+        item.location,
         item.followUpMessage
     )
     print(f"[API] Result: {success}, {message}")

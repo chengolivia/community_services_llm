@@ -18,7 +18,9 @@ const SidebarInformation = ({
   nextCheckIn, 
   setNextCheckIn,
   followUpMessage, 
-  setFollowUpMessage
+  setFollowUpMessage,
+  location,
+  setLocation,
 }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -58,6 +60,33 @@ const SidebarInformation = ({
                 onChange={(e) => setPatientName(e.target.value)}
               />
             </div>
+          </div>
+        )}
+        {isEditable && (
+          <div className="input-section">
+            <div className="form-group">
+              <label className="section-label" htmlFor="location">
+                <img src={ProfileIcon} alt="Location Icon" className="icon" /> {/* Adjust icon as needed */}
+                Location
+              </label>
+              <input 
+                type="text" 
+                id="location" 
+                placeholder="Enter location (e.g., city, clinic name)"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {!isEditable && patient.location && (
+          <div className="info-section">
+            <div className="section-label">
+              <img src={ProfileIcon} alt="Location Icon" className="icon" /> {/* Adjust icon as needed */}
+              Location
+            </div>
+            <div className="section-content">{patient.location}</div>
           </div>
         )}
 

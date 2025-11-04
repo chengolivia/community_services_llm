@@ -19,6 +19,7 @@ const ProfileManager = () => {
   const [lastSession, setLastSession] = useState('');
   const [nextCheckIn, setNextCheckIn] = useState('');
   const [followUpMessage, setFollowUpMessage] = useState('');
+  const [location, setLocation] = useState('');
 
   const handleSearchChange = (e) => {
     setSearch(e.target.value);
@@ -43,7 +44,8 @@ const ProfileManager = () => {
           lastSession,
           nextCheckIn,
           followUpMessage,
-          username: user.username
+          username: user.username,
+          location: location,
         }),
       });
   
@@ -55,8 +57,6 @@ const ProfileManager = () => {
       throw new Error(result.detail || 'Failed to save')
     }
 
-    alert('Check-in saved!');
-
     // Refresh list
     await getAllNames();
     
@@ -66,6 +66,7 @@ const ProfileManager = () => {
     setLastSession('');
     setNextCheckIn('');
     setFollowUpMessage('');
+    setLocation('');
     } catch (error) {
       console.error("Error:", error);
       alert(`Failed: ${error.followUpMessage}`)
@@ -86,11 +87,13 @@ const ProfileManager = () => {
       setLastSession('');
       setNextCheckIn('');
       setFollowUpMessage('');
+      setLocation('');
     } else {
       setPatientName(patient.service_user_name || '');
       setLastSession(patient.last_session || '');
       setNextCheckIn(patient.check_in || '');
       setFollowUpMessage(patient.follow_up_message || '');
+      setLocation(patient.location || '');
     }
     
     // Open the sidebar
@@ -179,6 +182,8 @@ const ProfileManager = () => {
             setNextCheckIn={setNextCheckIn}
             followUpMessage={followUpMessage}
             setFollowUpMessage={setFollowUpMessage}
+            location={location}
+            setLocation={setLocation}
           />
         ) : null
       }
