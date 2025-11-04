@@ -67,7 +67,7 @@ class Token(BaseModel):
 async def login(login_data: LoginRequest):
     print("Analyzing login_data {} {}".format(login_data.username,login_data.password))
     success, _, role = authenticate_user(login_data.username, login_data.password)
-    
+    print("Analyzed")
     if not success:
         raise HTTPException(
             status_code=401,

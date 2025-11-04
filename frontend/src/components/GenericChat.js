@@ -327,7 +327,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             ))}
             <div ref={conversationEndRef} />
           </div>
-          </div>
+        </div>
           {/* ← NEW: Right‐hand panel containing two empty boxes */}
         <div className="right-section">
         {/* Goals panel */}

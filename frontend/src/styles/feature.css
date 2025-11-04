@@ -7,11 +7,12 @@
 
 .content-area {
   flex: 1; /* Takes all available space */
-  display: flex;
+  display: grid;
   flex-direction: row; /* Left and right side-by-side */
   gap: 20px;
   min-height: 0; /* Critical for scroll */
   overflow: hidden;
+  grid-template-columns: 2fr 1fr; 
 }
 
 
@@ -57,7 +58,7 @@ table {
   gap: 20px;
   min-height: 0; */
   /* width: 100%; */
-  max-width: 800px;
+  /* max-width: 800px; */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -66,6 +67,7 @@ table {
   box-sizing: border-box;
   position: relative;
   transition: justify-content 0.3s ease, padding 0.3s ease;
+  min-width: 0; /* Allows flex to shrink */
 }
 
 .left-section.submitted {
@@ -196,7 +198,7 @@ table {
 }
 
 .right-section {
-  width: 400px;
+  /* width: 400px; */
   display: flex;
   flex-direction: column;
   padding: 20px;
@@ -204,11 +206,12 @@ table {
   border-radius: 10px;
   /* height: 95%; */
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  margin-right: 20px;
+  /* margin-right: 20px; */
   box-sizing: border-box;
   overflow-y: auto;
   gap: 20px;
-  margin-top: 20px
+  margin-top: 20px; 
+  min-width: 0; /* Allows flex to shrink */
 }
 
 .tabs {
@@ -486,4 +489,78 @@ th {
 td {
   padding: 10px;
   box-sizing: border-box;  /* Ensure padding is included within the element's dimensions */
+}
+/* Markdown list styling */
+.message-blurb ul,
+.message-blurb ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+  line-height: 1.6;
+}
+
+.message-blurb ul {
+  list-style-type: disc;
+}
+
+.message-blurb ol {
+  list-style-type: decimal;
+}
+
+.message-blurb li {
+  margin: 0.4em 0;
+  font-size: 1rem; /* Match the .message-blurb font-size */
+  line-height: 1.5; /* Match the .message-blurb line-height */
+}
+
+.message-blurb li p {
+  margin: 0.25em 0;
+  display: inline-block;
+}
+
+/* Nested lists */
+.message-blurb ul ul,
+.message-blurb ol ol,
+.message-blurb ul ol,
+.message-blurb ol ul {
+  margin: 0.25em 0;
+}
+
+.message-blurb ul ul {
+  list-style-type: circle;
+}
+
+.message-blurb ol ol {
+  list-style-type: lower-alpha;
+}
+
+/* Ensure paragraphs in lists don't add extra spacing */
+.message-blurb li > p:first-child {
+  margin-top: 0;
+}
+
+.message-blurb li > p:last-child {
+  margin-bottom: 0;
+}
+
+/* Same styling for resource items that use markdown */
+.resource-item ul,
+.resource-item ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+  line-height: 1.6;
+}
+
+.resource-item ul {
+  list-style-type: disc;
+}
+
+.resource-item ol {
+  list-style-type: decimal;
+}
+
+.message-blurb li {
+  display: list-item; /* Reset to default list item display */
+  margin: 0.4em 0;
+  font-size: 1rem;
+  line-height: 1.5;
 }

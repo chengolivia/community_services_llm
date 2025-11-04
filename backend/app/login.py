@@ -79,14 +79,18 @@ def authenticate_user(username, password):
     Returns: Boolean success and string message 
     
     Side Effects: Checks if a username-password combo is valid"""
+    
+    print(CONNECTION_STRING)
 
     conn = psycopg.connect(CONNECTION_STRING)
+    print(CONNECTION_STRING)
     cursor = conn.cursor()
     
     cursor.execute('''
     SELECT username, password_hash, salt, role FROM users 
     WHERE username = %s
     ''', (username,))
+    print("EXECUTED")
     
     user = cursor.fetchone()
     conn.close()
