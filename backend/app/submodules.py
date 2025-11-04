@@ -5,6 +5,9 @@ import json
 import os 
 import numpy as np
 from copy import deepcopy
+import time 
+from app.rag_utils import get_model_and_indices
+
 
 from app.eligibility_check import eligibility_check
 from app.utils import (
@@ -13,6 +16,7 @@ from app.utils import (
     get_all_prompts,
     call_chatgpt_with_functions,
 )
+embedding_model, saved_indices, documents = get_model_and_indices()  # Ensures embeddings are loaded
 
 openai.api_key = os.environ.get("SECRET_KEY")
 
@@ -30,31 +34,51 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
         external resources to load """
     
     # Lazy load embeddings on first use
-    from app.rag_utils import get_model_and_indices
-    embedding_model, saved_indices, documents = get_model_and_indices()  # Ensures embeddings are loaded
-    
+    print("Getting model, time={}".format(time.time()))
     
     all_message_list = []
     
     for prompt in ['goal','followup_question','resource']:#,'which_resource','benefit_extract']:
         all_message_list.append([{'role': 'system', 'content': internal_prompts[prompt].replace("[Organization]",organization)}]+all_messages+[{"role": "user", "content": situation}])
-    print("All messages",all_message_list[1])
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         initial_responses = list(executor.map(lambda s: call_chatgpt_api_all_chats(s, stream=False), all_message_list))
     initial_responses = deepcopy(list(initial_responses))
-    print("Initial",initial_responses)
+    print("Initial responses, Content {}, time={}".format(sum([sum([len(i['content']) for i in j]) for j in all_message_list]),time.time()))
 
     # Combine prompts with external information on resources
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(initial_responses[2]),flags=re.DOTALL)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         resources = list(executor.map(lambda s: extract_resources(embedding_model, saved_indices, documents, s, {'resource_{}'.format(organization): True},k=k), matches))
-    
-    ## Debuggin 10/16
-    all_resources = "\n".join(resources)
-    all_resources = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a highly knowledgable system that assists {}, a peer support organization, with finding the correct resources. Out of this large list of resources, return a nicely formatted list, with phones/addresses (ONLY USE THE INFORMATION PROVIDED) of the most relevant and diverse resources for the following situation: {}'.format(organization,situation)},{'role': 'user', 'content': all_resources}], stream=False)
+    print("Match resources time={}",time.time())
+    ## Debugging 10/16
 
+    print(len(resources),len(set(resources)))
+
+    all_lines = "\n".join(resources)
+    all_lines = all_lines.split("\n")
+    seen_resources = set()
+    real_lines = []
+    idx = 0
+    while idx < len(all_lines):
+        if "Resource:" in all_lines[idx] and all_lines[idx] not in seen_resources:
+            seen_resources.add(all_lines[idx])
+            real_lines.append(all_lines[idx])
+            idx += 1
+            while idx < len(all_lines) and "Resource:" not in all_lines[idx]:
+                real_lines.append(all_lines[idx])
+                idx += 1
+        elif all_lines[idx] in seen_resources:
+            idx += 1
+            while idx < len(all_lines) and "Resource:" not in all_lines[idx]:
+                idx += 1
+        else:
+            idx += 1
+    
+
+    all_resources = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a highly knowledgable system that assists {}, a peer support organization, with finding the correct resources. Out of this large list of resources, return a nicely formatted list, with phones/addresses (ONLY USE THE INFORMATION PROVIDED) of the most relevant and diverse resources for the following situation: {}'.format(organization,situation)},{'role': 'user', 'content': "\n".join(real_lines)}], stream=False)
+    print("Resource trimming, content {}, time={}".format(len(all_resources),time.time()))
     # # Combine prompts with external information on benefits
     # pattern = r"\[Situation\](.*?)\[/Situation\]"
     # benefit_info = re.sub(
@@ -180,7 +204,7 @@ def fetch_goals_and_resources(situation, all_messages, organization, k: int = 25
         situation, all_messages, organization, k=k
     )
 
-    # print(full_response)
+    print("Get questions/resources, time=",time.time())
 
     # 2) parse SMART Goals from the full_response blob
     goals = []
@@ -221,12 +245,13 @@ def fetch_goals_and_resources(situation, all_messages, organization, k: int = 25
         if act:
             entry += f"**Action:** {act}"
         resources.append(entry)
+    print("Parsing, time=",time.time())
 
-    return goals, resources
+    return goals, resources, full_response, external_resources, raw_prompt
 
 
 #NEW PLANNER APPROACH
-def construct_response(situation, all_messages, model, organization):
+def construct_response(situation, all_messages, model, organization,full_response, external_resources, raw_prompt):
     """
     1) Ask the model: is this a substantive request that needs SMART goals?
        -> JSON: {"needs_goals": true/false}
@@ -234,7 +259,7 @@ def construct_response(situation, all_messages, model, organization):
     2b) If true: your existing SMART-goals + orchestration pipeline.
     """
 
-
+    print("Intent Checker 2 {}".format(time.time()))
     # -- 1) INTENT & verbosity CHECK tiny LLM call --
     intent_and_verbosity_msgs = [
     {
@@ -270,7 +295,7 @@ def construct_response(situation, all_messages, model, organization):
         needs_goals = False
         verbosity   = "medium"
 
-    print(f"[DEBUG] needs_goals={needs_goals}, verbosity={verbosity}")
+    print(f"[DEBUG] needs_goals={needs_goals}, verbosity={verbosity}, time={time.time()}")
 
     # -- 2a) if it's just small talk, do a pure chat reply --
     if not needs_goals:
@@ -326,10 +351,10 @@ def construct_response(situation, all_messages, model, organization):
         return
 
     # the existing copilot pipeline:
-    print("[DEBUG] copilot pipeline branch (SMART goals + orchestration)")
-    initial_response, external_resources, raw_resource_prompt = get_questions_resources(
-        situation, all_messages, organization, k=full_k
-    )
+    print("[DEBUG] copilot pipeline branch (SMART goals + orchestration), time=",time.time())
+    initial_response = full_response 
+
+    print("Get questions, resource time={}".format(time.time()))
 
 
     new_message = [{'role': 'system', 'content': internal_prompts['orchestration']}]
@@ -339,8 +364,7 @@ def construct_response(situation, all_messages, model, organization):
         {"role": "user",    "content": initial_response}
     ]
 
-    print(initial_response)
-
+    print("Streaming Main Orchestration, Time {}".format(time.time()))
     # 1) stream the main orchestration 
     response = call_chatgpt_api_all_chats(new_message, stream=True, max_tokens=1000)
     yield from stream_process_chatgpt_response(response)

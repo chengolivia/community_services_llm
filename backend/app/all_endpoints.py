@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import threading
 import json
+import time 
 
 from app.submodules import (
     get_questions_resources,
@@ -67,7 +68,6 @@ class Token(BaseModel):
 async def login(login_data: LoginRequest):
     print("Analyzing login_data {} {}".format(login_data.username,login_data.password))
     success, _, role = authenticate_user(login_data.username, login_data.password)
-    print("Analyzed")
     if not success:
         raise HTTPException(
             status_code=401,
@@ -189,7 +189,7 @@ def accumulate_chunks(generator):
 # ─────────────────────────────────────────────────────────────────────────────
 # BACKGROUND STREAM HELPER
 # ─────────────────────────────────────────────────────────────────────────────
-def _background_stream(sid, text, previous_text, model, organization, loop, metadata, service_user_id):
+def _background_stream(sid, text, previous_text, model, organization, loop, metadata, service_user_id,full_response, external_resources, raw_prompt):
     """
     Runs construct_response in its own OS thread.
     Uses run_coroutine_threadsafe so .emit() coroutines are correctly awaited.
@@ -197,7 +197,7 @@ def _background_stream(sid, text, previous_text, model, organization, loop, meta
     import time
     try:
         # 1) Build your response generator (this may block, but only this thread)
-        gen = construct_response(text, previous_text, model, organization)
+        gen = construct_response(text, previous_text, model, organization,full_response, external_resources, raw_prompt)
         # 2) Stream chunks
         for accumulated_text in accumulate_chunks(gen):
             # Schedule the async emit on the main asyncio loop
@@ -274,7 +274,7 @@ async def start_generation(sid, data):
     - Cancels any existing generation task associated with the session ID before starting a new one.
     - Creates an asynchronous task (`run_generation`) to process the generator and store it.
     """
-    print(f"[Socket.IO] Received start_generation from {sid} with data: {data}")
+    print(f"[Socket.IO] Received start_generation from {sid} at time {time.time()}")
 
     text = data.get("text", "")
     previous_text = data.get("previous_text", [])
@@ -320,6 +320,7 @@ async def start_generation(sid, data):
     except Exception as e:
         print(f"[Socket.IO] Error parsing needs_goals: {e}")
         needs_goals = False
+    print("Finished Intent check, time={}".format(time.time()))
 
     # 2) If goals are needed, fetch & emit them
     #if the goals are not nneeded then emit them and remove them and delete them 
@@ -327,7 +328,7 @@ async def start_generation(sid, data):
     if needs_goals:
         # Use shared helper so we only run the pipeline once
         loop = asyncio.get_running_loop()
-        goals, resources = await loop.run_in_executor(
+        goals, resources, full_response, external_resources, raw_prompt = await loop.run_in_executor(
             None,
             fetch_goals_and_resources,
             text,
@@ -340,13 +341,15 @@ async def start_generation(sid, data):
           {"goals": goals, "resources": resources},
           room=sid
         )
-
+    else:
+        full_response, external_resources, raw_prompt = "","",""
+    print("Finished getting goals/resources, time={}".format(time.time()))
 
     # 3) Offload the rest of the chat‐stream to a background thread
     loop = asyncio.get_running_loop()
     threading.Thread(
         target=_background_stream,
-        args=(sid, text, previous_text, model, organization, loop, metadata, service_user_id),
+        args=(sid, text, previous_text, model, organization, loop, metadata, service_user_id,full_response, external_resources, raw_prompt),
         daemon=True
     ).start()
     # if conversation_id == "":
