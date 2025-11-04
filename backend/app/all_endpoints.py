@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import threading
 import json
+import time
 
 from app.submodules import (
     get_questions_resources,
@@ -92,9 +93,24 @@ async def login(login_data: LoginRequest):
 async def root():
     return {"status": "ok", "message": "PeerCopilot Backend Running"}
 
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+def warmup_models():
+    """Background task to load embeddings after server starts"""
+    time.sleep(10)  # Wait for server to be fully ready
+    try:
+        print("[Warmup] Loading embeddings...")
+        from app.rag_utils import get_model_and_indices
+        get_model_and_indices()
+        _warmup_complete = True
+        print("[Warmup] Embeddings loaded successfully")
+    except Exception as e:
+        print(f"[Warmup] Failed to load embeddings: {e}")
+
+threading.Thread(target=warmup_models, daemon=True).start()
 
 class NewWellness(BaseModel):
     patientName: str
@@ -128,7 +144,6 @@ async def create_item(item: NewWellness):
         raise HTTPException(status_code=400, detail=message)
 
 
-# app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
 
 # Handle Socket Messages
 
@@ -349,18 +364,7 @@ async def start_generation(sid, data):
         args=(sid, text, previous_text, model, organization, loop, metadata, service_user_id),
         daemon=True
     ).start()
-    # if conversation_id == "":
-    #     conversation_id = secrets.token_hex(16)
-    #     await sio.emit("conversation_id", {"conversation_id": conversation_id}, room=sid)
-    # username = data.get("username","")
 
-    # generator = construct_response(text, previous_text, model,organization)
-    
-    # if sid in generation_tasks:
-    #     generation_tasks[sid].cancel()
-
-    # task = asyncio.create_task(run_generation(sid, generator,text,{'conversation_id': conversation_id, 'username': username}))
-    # generation_tasks[sid] = task
 
 
 @sio.event
@@ -379,6 +383,3 @@ async def reset_session(sid, data):
         "previous_service_user_id": data.get('previous_service_user_id'),
         "new_service_user_id": data.get('new_service_user_id')
     }, room=sid)
-# @app.get("/{full_path:path}")
-# async def serve_react_app(full_path: str):
-#     return FileResponse("../frontend/build/index.html")
