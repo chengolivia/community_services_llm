@@ -1,62 +1,68 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { WellnessContext } from './AppStateContextProvider';
+import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
 import { API_URL } from '../config';
 import '../App.css';
-import { Link } from 'react-router-dom'; // 👈 add this at the top
+import { WellnessContext } from './AppStateContextProvider';
 
-function Login() {
+function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [organization, setOrg] = useState('cspnj'); // default
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser, setOrganization } = useContext(WellnessContext);
   const navigate = useNavigate();
+  const { setUser, setOrganization } = useContext(WellnessContext);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, organization }),
       });
 
-      // FIX: Get the data from response first
       const data = await response.json();
 
       if (response.ok) {
         const { access_token, role, organization } = data;
-
-        // Set user context with login info
+      
+        // Set user context
         setUser({
           username: username,
           role: role,
           isAuthenticated: true,
-          token: access_token, 
+          token: access_token,
         });
+      
+        // Set organization context
         setOrganization(organization);
-
-        // Store in localStorage for persistence
+      
+        // Store in localStorage
         localStorage.setItem('accessToken', access_token);
         localStorage.setItem('userRole', role);
-        localStorage.setItem('username', username);      
+        localStorage.setItem('username', username);
         localStorage.setItem('organization', organization);
-
-        // Redirect to home page after successful login
+      
+        // Redirect straight to home
         navigate('/');
       } else {
-        setError(data.message || 'Login failed. Please try again.');
-      }
+        setError(data.detail || 'Registration failed. Please try again.');
+      }      
     } catch (err) {
+      console.error('Registration error:', err);
       setError('Server error. Please try again later.');
-      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -69,10 +75,10 @@ function Login() {
           <img src={Logo} alt="PeerCoPilot Logo" />
         </div>
         <h1>PeerCoPilot</h1>
-        <h2>Login</h2>
-        
+        <h2>Register</h2>
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="username">Username</label>
@@ -84,7 +90,7 @@ function Login() {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -95,22 +101,46 @@ function Login() {
               required
             />
           </div>
-          
+
+          <div className="form-group">
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="organization">Organization</label>
+            <select
+                id="organization"
+                value={organization}
+                onChange={(e) => setOrg(e.target.value)}
+                required
+            >
+                <option value="cspnj">CSPNJ</option>
+                <option value="clhs">CLHS</option>
+            </select>
+          </div>
+
           <button 
             type="submit" 
             className="login-button"
             disabled={isLoading}
           >
-            {isLoading ? 'Logging in...' : 'Login'}
+            {isLoading ? 'Registering...' : 'Register'}
           </button>
         </form>
-        <p className="register-link">
-          Don’t have an account? <Link to="/register">Register here</Link>
-        </p>
 
+        <p className="register-link">
+          Already have an account? <Link to="/login">Login here</Link>
+        </p>
       </div>
     </div>
   );
 }
 
-export default Login;
+export default Register;

@@ -7,6 +7,7 @@ import {WellnessGoals} from './components/GenericChat';
 import {WellnessContextProvider} from './components/AppStateContextProvider.js';
 import ProfileManager from './components/ProfileManager';
 import OutreachCalendar from './components/OutreachCalendar';
+import Register from './components/Register';
 import './App.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route path="/wellness-goals" element={<WellnessGoals />} />
               <Route path="/profile-manager" element={<ProfileManager />} />
               <Route path="/outreach-calendar" element={<OutreachCalendar />} />

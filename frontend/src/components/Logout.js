@@ -3,7 +3,7 @@ import { WellnessContext } from './AppStateContextProvider';
 import { useNavigate } from 'react-router-dom';
 
 function Logout() {
-  const { setUser, setOrganization } = useContext(WellnessContext);
+  const { setUser, setOrganization, setConversation } = useContext(WellnessContext);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -15,6 +15,7 @@ function Logout() {
       token: null, // Clear token
     });
     setOrganization('');
+    setConversation([]);
     
     // SECURITY FIX: Clear localStorage
     localStorage.removeItem('accessToken');

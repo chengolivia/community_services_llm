@@ -18,7 +18,7 @@ from app.submodules import (
     internal_prompts,
 )
 from app.process_profiles import get_all_outreach, get_all_service_users
-from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, create_user
 from app.database import update_conversation, add_new_service_user
 
 import socketio
@@ -89,7 +89,43 @@ async def login(login_data: LoginRequest):
         role=role,
         organization=organization
     )
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    organization: str
     
+@app.post("/api/auth/register")
+async def register(register_data: RegisterRequest):
+    """Register a new user and auto-login."""
+    success, message = create_user(
+        username=register_data.username,
+        password=register_data.password,
+        role="provider",
+        organization=register_data.organization
+    )
+
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    # Create a JWT token right after registration
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={
+            "sub": register_data.username,
+            "role": "provider",
+            "organization": register_data.organization,
+        },
+        expires_delta=access_token_expires
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": "provider",
+        "organization": register_data.organization,
+    }
+
 @app.get("/")
 async def root():
     return {"status": "ok", "message": "PeerCopilot Backend Running"}

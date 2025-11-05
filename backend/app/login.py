@@ -88,6 +88,26 @@ async def login(request: LoginRequest):
         organization=organization
     )
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    organization: Optional[str] = 'cspnj'
+
+@router.post("/register")
+async def register(request: RegisterRequest):
+    success, message = create_user(
+        username=request.username,
+        password=request.password,
+        role='provider',
+        organization=request.organization
+    )
+
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+    
+    return {"message": message}
+
+
 def hash_password(password):
     """Create secure password hash with salt
     
@@ -101,31 +121,22 @@ def hash_password(password):
     return salt, pwdhash.hex()
 
 
-def create_user(username, password, role='provider'):
-    """Create a new user with secure password storage
-    
-    Arguments:
-        username: string, username
-        password: string, password
-    
-    Returns: Boolean success and string message 
-    
-    Side Effects: Create a new username + password"""
+def create_user(username, password, role='provider', organization='cspnj'):
     conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT username FROM users WHERE username = %s", (username,))
     if cursor.fetchone():
         conn.close()
         return False, "Username already exists"
-    
+
     salt, password_hash = hash_password(password)
-    
+
     try:
         cursor.execute('''
-        INSERT INTO users (username, password_hash, salt, role)
-        VALUES (%s, %s, %s, %s)
-        ''', (username, password_hash, salt, role))
+        INSERT INTO users (username, password_hash, salt, role, organization)
+        VALUES (%s, %s, %s, %s, %s)
+        ''', (username, password_hash, salt, role, organization))
         conn.commit()
         conn.close()
         return True, "User created successfully"
@@ -133,8 +144,6 @@ def create_user(username, password, role='provider'):
         conn.rollback()
         conn.close()
         return False, f"Error creating user: {str(e)}"
-
-
 
 # Protected route example
 @router.get("/me", response_model=UserData)
