@@ -1,190 +1,193 @@
+import os
+import numpy as np
 import pandas as pd
 import faiss
-import os 
-import numpy as np
-from .utils import BASE_DIR
 import psycopg
+from sentence_transformers import SentenceTransformer
+from pathlib import Path
 
+from .utils import BASE_DIR
+
+# Environment configuration
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
-from sentence_transformers import SentenceTransformer
 
 CONNECTION_STRING = os.getenv("RESOURCE_DB_URL")
 
-
-# lazy loading
+# Lazy loading globals
 _model = None
 _saved_indices = None
 _documents = None
 
 def get_model_and_indices():
+    """Lazy load embeddings model and indices."""
     global _model, _saved_indices, _documents
     if _model is None:
-        # _model, _saved_indices, _documents = get_all_embeddings({
-        #     'cspnj': f'{BASE_DIR}/data/cspnj.csv',
-        #     'clhs': f'{BASE_DIR}/data/clhs.csv'
-        # })   
         _model, _saved_indices, _documents = get_all_embeddings(['cspnj', 'clhs'])
     return _model, _saved_indices, _documents
 
-def load_embeddings(file_path, documents, model):
-    """Load or compute embeddings and save them
+def load_embeddings(file_path: str, documents: list, model) -> np.ndarray:
+    """
+    Load or compute embeddings and save them.
     
-    Arguments:
-        file_path: String, location of the file with embeddings
-        documents: List of strings, the documents to recreate embeddings
-        model: Some sentence transformer model
+    Args:
+        file_path: Path to save/load embeddings
+        documents: List of document strings
+        model: SentenceTransformer model
     
-    Returns: Numpy array of the embeddings"""
-
+    Returns:
+        Numpy array of embeddings
+    """
     if os.path.exists(file_path):
         return np.load(file_path)
-    else:
-        embeddings = model.encode(documents, convert_to_tensor=False, show_progress_bar=True)
-        embeddings = np.array(embeddings)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        np.save(file_path, embeddings)
-        return embeddings
-
-def process_resources_from_disk(resource_dict):
-    """Load and process resources data into a list of strings
     
-    Arguments:
-        csv_file_path: String, location of all the resources 
-            in a csv file
+    embeddings = model.encode(
+        documents, 
+        convert_to_tensor=False, 
+        show_progress_bar=True
+    )
+    embeddings = np.array(embeddings)
     
-    Returns: List of strings, each represents a document"""
-
-    d = {}
-    for key in resource_dict:
-        csv_file_path = resource_dict[key]
-        resources_df = pd.read_csv(csv_file_path)
-        names = list(resources_df['service'])
-        descriptions = list(resources_df['description'])
-        urls = list(resources_df['url'])
-        phones = list(resources_df['phone'])
-
-        formatted_documents = [f"Resource: {names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in range(len(descriptions))]
-        d[key] = formatted_documents
-
-    return d
-
-def process_guidance_resources(guidance_types):
-    """Load guidance-specific resources and process them
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    np.save(file_path, embeddings)
     
-    Arguments:
-        guidance_types: Dictionary, mapping which guidance types are
-            true/false for whether to process
-    
-    Returns: List of documents for each type of guidance"""
+    return embeddings
 
+def process_guidance_resources(guidance_types: list) -> dict:
+    """
+    Load guidance-specific resources and process them.
+    
+    Args:
+        guidance_types: List of guidance type names
+    
+    Returns:
+        Dictionary mapping guidance type to list of documents
+    """
     documents_by_guidance = {}
+    
     for guidance in guidance_types:
-        with open(BASE_DIR / f"prompts/external/{guidance}.txt") as file:
-            resource_data = [line for line in file.read().split("\n") if len(line) > 10]
-            documents_by_guidance[guidance] = [f"{line}: {resource_data[i]}" for i, line in enumerate(resource_data)]
+        file_path = BASE_DIR / f"prompts/external/{guidance}.txt"
+        with open(file_path) as file:
+            resource_data = [
+                line for line in file.read().split("\n") 
+                if len(line) > 10
+            ]
+            documents_by_guidance[guidance] = [
+                f"{line}: {resource_data[i]}" 
+                for i, line in enumerate(resource_data)
+            ]
+    
     return documents_by_guidance
 
-def create_faiss_index(embeddings):
-    """Create and return FAISS index
+def create_faiss_index(embeddings: np.ndarray) -> faiss.Index:
+    """
+    Create and return FAISS index.
     
-    Arguments:
-        embeddings: Numpy array representing embeddings
+    Args:
+        embeddings: Numpy array of embeddings
     
-    Returns: FAISS index computed from the embeddings"""
+    Returns:
+        FAISS index
+    """
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
     return index
 
-
-def get_all_embeddings_from_disk(resource_dict):
-    """Get all the saved embeddings to run RAG
-    
-    Arguments:
-        resource_list: String, path to a CSV file with all the resources
-    
-    Returns: A SentenceTransforemr Model and a dictionary
-        mapping a string to an Index for different embeddins"""
-
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2', token=os.getenv('HF_TOKEN'))
-
-    org_resources = process_resources_from_disk(resource_dict)
-
-    documents = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
-
-    saved_indices = {}
-    for guidance, doc_list in documents.items():
-        embeddings_file_path = f"saved_embeddings/saved_embedding_{guidance}.npy"
-        embeddings = load_embeddings(embeddings_file_path, doc_list, model)
-        saved_indices[guidance] = create_faiss_index(embeddings)
-
-    for key in org_resources:
-        documents['resource_{}'.format(key)] = org_resources[key]
-        file_path = "saved_embeddings/saved_embedding_{}.npy".format(key)
-        embeddings = load_embeddings(file_path, documents['resource_{}'.format(key)], model)
-        saved_indices['resource_{}'.format(key)] = create_faiss_index(embeddings)
-
-    return model, saved_indices, documents
-
-
-def process_resources(resource_dict):
-    """Load and process resources data into a list of strings
-    Arguments:
-        resource_dict: dict of resource keys to query
-    Returns: 
-        d: dict of formatted documents per key
-        embeddings_dict: dict of embeddings per key
+def process_resources(resource_list: list) -> tuple:
     """
-    d = {}
-    embeddings_dict = {}  # NEW: Store embeddings per key
+    Load and process resources from database.
+    
+    Args:
+        resource_list: List of organization keys to query
+    
+    Returns:
+        Tuple of (documents_dict, embeddings_dict)
+    """
+    documents_dict = {}
+    embeddings_dict = {}
     
     with psycopg.connect(CONNECTION_STRING) as conn:
-        for key in resource_dict:
-            resources_df = pd.read_sql_query("""
-                SELECT service, description, url, phone, embedding FROM resources WHERE organization = %s
-                """, conn, params=[key])
+        for org_key in resource_list:
+            # Fetch resources from database
+            resources_df = pd.read_sql_query(
+                """
+                SELECT service, description, url, phone, embedding 
+                FROM resources 
+                WHERE organization = %s
+                """, 
+                conn, 
+                params=[org_key]
+            )
             
-            names = list(resources_df['service'])
-            descriptions = list(resources_df['description'])
-            urls = list(resources_df['url'])
-            phones = list(resources_df['phone'])
-            
+            # Parse embedding strings to arrays
             for i in range(len(resources_df)):
-                resources_df.loc[i, 'embedding'] = resources_df.loc[i, 'embedding'].strip("[").strip("]").split(",")
+                embedding_str = resources_df.loc[i, 'embedding']
+                resources_df.loc[i, 'embedding'] = (
+                    embedding_str.strip("[").strip("]").split(",")
+                )
             
-            vector_arr = np.array(list(resources_df.loc[:, 'embedding'])).astype(float)
-            formatted_documents = [f"Resource: {names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in range(len(descriptions))]
+            # Convert to numpy array
+            embeddings = np.array(
+                list(resources_df['embedding'])
+            ).astype(float)
             
-            d[key] = formatted_documents
-            embeddings_dict[key] = vector_arr  # NEW: Save this key's embeddings
+            # Format documents
+            formatted_docs = [
+                f"Resource: {row['service']}, "
+                f"URL: {row['url']}, "
+                f"Phone: {row['phone']}, "
+                f"Description: {row['description']}"
+                for _, row in resources_df.iterrows()
+            ]
+            
+            documents_dict[org_key] = formatted_docs
+            embeddings_dict[org_key] = embeddings
     
-    return d, embeddings_dict
+    return documents_dict, embeddings_dict
 
-def get_all_embeddings(resource_list):
-    """Get all the saved embeddings to run RAG
+def get_all_embeddings(resource_list: list) -> tuple:
+    """
+    Get all embeddings for RAG system.
     
-    Arguments:
-        resource_list: list of strings, orgs to query from
+    Args:
+        resource_list: List of organization identifiers
     
-    Returns: A SentenceTransforemr Model and a dictionary
-        mapping a string to an Index for different embeddins"""
-
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2', token=os.getenv('HF_TOKEN'))
-    documents = process_guidance_resources(['human_resource', 'peer', 'crisis', 'trans'])
-
+    Returns:
+        Tuple of (model, indices_dict, documents_dict)
+    """
+    # Initialize model
+    model = SentenceTransformer(
+        'sentence-transformers/all-mpnet-base-v2', 
+        token=os.getenv('HF_TOKEN')
+    )
+    
+    # Process guidance resources
+    guidance_types = ['human_resource', 'peer', 'crisis', 'trans']
+    documents = process_guidance_resources(guidance_types)
+    
     saved_indices = {}
+    
+    # Create indices for guidance resources
     for guidance, doc_list in documents.items():
-        embeddings_file_path = f"saved_embeddings/saved_embedding_{guidance}.npy"
-        embeddings = load_embeddings(embeddings_file_path, doc_list, model)
+        embeddings_file = f"saved_embeddings/saved_embedding_{guidance}.npy"
+        embeddings = load_embeddings(embeddings_file, doc_list, model)
         saved_indices[guidance] = create_faiss_index(embeddings)
-
-    org_resources, resource_embeddings_dict = process_resources(resource_list)
-
-    for key in org_resources:
-        documents['resource_{}'.format(key)] = org_resources[key]
-        saved_indices['resource_{}'.format(key)] = create_faiss_index(resource_embeddings_dict[key])  # Use the right embeddings!
-
-    print([i for i in documents['resource_cspnj'] if 'Vineland' in i and 'Salvation' in i])
-
+    
+    # Process organization resources
+    org_resources, resource_embeddings = process_resources(resource_list)
+    
+    for org_key in org_resources:
+        doc_key = f'resource_{org_key}'
+        documents[doc_key] = org_resources[org_key]
+        saved_indices[doc_key] = create_faiss_index(resource_embeddings[org_key])
+    
+    # Debug logging
+    example_docs = [
+        doc for doc in documents.get('resource_cspnj', [])
+        if 'Vineland' in doc and 'Salvation' in doc
+    ]
+    if example_docs:
+        print(f"[Debug] Found {len(example_docs)} Vineland Salvation resources")
+    
     return model, saved_indices, documents
