@@ -7,17 +7,15 @@ function Logout() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    // Clear user state
     setUser({
       username: '',
       role: '',
       isAuthenticated: false,
-      token: null, // Clear token
+      token: null,
     });
     setOrganization('');
     setConversation([]);
     
-    // SECURITY FIX: Clear localStorage
     localStorage.removeItem('accessToken');
     localStorage.removeItem('userRole');
     localStorage.removeItem('username');

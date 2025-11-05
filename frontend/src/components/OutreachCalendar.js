@@ -1,151 +1,228 @@
-import React, { useEffect, useState, useContext } from 'react';
-import '../styles/calendar.css';
+import React, { useEffect, useState, useContext, useCallback, useMemo } from 'react';
 import Sidebar from './Sidebar';
-import '../styles/feature.css';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
-import { API_URL } from '../config';
 import { authenticatedFetch } from '../utils/api';
+import '../styles/pages/calendar.css';
+
+// Constants
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const COLORS = [
+  '#FFBC2A', '#9F69AF', '#F5511F', '#79C981', '#34A2ED',
+  '#5AD1D3', '#E57C7E', '#FF61B5', '#FFD83E', '#FFAE95'
+];
+
+const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Utility functions
+const parseCheckInDate = (checkInStr) => {
+  const [month, day, year] = checkInStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const getWeekStart = (date) => {
+  const newDate = new Date(date);
+  const dayOfWeek = newDate.getDay();
+  newDate.setDate(newDate.getDate() - dayOfWeek);
+  return newDate;
+};
+
+const getWeekTimestamp = (date) => {
+  return Math.floor(date.getTime() / 1000);
+};
 
 const OutreachCalendar = () => {
-    const [weekCode, setWeekCode] = useState(null);
-    const [hasSidebar, setSidebar] = useState(false);
-    const [search, setSearch] = useState('');
-    const [allOutreach, setAllOutreach] = useState([]);
-    const [currentPatient, setCurrentPatient] = useState({});
-    const { user } = useContext(WellnessContext);
-
-    const all_months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-    // Step 2: Create the handler for input changes
-    const handleSearchChange = (e) => {
-        setSearch(e.target.value);  // Update the state with the input value
-    };
-
-    const updateOutreach = (all_outreach) => {
-        let outreach_by_week = {};
-        let colors = ["#FFBC2A","#9F69AF","#F5511F","#79C981","#34A2ED","#5AD1D3","#E57C7E","#FF61B5","#FFD83E","#FFAE95"]
-        let idx_color = 0;
-        let color_by_week = {}
-    
-        for (let i = 0; i < all_outreach.length; i++) {
-            let curr_date = new Date();
-            const dateList = all_outreach[i]["check_in"].split("-").map(Number);
-            curr_date.setFullYear(dateList[2], dateList[0] - 1, dateList[1]);
-            var a = curr_date.getDate();
-            var t = curr_date.getDay();
-            curr_date.setDate(a - t);
-    
-            let week_num = curr_date.getTime() / 1000;
-    
-            if (!(week_num in outreach_by_week)) {
-                outreach_by_week[week_num] = [];
-                color_by_week[week_num] = [];
-            }
-            outreach_by_week[week_num].push(all_outreach[i]); 
-            color_by_week[week_num].push(colors[idx_color % colors.length]);
-            idx_color++;
-        }
-    
-        let all_weeks = Object.keys(outreach_by_week).sort();
-        let week_code = [];
-    
-    
-        for (let i = 0; i < all_weeks.length; i++) {
-            let week_start = new Date(all_weeks[i] * 1000);
-            let day_of_week = "Sunday";  // You can calculate day_of_week if needed
-            let month = all_months[week_start.getMonth()];
-            let date = week_start.getDate();
-            
-            // Filter the outreach list based on the search term
-            const outreach_code = outreach_by_week[all_weeks[i]]
-                .filter((d) => d["name"].toLowerCase().includes(search.toLowerCase()))
-                .map((d, idx) => (
-                    <li key={d.id} onClick={() => updateSidebar(d)}>
-                        <span className="dot" style={{ background: color_by_week[all_weeks[i]][idx] }}></span>
-                        Follow-up Wellness Check-in w/ {d["name"]}
-                    </li>
-                ));
-    
-            week_code.push(
-                <div key={all_weeks[i]} className="day">
-                    <div className="date black">{date}</div>
-                    <div className="info">{month}, {day_of_week}</div>
-                    <ul>
-                        {outreach_code}
-                    </ul>
-                </div>
-            );
-        }
-        setWeekCode(week_code);
-    };
-
-    const getAllOutreach = async () => {
-        try {
-            const response = await authenticatedFetch(`/outreach_list/?name=${user.username}`);
-            const data = await response.json();
-            setAllOutreach(data);
-            updateOutreach(data);
-        } catch (error) {
-            console.error('Error fetching outreach:', error);
-        }
-    };
+  const { user } = useContext(WellnessContext);
   
-    useEffect(() => {
-        getAllOutreach();
-    }, []);
+  const [search, setSearch] = useState('');
+  const [allOutreach, setAllOutreach] = useState([]);
+  const [currentPatient, setCurrentPatient] = useState(null);
+  const [hasSidebar, setSidebar] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    // Re-run updateOutreach whenever the search term changes
-    useEffect(() => {
-        if (allOutreach.length > 0) {
-            updateOutreach(allOutreach);
-        }
-    }, [search, allOutreach]);  // Dependency array includes 'search' and 'allOutreach'
+  // Fetch outreach data
+  const fetchOutreach = useCallback(async () => {
+    if (!user?.username) return;
 
-    let updateSidebar = (patient) => {
-        setCurrentPatient({
-            'service_user_name': patient.name || '', 
-            'last_session': patient.last_session || '', 
-            'check_in': patient.check_in || '', 
-            'follow_up_message': patient.follow_up_message || ''
-        });    
-        setSidebar(true);
-    };
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await authenticatedFetch(`/outreach_list/?name=${user.username}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch outreach data');
+      }
+      
+      const data = await response.json();
+      setAllOutreach(data);
+    } catch (err) {
+      console.error('Error fetching outreach:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.username]);
 
-    return (
-        <div className="container">
-            <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
-                <div  className="header">
-                    <h2 style={{paddingRight: "20px"}}>{all_months[new Date().getMonth()]} {new Date().getFullYear()}</h2>                    
-                     <input 
-                        type="text" 
-                        placeholder="Search" 
-                        className="search-box" 
-                        value={search}  // Set input value to the state
-                        onChange={handleSearchChange}  // Update state on change
-                    /> 
-                </div>
-                <div className="table-wrapper">
-                <div className="schedule">
-                    {weekCode}
-                </div> 
-                </div>
-            </div> 
-            <Sidebar 
-            isOpen={hasSidebar}
-            content={
-                hasSidebar ? (
-                <SidebarInformation
-                    patient={currentPatient}
-                    isEditable={false}
-                    onSubmit={()=>{}}
-                    onClose={() => setSidebar(false)}
-                />
-                ) : null
-            }
-            />
+  useEffect(() => {
+    fetchOutreach();
+  }, [fetchOutreach]);
+
+  // Group outreach by week
+  const outreachByWeek = useMemo(() => {
+    const grouped = {};
+    const patientColors = {};
+    let colorIndex = 0;
+
+    allOutreach.forEach((outreach) => {
+      const date = parseCheckInDate(outreach.check_in);
+      const weekStart = getWeekStart(date);
+      const weekKey = getWeekTimestamp(weekStart);
+
+      if (!grouped[weekKey]) {
+        grouped[weekKey] = [];
+      }
+
+      // Assign consistent color per patient
+      if (!patientColors[outreach.name]) {
+        patientColors[outreach.name] = COLORS[colorIndex % COLORS.length];
+        colorIndex++;
+      }
+
+      grouped[weekKey].push({
+        ...outreach,
+        color: patientColors[outreach.name]
+      });
+    });
+
+    return grouped;
+  }, [allOutreach]);
+
+  // Filter and render weeks
+  const weekComponents = useMemo(() => {
+    const sortedWeeks = Object.keys(outreachByWeek).sort((a, b) => b - a); // Most recent first
+    const searchLower = search.toLowerCase();
+
+    return sortedWeeks.map((weekKey) => {
+      const weekStart = new Date(Number(weekKey) * 1000);
+      const month = MONTHS[weekStart.getMonth()];
+      const date = weekStart.getDate();
+      const dayOfWeek = DAYS_OF_WEEK[weekStart.getDay()];
+
+      const filteredOutreach = outreachByWeek[weekKey].filter((item) =>
+        item.name.toLowerCase().includes(searchLower)
+      );
+
+      // Skip weeks with no matching results
+      if (filteredOutreach.length === 0 && search) {
+        return null;
+      }
+
+      return (
+        <div key={weekKey} className="day">
+          <div className="date black">{date}</div>
+          <div className="info">
+            {month}, {dayOfWeek}
+          </div>
+          <ul>
+            {filteredOutreach.map((item) => (
+              <li key={item.id} onClick={() => handlePatientClick(item)}>
+                <span className="dot" style={{ background: item.color }} />
+                Follow-up Wellness Check-in w/ {item.name}
+              </li>
+            ))}
+          </ul>
         </div>
-    );
+      );
+    }).filter(Boolean); // Remove null entries
+  }, [outreachByWeek, search]);
+
+  // Handlers
+  const handleSearchChange = useCallback((e) => {
+    setSearch(e.target.value);
+  }, []);
+
+  const handlePatientClick = useCallback((patient) => {
+    setCurrentPatient({
+      service_user_name: patient.name || '',
+      last_session: patient.last_session || '',
+      check_in: patient.check_in || '',
+      follow_up_message: patient.follow_up_message || ''
+    });
+    setSidebar(true);
+  }, []);
+
+  const handleCloseSidebar = useCallback(() => {
+    setSidebar(false);
+    setCurrentPatient(null);
+  }, []);
+
+  // Get current date info
+  const currentMonth = MONTHS[new Date().getMonth()];
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <div className="container">
+      <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
+        <div className="header">
+          <h2 style={{ paddingRight: '20px' }}>
+            {currentMonth} {currentYear}
+          </h2>
+          <input
+            type="text"
+            placeholder="Search by patient name..."
+            className="search-box"
+            value={search}
+            onChange={handleSearchChange}
+            aria-label="Search patients"
+          />
+        </div>
+
+        <div className="table-wrapper">
+          <div className="schedule">
+            {isLoading && (
+              <div className="loading-message">Loading outreach data...</div>
+            )}
+            
+            {error && (
+              <div className="error-message">
+                Error: {error}
+                <button onClick={fetchOutreach}>Retry</button>
+              </div>
+            )}
+
+            {!isLoading && !error && weekComponents.length === 0 && (
+              <div className="empty-message">
+                {search
+                  ? `No results found for "${search}"`
+                  : 'No outreach scheduled'}
+              </div>
+            )}
+
+            {!isLoading && !error && weekComponents}
+          </div>
+        </div>
+      </div>
+
+      <Sidebar
+        isOpen={hasSidebar}
+        content={
+          hasSidebar && currentPatient ? (
+            <SidebarInformation
+              patient={currentPatient}
+              isEditable={false}
+              onSubmit={() => {}}
+              onClose={handleCloseSidebar}
+            />
+          ) : null
+        }
+      />
+    </div>
+  );
 };
 
 export default OutreachCalendar;

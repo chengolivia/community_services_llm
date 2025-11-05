@@ -1,41 +1,150 @@
-import React, { useRef, useContext, useEffect, useState } from 'react';
+import React, { useRef, useContext, useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { jsPDF } from 'jspdf';
 import io from 'socket.io-client';
-import '../styles/feature.css';
-import {WellnessContext } from './AppStateContextProvider';
+import '../styles/components/chat.css';
+import { WellnessContext } from './AppStateContextProvider';
 import { apiGet } from '../utils/api';
 import { API_URL } from '../config';
 
+// Constants
+const SOCKET_CONFIG = {
+  transports: ['polling', 'websocket'],
+  reconnectionAttempts: 5,
+  timeout: 20000,
+};
+
+const PDF_CONFIG = {
+  orientation: 'portrait',
+  unit: 'mm',
+  format: 'a4',
+  lineHeight: 10,
+  margin: 10,
+};
+
+const SCROLL_THRESHOLD = 50;
+
+// Extracted Components
+const MarkdownContent = ({ content }) => (
+  <ReactMarkdown
+    skipHtml={false}
+    remarkPlugins={[remarkGfm]}
+    rehypePlugins={[rehypeRaw]}
+    components={{
+      a: ({ href, children }) => (
+        <a href={href} target="_blank" rel="noopener noreferrer">
+          {children}
+        </a>
+      ),
+    }}
+  >
+    {content}
+  </ReactMarkdown>
+);
+
+const ServiceUserSelector = ({ serviceUsers, selectedServiceUser, onChange }) => (
+  <select value={selectedServiceUser} onChange={onChange}>
+    <option value="">General Inquiry (not user-specific)</option>
+    <optgroup label="Service Users">
+      {serviceUsers.map(user => (
+        <option key={user.service_user_id} value={user.service_user_id}>
+          {user.service_user_name}
+        </option>
+      ))}
+    </optgroup>
+  </select>
+);
+
+const ResetWarningModal = ({ pendingServiceUser, serviceUsers, onConfirm, onCancel }) => {
+  const getUserName = () => {
+    if (!pendingServiceUser) return 'General Inquiry';
+    return serviceUsers.find(u => u.service_user_id === pendingServiceUser)?.service_user_name;
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h3>Switch Context?</h3>
+        <p>
+          Switching to <strong>{getUserName()}</strong> will clear the current conversation.
+        </p>
+        <p>This action cannot be undone.</p>
+        <div className="modal-buttons">
+          <button onClick={onCancel} className="btn-cancel">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="btn-confirm">
+            Switch & Reset Chat
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ResourceItem = ({ content, className = '' }) => {
+  // Parse resource format: "Name — [Link](url) (Action: act)"
+  const parseResource = (text) => {
+    const regex = /^(.*?)\s+—\s+\[Link\]\((.*?)\)\s*(?:\(Action:\s*(.*?)\))?$/;
+    const match = text.match(regex);
+    
+    if (match) {
+      const [, name, linkUrl, action] = match;
+      return `**${name}**  \n[Link](${linkUrl})  \n**Action:** ${action}`;
+    }
+    return text;
+  };
+
+  const shouldShowTopBorder = (text) => {
+    const firstWord = text.trim().split(/\s+/)[0].replace(/[*_#>-]/g, '');
+    return ['Goal', 'Resource'].includes(firstWord);
+  };
+
+  const showBorder = shouldShowTopBorder(content);
+  const parsedContent = parseResource(content);
+
+  return (
+    <div className={`resource-item ${showBorder ? 'with-top-border' : ''} ${className}`}>
+      <MarkdownContent content={parsedContent} />
+    </div>
+  );
+};
 
 function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const {
-    inputText, setInputText,
-    inputLocationText, setInputLocationText,
-    conversation, setConversation,
-    submitted,
-    chatConvo, setChatConvo,
-    organization,setOrganization,
-    user
+    inputText,
+    setInputText,
+    inputLocationText,
+    setInputLocationText,
+    conversation,
+    setConversation,
+    chatConvo,
+    setChatConvo,
+    organization,
+    user,
   } = useContext(context);
 
   const inputRef = useRef(null);
   const conversationEndRef = useRef(null);
+  
   const [socket, setSocket] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
-  const [conversationID, setConversationID] = useState("");
+  const [conversationID, setConversationID] = useState('');
   const [goalsList, setGoalsList] = useState([]);
   const [resourcesList, setResourcesList] = useState([]);
   const [serviceUsers, setServiceUsers] = useState([]);
-  const [selectedServiceUser, setSelectedServiceUser] = useState(''); // '' for general, or user ID
+  const [selectedServiceUser, setSelectedServiceUser] = useState('');
   const [pendingServiceUser, setPendingServiceUser] = useState(null);
   const [showResetWarning, setShowResetWarning] = useState(false);
 
+  // Fetch service users
   useEffect(() => {
     const fetchServiceUsers = async () => {
+      if (!user?.username) return;
+      
       try {
         console.log('[Dropdown] Fetching service users...');
         const data = await apiGet(`/service_user_list/?name=${user.username}`);
@@ -45,31 +154,22 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
         console.error('[Dropdown] Error:', error);
       }
     };
-  
-    if (user?.username) {
-      fetchServiceUsers();
-    }
+
+    fetchServiceUsers();
   }, [user?.username]);
-  
-  
 
-
-  
+  // Socket setup
   useEffect(() => {
-    const newSocket = io(socketServerUrl, {
-      transports: ['polling', 'websocket'],
-      reconnectionAttempts: 5,
-      timeout: 20000,
-    });
+    const newSocket = io(socketServerUrl, SOCKET_CONFIG);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('[Socket.io] Connected to server');
     });
 
-    newSocket.on("conversation_id", (data) => {
-      setConversationID(data.conversation_id)
-    }); 
+    newSocket.on('conversation_id', (data) => {
+      setConversationID(data.conversation_id);
+    });
 
     newSocket.on('welcome', (data) => {
       console.log('[Socket.io] Received welcome message:', data);
@@ -79,7 +179,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       console.log('[Socket.io] Received generation update:', data);
       if (typeof data.chunk === 'string') {
         setConversation(prev => {
-          if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage?.sender === 'bot') {
             const updated = [...prev];
             updated[updated.length - 1].text = data.chunk;
             return updated;
@@ -87,15 +188,6 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
           return [...prev, { sender: 'bot', text: data.chunk }];
         });
       }
-      // setConversation((prev) => {
-      //   if (prev.length > 0 && prev[prev.length - 1].sender === 'bot') {
-      //     const updated = [...prev];
-      //     updated[updated.length - 1].text = data.chunk;
-      //     return updated;
-      //   } else {
-      //     return [...prev, { sender: 'bot', text: data.chunk }];
-      //   }
-      // });
     });
 
     newSocket.on('goals_update', ({ goals, resources }) => {
@@ -120,299 +212,207 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     return () => {
       newSocket.disconnect();
     };
-  }, [socketServerUrl]);
+  }, [socketServerUrl, setConversation]);
 
-  useEffect(() => {
-    const fetchServiceUsers = async () => {
-      try {
-        const data = await apiGet(`/service_user_list/?name=${user.username}`);
-        setServiceUsers(data);
-      } catch (error) {
-        console.error('Error fetching service users:', error);
-      }
-    };
-  
-    if (user.username) {
-      fetchServiceUsers();
-    }
-  }, [user.username]);
-  
-  const handleScroll = (e) => {
+  // Auto-scroll management
+  const handleScroll = useCallback((e) => {
     const { scrollTop, clientHeight, scrollHeight } = e.target;
-    if (scrollTop + clientHeight >= scrollHeight - 50) {
-      setAutoScrollEnabled(true);
-    } else {
-      setAutoScrollEnabled(false);
-    }
-  };
-  
+    setAutoScrollEnabled(scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD);
+  }, []);
+
   useEffect(() => {
     if (autoScrollEnabled && conversationEndRef.current) {
       conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [conversation, autoScrollEnabled]);
-  
 
-  const adjustTextareaHeight = (textarea) => {
+  // Textarea auto-resize
+  const adjustTextareaHeight = useCallback((textarea) => {
     if (textarea) {
       textarea.style.height = 'auto';
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (inputRef.current) {
-      adjustTextareaHeight(inputRef.current);
-    }
-  }, [inputText]);
+    adjustTextareaHeight(inputRef.current);
+  }, [inputText, adjustTextareaHeight]);
 
-  const handleInputChange = (e) => {
+  // Input handlers
+  const handleInputChange = useCallback((e) => {
     setInputText(e.target.value);
     adjustTextareaHeight(e.target);
-  };
+  }, [setInputText, adjustTextareaHeight]);
 
-  const handleInputChangeLocation = (e) => {
+  const handleInputChangeLocation = useCallback((e) => {
     setInputLocationText(e.target.value);
-  };
+  }, [setInputLocationText]);
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
-  };
+  }, [inputText, isGenerating, socket, chatConvo, conversationID, organization, user, tool]);
 
-  const handleSubmit = () => {
-    if (!inputText.trim() || isGenerating) return;
+  const handleSubmit = useCallback(() => {
+    if (!inputText.trim() || isGenerating || !socket) return;
 
     const messageText = inputText.trim();
+    const userMsg = { sender: 'user', text: messageText };
 
-    const userMsg = { sender: 'user', text: inputText.trim() };
-    setConversation((prev) => [...prev, userMsg]);
-    setChatConvo((prev) => [...prev, { role: 'user', content: inputText.trim() }]);
+    setConversation(prev => [...prev, userMsg, { sender: 'bot', text: 'Loading...' }]);
+    setChatConvo(prev => [...prev, { role: 'user', content: messageText }]);
     setInputText('');
-
-    setConversation((prev) => [...prev, { sender: 'bot', text: "Loading..." }]);
     setIsGenerating(true);
 
-    if (socket) {
-      console.log('[GenericChat] Emitting start_generation event');
-      console.log(user.username);
-      socket.emit('start_generation', {
-        text: messageText,
-        previous_text: chatConvo,
-        model: "A",
-        organization: organization, 
-        tool,
-        conversation_id: conversationID,
-        username: user.username,
-        service_user_id: user.service_user_id || null,
-      });
-    } else {
-      console.error('[GenericChat] Socket is not connected.');
-    }
-  };
-  
-  const handleNewSession = () => {
-    window.location.reload();
-  };
-
-  const exportChatToPDF = () => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
+    console.log('[GenericChat] Emitting start_generation event');
+    socket.emit('start_generation', {
+      text: messageText,
+      previous_text: chatConvo,
+      model: 'A',
+      organization,
+      tool,
+      conversation_id: conversationID,
+      username: user.username,
+      service_user_id: user.service_user_id || null,
     });
+  }, [
+    inputText,
+    isGenerating,
+    socket,
+    chatConvo,
+    conversationID,
+    organization,
+    user,
+    tool,
+    setConversation,
+    setChatConvo,
+    setInputText,
+  ]);
+
+  // Session management
+  const handleNewSession = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const exportChatToPDF = useCallback(() => {
+    const doc = new jsPDF(PDF_CONFIG);
     doc.setFontSize(16);
-    doc.text('Chat History', 10, 10);
+    doc.text('Chat History', PDF_CONFIG.margin, PDF_CONFIG.margin);
 
     let yPosition = 20;
-    const lineHeight = 10;
     const pageHeight = doc.internal.pageSize.height;
 
     conversation.forEach((msg) => {
       const sender = msg.sender === 'user' ? 'You' : 'Bot';
       const text = `${sender}: ${msg.text}`;
       const lines = doc.splitTextToSize(text, 180);
+      
       lines.forEach((line) => {
-        if (yPosition + lineHeight > pageHeight - 10) {
+        if (yPosition + PDF_CONFIG.lineHeight > pageHeight - PDF_CONFIG.margin) {
           doc.addPage();
-          yPosition = 10;
+          yPosition = PDF_CONFIG.margin;
         }
-        doc.text(line, 10, yPosition);
-        yPosition += lineHeight;
+        doc.text(line, PDF_CONFIG.margin, yPosition);
+        yPosition += PDF_CONFIG.lineHeight;
       });
     });
 
     doc.save('Chat_History.pdf');
-  };
+  }, [conversation]);
 
-  const handleServiceUserChange = (e) => {
-    const newUserId = e.target.value; // '' for general, or actual user ID
+  // Service user switching
+  const handleServiceUserChange = useCallback((e) => {
+    const newUserId = e.target.value;
     
-    // If there's an active conversation, show warning before switching
     if (chatConvo.length > 0 && selectedServiceUser !== newUserId) {
       setPendingServiceUser(newUserId);
       setShowResetWarning(true);
     } else {
-      // No conversation yet, just switch
       setSelectedServiceUser(newUserId);
     }
-  };
+  }, [chatConvo.length, selectedServiceUser]);
 
-  // Confirm the switch and reset
-  const confirmServiceUserSwitch = () => {
-    setConversation([]);   
+  const confirmServiceUserSwitch = useCallback(() => {
+    setConversation([]);
     setChatConvo([]);
     setConversationID('');
-    
-    setGoalsList([]);       
-    setResourcesList([]);   
-    
-    // Emit reset to backend
+    setGoalsList([]);
+    setResourcesList([]);
+
     if (socket) {
-      socket.emit('reset_session', { 
+      socket.emit('reset_session', {
         reason: 'service_user_switch',
         previous_service_user_id: selectedServiceUser || 'general',
-        new_service_user_id: pendingServiceUser || 'general'
+        new_service_user_id: pendingServiceUser || 'general',
       });
     }
-    
-    // Switch to new selection
+
     setSelectedServiceUser(pendingServiceUser);
     setPendingServiceUser(null);
     setShowResetWarning(false);
-    
     console.log('[Chat] Switched service user context, chat reset');
-  };
+  }, [socket, selectedServiceUser, pendingServiceUser, setConversation, setChatConvo]);
 
-  // Cancel the switch
-  const cancelServiceUserSwitch = () => {
+  const cancelServiceUserSwitch = useCallback(() => {
     setPendingServiceUser(null);
     setShowResetWarning(false);
-  };
+  }, []);
+
+  const submitted = conversation.length > 0;
 
   return (
     <div className="resource-recommendation-container">
       <div className="content-area">
         <div className={`left-section ${submitted ? 'submitted' : ''}`}>
           <h1 className="page-title">{title}</h1>
-          <select 
-              value={selectedServiceUser} 
-              onChange={handleServiceUserChange}
-          >
-              <option value="">General Inquiry (not user-specific)</option>
-              <optgroup label="Service Users">
-                {serviceUsers.map(user => (
-                  <option key={user.service_user_id} value={user.service_user_id}>
-                    {user.service_user_name}
-                  </option>
-                ))}
-              </optgroup>
-          </select>
+          
+          <ServiceUserSelector
+            serviceUsers={serviceUsers}
+            selectedServiceUser={selectedServiceUser}
+            onChange={handleServiceUserChange}
+          />
+          
           <h2 className="instruction">
-            What is the service user’s needs and goals for today’s meeting?
+            What is the service user's needs and goals for today's meeting?
           </h2>
-          <div 
+          
+          <div
             className={`conversation-thread ${submitted ? 'visible' : ''}`}
             onScroll={handleScroll}
-            style={{ overflowY: 'auto', maxHeight: '80vh' }} // ensure the container is scrollable
+            style={{ overflowY: 'auto', maxHeight: '80vh' }}
           >
             {conversation.map((msg, index) => (
-              <div key={index} className={`message-blurb ${msg.sender === 'user' ? 'user' : 'bot'}`}>
-                <ReactMarkdown
-                  children={msg.text}
-                  skipHtml={false}
-                  rehypePlugins={[rehypeRaw]}
-                  components={{
-                    a: ({ href, children }) => (
-                      <a href={href} target="_blank" rel="noopener noreferrer">
-                        {children}
-                      </a>
-                    ),
-                  }}
-                />
+              <div key={index} className={`message-blurb ${msg.sender}`}>
+                <MarkdownContent content={msg.text} />
               </div>
             ))}
             <div ref={conversationEndRef} />
           </div>
         </div>
-          {/* ← NEW: Right‐hand panel containing two empty boxes */}
+
         <div className="right-section">
-        {/* Goals panel */}
-        <div className="goals-box">
-          <h3>Goals</h3>
-          <div className="scroll-container">
-          {goalsList.map((goal, idx) => {
-              // Get the first visible word (strip Markdown and trim)
-              const firstWord = goal.trim().split(/\s+/)[0].replace(/[*_#>-]/g, '');
-              const showTopBorder = ['Goal', 'Resource'].includes(firstWord);
-
-              return (
-                <div
-                  key={idx}
-                  className={`resource-item ${showTopBorder ? 'with-top-border' : ''}`}
-                >
-                  <ReactMarkdown
-                    children={goal}
-                    skipHtml={false}
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw]}
-                    components={{
-                      a: ({ href, children }) => (
-                        <a href={href} target="_blank" rel="noopener noreferrer">
-                          {children}
-                        </a>
-                      ),
-                    }}
-                  />
-                </div>
-              );
-            })}
-
+          <div className="goals-box">
+            <h3>Goals</h3>
+            <div className="scroll-container">
+              {goalsList.map((goal, idx) => (
+                <ResourceItem key={idx} content={goal} />
+              ))}
+            </div>
           </div>
-        </div>
 
-          {/* Resources panel */}
           <div className="resources-box">
             <h3>Resources</h3>
             <div className="scroll-container">
-              {resourcesList.map((res, idx) => {
-                // Parse the backend’s flat “Name — [Link](url) (Action: act)” string
-                // into a pretty markdown with name bold, link & action on their own lines.
-                const regex = /^(.*?)\s+—\s+\[Link\]\((.*?)\)\s*(?:\(Action:\s*(.*?)\))?$/;
-                const match = res.match(regex);
-                let mdString = res;
-                if (match) {
-                  const [, name, linkUrl, action] = match;
-                  mdString =
-                    `**${name}**  \n` +     // bold name + linebreak
-                    `[Link](${linkUrl})  \n` + // link + linebreak
-                    `**Action:** ${action}`;   // action
-                }
-
-                return (
-                  <div key={idx} className="resource-item">
-                    <ReactMarkdown
-                      children={mdString}
-                      skipHtml={false}
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw]}
-                      components={{
-                        a: ({ href, children }) => (
-                          <a href={href} target="_blank" rel="noopener noreferrer">
-                            {children}
-                          </a>
-                        ),
-                      }}
-                    />
-                  </div>
-                );
-              })}
+              {resourcesList.map((res, idx) => (
+                <ResourceItem key={idx} content={res} />
+              ))}
             </div>
           </div>
-        </div> 
+        </div>
       </div>
+
       <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
         {showLocation && (
           <div className="input-box">
@@ -425,6 +425,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             />
           </div>
         )}
+        
         <div className="input-box">
           <textarea
             className="input-bar"
@@ -432,7 +433,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             placeholder={
               submitted
                 ? 'Write a follow-up to update...'
-                : 'Describe the service user’s situation...'
+                : "Describe the service user's situation..."
             }
             value={inputText}
             onChange={handleInputChange}
@@ -444,35 +445,16 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             ➤
           </button>
         </div>
-              {showResetWarning && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Switch Context?</h3>
-            <p>
-              {pendingServiceUser ? (
-                <>Switching to <strong>{serviceUsers.find(u => u.service_user_id === pendingServiceUser)?.service_user_name}</strong> will clear the current conversation.</>
-              ) : (
-                <>Switching to <strong>General Inquiry</strong> will clear the current conversation.</>
-              )}
-            </p>
-            <p>This action cannot be undone.</p>
-            <div className="modal-buttons">
-              <button 
-                onClick={cancelServiceUserSwitch}
-                className="btn-cancel"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmServiceUserSwitch}
-                className="btn-confirm"
-              >
-                Switch & Reset Chat
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+        {showResetWarning && (
+          <ResetWarningModal
+            pendingServiceUser={pendingServiceUser}
+            serviceUsers={serviceUsers}
+            onConfirm={confirmServiceUserSwitch}
+            onCancel={cancelServiceUserSwitch}
+          />
+        )}
+
         <div className="backend-selector-div">
           <button
             className="submit-button"
@@ -488,7 +470,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
           >
             Save Session History
           </button>
-          {tool === "wellness" && (
+          {tool === 'wellness' && (
             <button
               className="submit-button"
               style={{ width: '60px', height: '100%', marginLeft: '20px' }}
@@ -498,7 +480,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             </button>
           )}
         </div>
-        </div>
+      </div>
     </div>
   );
 }

@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { WellnessContext } from './AppStateContextProvider';
 import Logo from '../icons/Logo.png';
 import { API_URL } from '../config';
-import '../App.css';
-import { Link } from 'react-router-dom'; // 👈 add this at the top
+import { Link } from 'react-router-dom';
+import '../styles/pages/login.css';
+
 
 function Login() {
   const [username, setUsername] = useState('');

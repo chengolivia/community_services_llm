@@ -8,7 +8,12 @@ import {WellnessContextProvider} from './components/AppStateContextProvider.js';
 import ProfileManager from './components/ProfileManager';
 import OutreachCalendar from './components/OutreachCalendar';
 import Register from './components/Register';
-import './App.css';
+
+import './styles/variable.css';
+import './styles/base/base.css';
+import './styles/layouts/content-layout.css';
+import './styles/components/common.css';
+import './styles/components/navbar.css';
 
 function App() {
   return (
