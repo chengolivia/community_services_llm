@@ -122,7 +122,7 @@ def get_all_prompts():
     Returns: Dictionary internal_prompts and external_prompts
         mapping prompt name to a string"""
 
-    internal_prompt_names = ["benefit_system","benefit_extract","goal","followup_question","resource","orchestration","which_resource"]
+    internal_prompt_names = ["benefit_system","benefit_extract","goal","followup_question","resource","orchestration","which_resource","refine_resources"]
     external_prompt_names = ['human_resource','peer','crisis','trans']
 
     internal_prompts = {}

@@ -23,7 +23,7 @@ def get_model_and_indices():
         # _model, _saved_indices, _documents = get_all_embeddings({
         #     'cspnj': f'{BASE_DIR}/data/cspnj.csv',
         #     'clhs': f'{BASE_DIR}/data/clhs.csv'
-        # })        
+        # })   
         _model, _saved_indices, _documents = get_all_embeddings(['cspnj', 'clhs'])
     return _model, _saved_indices, _documents
 
@@ -130,31 +130,36 @@ def get_all_embeddings_from_disk(resource_dict):
 
 def process_resources(resource_dict):
     """Load and process resources data into a list of strings
-    
     Arguments:
-        resource_list: list of strings, orgs to query from
-    
-    Returns: List of strings, each represents a document"""
-
+        resource_dict: dict of resource keys to query
+    Returns: 
+        d: dict of formatted documents per key
+        embeddings_dict: dict of embeddings per key
+    """
     d = {}
+    embeddings_dict = {}  # NEW: Store embeddings per key
+    
     with psycopg.connect(CONNECTION_STRING) as conn:
         for key in resource_dict:
             resources_df = pd.read_sql_query("""
                 SELECT service, description, url, phone, embedding FROM resources WHERE organization = %s
                 """, conn, params=[key])
+            
             names = list(resources_df['service'])
             descriptions = list(resources_df['description'])
             urls = list(resources_df['url'])
             phones = list(resources_df['phone'])
+            
             for i in range(len(resources_df)):
                 resources_df.loc[i, 'embedding'] = resources_df.loc[i, 'embedding'].strip("[").strip("]").split(",")
+            
             vector_arr = np.array(list(resources_df.loc[:, 'embedding'])).astype(float)
-
-
             formatted_documents = [f"Resource: {names[i]}, URL: {urls[i]}, Phone: {phones[i]}, Description: {descriptions[i]}" for i in range(len(descriptions))]
+            
             d[key] = formatted_documents
-
-    return d, vector_arr
+            embeddings_dict[key] = vector_arr  # NEW: Save this key's embeddings
+    
+    return d, embeddings_dict
 
 def get_all_embeddings(resource_list):
     """Get all the saved embeddings to run RAG
@@ -174,9 +179,12 @@ def get_all_embeddings(resource_list):
         embeddings = load_embeddings(embeddings_file_path, doc_list, model)
         saved_indices[guidance] = create_faiss_index(embeddings)
 
-    org_resources, resource_embeddings = process_resources(resource_list)
+    org_resources, resource_embeddings_dict = process_resources(resource_list)
+
     for key in org_resources:
         documents['resource_{}'.format(key)] = org_resources[key]
-        saved_indices['resource_{}'.format(key)] = create_faiss_index(resource_embeddings)
+        saved_indices['resource_{}'.format(key)] = create_faiss_index(resource_embeddings_dict[key])  # Use the right embeddings!
+
+    print([i for i in documents['resource_cspnj'] if 'Vineland' in i and 'Salvation' in i])
 
     return model, saved_indices, documents

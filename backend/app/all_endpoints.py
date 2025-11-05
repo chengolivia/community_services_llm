@@ -347,19 +347,20 @@ async def start_generation(sid, data):
       },
       {"role": "user", "content": text}
     ]
-    try:
-        meta_resp = await loop.run_in_executor(
-          None,
-          call_chatgpt_api_all_chats,
-          intent_msgs,
-          False,
-          40
-        )
-        meta = json.loads(meta_resp.strip())
-        needs_goals = bool(meta.get("needs_goals", False))
-    except Exception as e:
-        print(f"[Socket.IO] Error parsing needs_goals: {e}")
-        needs_goals = False
+    # try:
+    #     meta_resp = await loop.run_in_executor(
+    #       None,
+    #       call_chatgpt_api_all_chats,
+    #       intent_msgs,
+    #       False,
+    #       40
+    #     )
+    #     meta = json.loads(meta_resp.strip())
+    #     needs_goals = bool(meta.get("needs_goals", False))
+    # except Exception as e:
+    #     print(f"[Socket.IO] Error parsing needs_goals: {e}")
+    #     needs_goals = False
+    needs_goals = True 
     print("Finished Intent check, time={}".format(time.time()))
 
     # 2) If goals are needed, fetch & emit them

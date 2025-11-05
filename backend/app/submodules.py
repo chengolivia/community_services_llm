@@ -17,8 +17,8 @@ from app.utils import (
     call_chatgpt_with_functions,
 )
 embedding_model, saved_indices, documents = get_model_and_indices()  # Ensures embeddings are loaded
-
 openai.api_key = os.environ.get("SECRET_KEY")
+
 
 internal_prompts, external_prompts = get_all_prompts()
 
@@ -49,12 +49,11 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
     # Combine prompts with external information on resources
     pattern = r"\[Resource\](.*?)\[\/Resource\]"
     matches = re.findall(pattern,str(initial_responses[2]),flags=re.DOTALL)
+    matches += [situation ]
     with concurrent.futures.ThreadPoolExecutor() as executor:
         resources = list(executor.map(lambda s: extract_resources(embedding_model, saved_indices, documents, s, {'resource_{}'.format(organization): True},k=k), matches))
     print("Match resources time={}",time.time())
     ## Debugging 10/16
-
-    print(len(resources),len(set(resources)))
 
     all_lines = "\n".join(resources)
     all_lines = all_lines.split("\n")
@@ -77,7 +76,7 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
             idx += 1
     
 
-    all_resources = call_chatgpt_api_all_chats([{'role': 'system', 'content': 'You are a highly knowledgable system that assists {}, a peer support organization, with finding the correct resources. Out of this large list of resources, return a nicely formatted list, with phones/addresses (ONLY USE THE INFORMATION PROVIDED) of the most relevant and diverse resources for the following situation: {}'.format(organization,situation)},{'role': 'user', 'content': "\n".join(real_lines)}], stream=False)
+    all_resources = call_chatgpt_api_all_chats([{'role': 'system', 'content': internal_prompts['refine_resources'].format(organization,situation)},{'role': 'user', 'content': "\n".join(real_lines)}], stream=False)
     print("Resource trimming, content {}, time={}".format(len(all_resources),time.time()))
     # # Combine prompts with external information on benefits
     # pattern = r"\[Situation\](.*?)\[/Situation\]"
@@ -103,6 +102,7 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
     #     which_external_resources = {}
     # full_situation = "\n".join([i['content'] for i in all_messages if i['role'] == 'user' and len(i['content']) < 500] + [situation])
     # external_resources = extract_resources(embedding_model, saved_indices, documents, full_situation,which_external_resources,k=k)
+    
     external_resources = ""
 
     # capture the raw "[Resource]...[/Resource]" output
@@ -114,7 +114,7 @@ def get_questions_resources(situation,all_messages,organization,k: int = 5):
     response = "\n".join([
         f"SMART Goals: {initial_responses[0]}",
         f"Questions: {initial_responses[1]}",
-        "Resources (use only these resources):\n" + all_resources, #TODO: Remove this, from debugging 
+        "Resources (use only these resources):\n" + all_resources,
         # f"Benefit Info: {benefit_info}"
     ])
 
@@ -285,8 +285,6 @@ def construct_response(situation, all_messages, model, organization,full_respons
         max_tokens=40
     ).strip()
 
-    print("Resources {}".format(external_resources))
-
     try:
         meta = json.loads(meta_resp)
         needs_goals = meta.get("needs_goals", False)
@@ -426,3 +424,5 @@ def get_benefit_eligibility(situation,all_messages):
     )
  
     return eligibility_info
+
+print(extract_resources(embedding_model, saved_indices, documents, 'Salvation Army of New Jersey- Vineland Corps', {'resource_{}'.format('cspnj'): True},k=5))
