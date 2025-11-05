@@ -285,7 +285,7 @@ def construct_response(situation, all_messages, model, organization,full_respons
         max_tokens=40
     ).strip()
 
-    
+    print("Resources {}".format(external_resources))
 
     try:
         meta = json.loads(meta_resp)
@@ -294,6 +294,10 @@ def construct_response(situation, all_messages, model, organization,full_respons
     except:
         needs_goals = False
         verbosity   = "medium"
+
+    # TODO: Think about whether this is needed/or to remove this
+    needs_goals = True 
+    verbosity = "medium"
 
     print(f"[DEBUG] needs_goals={needs_goals}, verbosity={verbosity}, time={time.time()}")
 
@@ -353,6 +357,8 @@ def construct_response(situation, all_messages, model, organization,full_respons
     # the existing copilot pipeline:
     print("[DEBUG] copilot pipeline branch (SMART goals + orchestration), time=",time.time())
     initial_response = full_response 
+
+    print("Initial Response {}".format(initial_response))
 
     print("Get questions, resource time={}".format(time.time()))
 
