@@ -5,6 +5,7 @@ import '../styles/feature.css';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
 import { API_URL } from '../config';
+import { authenticatedFetch } from '../utils/api';
 
 const OutreachCalendar = () => {
     const [weekCode, setWeekCode] = useState(null);
@@ -80,11 +81,14 @@ const OutreachCalendar = () => {
     };
 
     const getAllOutreach = async () => {
-        const response = await fetch(`${API_URL}/outreach_list/?name=${user.username}`);
-        response.json().then((res) => {
-            setAllOutreach(res); // Save the fetched data
-            updateOutreach(res); // Process the data
-        });
+        try {
+            const response = await authenticatedFetch(`/outreach_list/?name=${user.username}`);
+            const data = await response.json();
+            setAllOutreach(data);
+            updateOutreach(data);
+        } catch (error) {
+            console.error('Error fetching outreach:', error);
+        }
     };
   
     useEffect(() => {

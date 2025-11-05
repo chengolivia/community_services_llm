@@ -9,7 +9,30 @@ const createContextProvider = (Context) => ({ children }) => {
   const [chatConvo, setChatConvo] = useState([]);
   const [inputLocationText, setInputLocationText] = useState('');
   const [organization, setOrganization] = useState('cspnj');
-  const [user, setUser] = useState({username: '', isAuthenticated: false});
+  
+  // Initialize user state from localStorage if available
+  const [user, setUser] = useState(() => {
+    // This runs only once during initial render
+    const storedToken = localStorage.getItem('accessToken');
+    const storedRole = localStorage.getItem('userRole');
+    const storedUsername = localStorage.getItem('username');
+
+    if (storedToken && storedRole && storedUsername) {
+      return {
+        isAuthenticated: true,
+        username: storedUsername,
+        role: storedRole,
+        token: storedToken,
+      };
+    }
+
+    return {
+      username: '', 
+      isAuthenticated: false,
+      token: null,
+      role: null,
+    };
+  });
 
   const resetContext = () => {
     setInputText('');

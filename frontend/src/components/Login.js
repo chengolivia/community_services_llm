@@ -27,16 +27,27 @@ function Login() {
         body: JSON.stringify({ username, password }),
       });
 
+      // FIX: Get the data from response first
       const data = await response.json();
 
       if (response.ok) {
+        const { access_token, role, organization } = data;
+
         // Set user context with login info
         setUser({
           username: username,
-          role: data.role,
-          isAuthenticated: true, 
+          role: role,
+          isAuthenticated: true,
+          token: access_token, 
         });
-                
+        setOrganization(organization);
+
+        // Store in localStorage for persistence
+        localStorage.setItem('accessToken', access_token);
+        localStorage.setItem('userRole', role);
+        localStorage.setItem('username', username);      
+        localStorage.setItem('organization', organization);
+
         // Redirect to home page after successful login
         navigate('/');
       } else {

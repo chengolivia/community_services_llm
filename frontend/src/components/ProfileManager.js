@@ -4,7 +4,8 @@ import '../styles/feature.css';
 import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
-import { API_URL } from '../config';
+import { apiPost } from '../utils/api';
+import { apiGet } from '../utils/api';
 
 const ProfileManager = () => {
   const [allNames, setAllNames] = useState([{}]);
@@ -34,42 +35,30 @@ const ProfileManager = () => {
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`${API_URL}/new_service_user/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          patientName,
-          lastSession,
-          nextCheckIn,
-          followUpMessage,
-          username: user.username,
-          location: location,
-        }),
-      });
+      const result = await apiPost('/new_service_user/', {
+        patientName,
+        lastSession,
+        nextCheckIn,
+        followUpMessage,
+        username: user.username,
+        location: location,
+      });    
   
-      const result = await response.json();
       console.log("[Submit] Response:", result);
 
-    
-    if (!response.ok) {
-      throw new Error(result.detail || 'Failed to save')
-    }
-
-    // Refresh list
-    await getAllNames();
-    
-    // Close and reset
-    setSidebar(false);
-    setPatientName('');
-    setLastSession('');
-    setNextCheckIn('');
-    setFollowUpMessage('');
-    setLocation('');
+      // Refresh list
+      await getAllNames();
+      
+      // Close and reset
+      setSidebar(false);
+      setPatientName('');
+      setLastSession('');
+      setNextCheckIn('');
+      setFollowUpMessage('');
+      setLocation('');
     } catch (error) {
       console.error("Error:", error);
-      alert(`Failed: ${error.followUpMessage}`)
+      alert(`Failed: ${error.message || 'Unknown error'}`)
     } finally {
       setIsSubmitting(false);
     }
@@ -104,10 +93,9 @@ const ProfileManager = () => {
   const getAllNames = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
-      const res = await response.json()
-      setAllNames(res);
-      console.log('[Load] Got', res.length, 'profiles');
+      const data = await apiGet(`/service_user_list/?name=${user.username}`);
+      setAllNames(data);
+      console.log('[Load] Got', data.length, 'profiles');
     } catch (error) {
       console.error('[Load] Error:', error);
       setAllNames([]);
@@ -115,6 +103,7 @@ const ProfileManager = () => {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     getAllNames();

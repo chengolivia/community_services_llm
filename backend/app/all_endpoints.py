@@ -62,12 +62,13 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     role: str
+    organization: str
 
 # Add this endpoint to your FastAPI app
 @app.post("/api/auth/login")
 async def login(login_data: LoginRequest):
     print("Analyzing login_data {} {}".format(login_data.username,login_data.password))
-    success, _, role = authenticate_user(login_data.username, login_data.password)
+    success, _, role, organization = authenticate_user(login_data.username, login_data.password)
     if not success:
         raise HTTPException(
             status_code=401,
@@ -78,14 +79,15 @@ async def login(login_data: LoginRequest):
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": login_data.username, "role": role},
+        data={"sub": login_data.username, "role": role, "organization": organization},
         expires_delta=access_token_expires
     )
     
     return Token(
         access_token=access_token,
         token_type="bearer",
-        role=role
+        role=role,
+        organization=organization
     )
     
 @app.get("/")

@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import io from 'socket.io-client';
 import '../styles/feature.css';
 import {WellnessContext } from './AppStateContextProvider';
+import { apiGet } from '../utils/api';
 import { API_URL } from '../config';
 
 
@@ -34,26 +35,26 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [showResetWarning, setShowResetWarning] = useState(false);
 
   useEffect(() => {
-  if (!user?.username) {
-    console.log('[Dropdown] No username available yet');
-    return;
-  }
+    const fetchServiceUsers = async () => {
+      try {
+        console.log('[Dropdown] Fetching service users...');
+        const data = await apiGet(`/service_user_list/?name=${user.username}`);
+        console.log('[Dropdown] Received data:', data);
+        setServiceUsers(data);
+      } catch (error) {
+        console.error('[Dropdown] Error:', error);
+      }
+    };
   
-  console.log('[Dropdown] Fetching service users for:', user.username);
+    if (user?.username) {
+      fetchServiceUsers();
+    }
+  }, [user?.username]);
   
-  fetch(`${API_URL}/service_user_list/?name=${user.username}`)
-    .then(res => {
-      console.log('[Dropdown] Response status:', res.status);
-      return res.json();
-    })
-    .then(data => {
-      console.log('[Dropdown] Received data:', data);
-      setServiceUsers(data);
-    })
-    .catch(error => {
-      console.error('[Dropdown] Error:', error);
-    });
-}, [user?.username]);
+  
+
+
+  
   useEffect(() => {
     const newSocket = io(socketServerUrl, {
       transports: ['polling', 'websocket'],
@@ -122,12 +123,20 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   }, [socketServerUrl]);
 
   useEffect(() => {
-  fetch(`${API_URL}/service_user_list/?name=${user.username}`)  
-    .then(res => res.json())
-    .then(setServiceUsers)
-    .catch(console.error);
-}, [user.username]); 
-
+    const fetchServiceUsers = async () => {
+      try {
+        const data = await apiGet(`/service_user_list/?name=${user.username}`);
+        setServiceUsers(data);
+      } catch (error) {
+        console.error('Error fetching service users:', error);
+      }
+    };
+  
+    if (user.username) {
+      fetchServiceUsers();
+    }
+  }, [user.username]);
+  
   const handleScroll = (e) => {
     const { scrollTop, clientHeight, scrollHeight } = e.target;
     if (scrollTop + clientHeight >= scrollHeight - 50) {
