@@ -397,7 +397,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             <h3>Goals</h3>
             <div className="scroll-container">
               {goalsList.map((goal, idx) => (
-                <ResourceItem key={idx} content={goal} />
+                <ResourceItem key={`goal-${idx}`} content={goal} />
               ))}
             </div>
           </div>
@@ -406,7 +406,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             <h3>Resources</h3>
             <div className="scroll-container">
               {resourcesList.map((res, idx) => (
-                <ResourceItem key={idx} content={res} />
+                <ResourceItem key={`resource-${idx}`} content={res} />
               ))}
             </div>
           </div>

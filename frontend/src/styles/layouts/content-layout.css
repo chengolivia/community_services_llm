@@ -46,6 +46,7 @@
   gap: var(--spacing-xl);
   min-height: 0;
   overflow: hidden;
+  align-items: start;
 }
 
 
@@ -63,6 +64,8 @@
   position: relative;
   transition: justify-content var(--transition-normal), padding var(--transition-normal);
   min-width: 0;
+  overflow-y: auto;
+  max-height: 100%;
 }
 
 .left-section.submitted {
@@ -87,7 +90,10 @@
   gap: var(--spacing-xl);
   margin-top: var(--spacing-xl);
   min-width: 0;
-  max-height: 100%;
+  max-height: calc(100vh - 200px); /* CHANGE from 100% */
+  overflow: hidden;
+  position: sticky;
+  top: var(--spacing-xl); /* ADD THIS */
 }
 
 
