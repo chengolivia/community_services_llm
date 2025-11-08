@@ -4,23 +4,15 @@ import EditIcon from '../icons/Pencil.png';
 import ChatIcon from '../icons/Chat.png';
 import ProfileIcon from '../icons/Profile.png';
 
-// New PatientSidebar component
+// Updated SidebarInformation component
 const SidebarInformation = ({ 
   patient = {}, 
   isEditable = false,
   isSubmitting = false, 
+  formData = {},
+  onFormChange,
   onSubmit, 
   onClose,
-  patientName, 
-  setPatientName,
-  lastSession, 
-  setLastSession,
-  nextCheckIn, 
-  setNextCheckIn,
-  followUpMessage, 
-  setFollowUpMessage,
-  location,
-  setLocation,
 }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -56,8 +48,8 @@ const SidebarInformation = ({
                 type="text" 
                 id="patientName" 
                 placeholder="Enter service user name"
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
+                value={formData.patientName || ''}
+                onChange={(e) => onFormChange('patientName', e.target.value)}
               />
             </div>
           </div>
@@ -66,15 +58,15 @@ const SidebarInformation = ({
           <div className="input-section">
             <div className="form-group">
               <label className="section-label" htmlFor="location">
-                <img src={ProfileIcon} alt="Location Icon" className="icon" /> {/* Adjust icon as needed */}
+                <img src={ProfileIcon} alt="Location Icon" className="icon" />
                 Location
               </label>
               <input 
                 type="text" 
                 id="location" 
                 placeholder="Enter location (e.g., city, clinic name)"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={formData.location || ''}
+                onChange={(e) => onFormChange('location', e.target.value)}
               />
             </div>
           </div>
@@ -83,7 +75,7 @@ const SidebarInformation = ({
         {!isEditable && patient.location && (
           <div className="info-section">
             <div className="section-label">
-              <img src={ProfileIcon} alt="Location Icon" className="icon" /> {/* Adjust icon as needed */}
+              <img src={ProfileIcon} alt="Location Icon" className="icon" />
               Location
             </div>
             <div className="section-content">{patient.location}</div>
@@ -99,8 +91,8 @@ const SidebarInformation = ({
             <input 
               type="date" 
               id="lastSession"
-              value={lastSession}
-              onChange={(e) => setLastSession(e.target.value)}
+              value={formData.lastSession || ''}
+              onChange={(e) => onFormChange('lastSession', e.target.value)}
             />
           ) : (
             <div className="section-content">{formatDate(patient.last_session)}</div>
@@ -122,8 +114,8 @@ const SidebarInformation = ({
             <input 
               type="date" 
               id="nextCheckIn"
-              value={nextCheckIn}
-              onChange={(e) => setNextCheckIn(e.target.value)}
+              value={formData.nextCheckIn || ''}
+              onChange={(e) => onFormChange('nextCheckIn', e.target.value)}
             />
           ) : (
             <div className="section-content">{formatDate(patient.check_in)}</div>
@@ -141,8 +133,8 @@ const SidebarInformation = ({
               <textarea 
                 id="followUpMessage" 
                 placeholder="Enter follow-up message"
-                value={followUpMessage}
-                onChange={(e) => setFollowUpMessage(e.target.value)}
+                value={formData.followUpMessage || ''}
+                onChange={(e) => onFormChange('followUpMessage', e.target.value)}
               ></textarea>
             ) : (
               <div>
@@ -161,7 +153,14 @@ const SidebarInformation = ({
         
         {isEditable && (
           <div className="save-button-container">
-            <button onClick={onSubmit} disabled={isSubmitting || !patientName} type="submit" className="save-button">{isSubmitting ? 'Saving...' : 'Save Check-in'}</button>
+            <button 
+              onClick={onSubmit} 
+              disabled={isSubmitting || !formData.patientName} 
+              type="submit" 
+              className="save-button"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Check-in'}
+            </button>
           </div>
         )}
       </div>
