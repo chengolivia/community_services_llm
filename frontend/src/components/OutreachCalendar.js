@@ -20,19 +20,26 @@ const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'F
 
 // Utility functions
 const parseCheckInDate = (checkInStr) => {
-  const [month, day, year] = checkInStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  // Handle both YYYY-MM-DD and MM-DD-YYYY formats
+  const parts = checkInStr.split('-').map(Number);
+  
+  // Check if first part is a year (4 digits) - YYYY-MM-DD format
+  if (parts[0] > 31) {
+    const [year, month, day] = parts;
+    return new Date(year, month - 1, day);
+  } else {
+    // MM-DD-YYYY format
+    const [month, day, year] = parts;
+    return new Date(year, month - 1, day);
+  }
 };
 
-const getWeekStart = (date) => {
-  const newDate = new Date(date);
-  const dayOfWeek = newDate.getDay();
-  newDate.setDate(newDate.getDate() - dayOfWeek);
-  return newDate;
-};
-
-const getWeekTimestamp = (date) => {
-  return Math.floor(date.getTime() / 1000);
+const getDateKey = (date) => {
+  // Create a key for the specific date (not week start)
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  return `${year}-${month}-${day}`;
 };
 
 const OutreachCalendar = () => {
@@ -72,19 +79,28 @@ const OutreachCalendar = () => {
     fetchOutreach();
   }, [fetchOutreach]);
 
-  // Group outreach by week
-  const outreachByWeek = useMemo(() => {
+  // Group outreach by actual date
+  const outreachByDate = useMemo(() => {
     const grouped = {};
     const patientColors = {};
     let colorIndex = 0;
 
     allOutreach.forEach((outreach) => {
       const date = parseCheckInDate(outreach.check_in);
-      const weekStart = getWeekStart(date);
-      const weekKey = getWeekTimestamp(weekStart);
+      
+      // Skip invalid dates
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date for outreach:', outreach.check_in);
+        return;
+      }
+      
+      const dateKey = getDateKey(date);
 
-      if (!grouped[weekKey]) {
-        grouped[weekKey] = [];
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = {
+          date: date,
+          outreach: []
+        };
       }
 
       // Assign consistent color per patient
@@ -93,7 +109,7 @@ const OutreachCalendar = () => {
         colorIndex++;
       }
 
-      grouped[weekKey].push({
+      grouped[dateKey].outreach.push({
         ...outreach,
         color: patientColors[outreach.name]
       });
@@ -102,31 +118,37 @@ const OutreachCalendar = () => {
     return grouped;
   }, [allOutreach]);
 
-  // Filter and render weeks
-  const weekComponents = useMemo(() => {
-    const sortedWeeks = Object.keys(outreachByWeek).sort((a, b) => b - a); // Most recent first
+  // Filter and render dates
+  const dateComponents = useMemo(() => {
+    const sortedDates = Object.keys(outreachByDate).sort((a, b) => {
+      // Sort by actual date, oldest first
+      return outreachByDate[a].date.getTime() - outreachByDate[b].date.getTime();
+    });
+    
     const searchLower = search.toLowerCase();
 
-    return sortedWeeks.map((weekKey) => {
-      const weekStart = new Date(Number(weekKey) * 1000);
-      const month = MONTHS[weekStart.getMonth()];
-      const date = weekStart.getDate();
-      const dayOfWeek = DAYS_OF_WEEK[weekStart.getDay()];
+    return sortedDates.map((dateKey) => {
+      const { date, outreach } = outreachByDate[dateKey];
+      const month = MONTHS[date.getMonth()];
+      const day = date.getDate();
+      const dayOfWeek = DAYS_OF_WEEK[date.getDay()];
 
-      const filteredOutreach = outreachByWeek[weekKey].filter((item) =>
+      const filteredOutreach = outreach.filter((item) =>
         item.name.toLowerCase().includes(searchLower)
       );
 
-      // Skip weeks with no matching results
+      // Skip dates with no matching results
       if (filteredOutreach.length === 0 && search) {
         return null;
       }
 
+      const year = date.getFullYear();
+
       return (
-        <div key={weekKey} className="day">
-          <div className="date black">{date}</div>
+        <div key={dateKey} className="day">
+          <div className="date black">{day}</div>
           <div className="info">
-            {month}, {dayOfWeek}
+            {dayOfWeek}, {month} {day}, {year}
           </div>
           <ul>
             {filteredOutreach.map((item) => (
@@ -139,7 +161,7 @@ const OutreachCalendar = () => {
         </div>
       );
     }).filter(Boolean); // Remove null entries
-  }, [outreachByWeek, search]);
+  }, [outreachByDate, search]);
 
   // Handlers
   const handleSearchChange = useCallback((e) => {
@@ -195,7 +217,7 @@ const OutreachCalendar = () => {
               </div>
             )}
 
-            {!isLoading && !error && weekComponents.length === 0 && (
+            {!isLoading && !error && dateComponents.length === 0 && (
               <div className="empty-message">
                 {search
                   ? `No results found for "${search}"`
@@ -203,7 +225,7 @@ const OutreachCalendar = () => {
               </div>
             )}
 
-            {!isLoading && !error && weekComponents}
+            {!isLoading && !error && dateComponents}
           </div>
         </div>
       </div>
