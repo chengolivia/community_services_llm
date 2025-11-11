@@ -6,8 +6,43 @@ import json
 from datetime import datetime, timedelta
 from app.utils import call_chatgpt_api_all_chats
 from app.database import CONNECTION_STRING
+import spacy
 
 openai.api_key = os.environ.get("SECRET_KEY")
+
+
+nlp = spacy.load("en_core_web_sm")
+
+keyword_map = {
+    "extremely pressing": {"food", "hungry", "unsafe", "shelter"},
+    "pressing": {"housing", "rent", "bills", "job"},
+    "less pressing": {"therapy", "support group", "resume"},
+    "long-term": {"education", "section 8", "career", "training"}
+}
+negations = {"no", "not", "n't", "never", "without"}
+check_in_delta_map = {
+    "extremely pressing": 1,
+    "pressing": 7,
+    "less pressing": 21,
+    "long-term": 90,
+}
+
+def detect_urgency(text):
+    doc = nlp(text.lower())
+    found = set()
+
+    for level, words in keyword_map.items():
+        for token in doc:
+            word = token.lemma_
+            if word in words:
+                # detect negation within ±3 tokens
+                negated = any(
+                    (t.lemma_ in negations) and abs(t.i - token.i) <= 3
+                    for t in doc
+                )
+                if not negated:
+                    found.add(level)
+    return sorted(found)
 
 
 def generate_followup_message(messages):
@@ -125,6 +160,89 @@ def generate_check_ins_standard(service_user_id: str, conversation_summary: str 
         return False, str(e)
     finally:
         conn.close()
+        
+        
+def generate_check_ins_rule_based(service_user_id: str, conversation_id: str):
+    """Generate and insert check-ins based on conversation"""
+    messages = load_messages_for_conversation(conversation_id)
+    conversation = [message["text"] for message in messages]
+    urgencies = detect_urgency("\n".join(conversation))
+    
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    
+    try:
+        # Get service user name and last_session date
+        cursor.execute(
+            """SELECT p.service_user_name, o.last_session 
+               FROM profiles p
+               LEFT JOIN outreach_details o ON p.service_user_id = o.service_user_id
+               WHERE p.service_user_id = %s
+                 AND o.last_session IS NOT NULL
+                 AND o.last_session != ''
+               ORDER BY o.created_at DESC 
+               LIMIT 1""",
+            (service_user_id,)
+        )
+        result = cursor.fetchone()
+        
+        if not result or not result[0]:
+            # Try just getting the profile
+            cursor.execute(
+                "SELECT service_user_name FROM profiles WHERE service_user_id = %s",
+                (service_user_id,)
+            )
+            profile_result = cursor.fetchone()
+            if not profile_result:
+                return False, "Service user not found"
+            
+            service_user_name = profile_result[0]
+            last_session = None
+        else:
+            service_user_name = result[0]
+            last_session = result[1]
+        
+        # Determine base date
+        if last_session:
+            try:
+                base_date = datetime.strptime(last_session, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                base_date = datetime.now()
+        else:
+            base_date = datetime.now()
+        
+        last_session_str = base_date.strftime("%Y-%m-%d")
+        
+        # Generate and insert check-ins
+        check_ins = []
+        for urgency in urgencies:
+            check_in_date = base_date + timedelta(days=check_in_delta_map[urgency])
+            check_in_str = check_in_date.strftime("%Y-%m-%d")
+            # Personalized message with user's name
+            follow_up = f"Hey {service_user_name}, I wanted to see how things were going"
+            
+            cursor.execute('''
+                INSERT INTO outreach_details 
+                (service_user_id, last_session, check_in, follow_up_message)
+                VALUES (%s, %s, %s, %s)
+            ''', (service_user_id, last_session_str, check_in_str, follow_up))
+            
+            check_ins.append({
+                'date': check_in_str,
+                'message': follow_up
+            })
+        
+        conn.commit()
+        return True, check_ins
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"[DB Error] {e}")
+        return False, str(e)
+    finally:
+        conn.close()
+
+
 
 
 def autogenerate_conversations(username):
