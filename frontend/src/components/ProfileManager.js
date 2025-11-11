@@ -19,6 +19,22 @@ const ProfileManager = () => {
   const [lastSession, setLastSession] = useState('');
   const [nextCheckIn, setNextCheckIn] = useState('');
   const [followUpMessage, setFollowUpMessage] = useState('');
+  const [checkIns, setCheckIns] = useState([]);
+
+  useEffect(() => {
+    if (currentPatient?.service_user_id && !isEditable) {
+      fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
+        .then(res => res.json())
+        .then(data => setCheckIns(data))
+        .catch(error => {
+          console.error('[Check-ins] Error fetching:', error);
+          setCheckIns([]);
+        });
+    } else {
+      setCheckIns([]);
+    }
+  }, [currentPatient?.service_user_id, isEditable]);
+  
 
   const handleSearchChange = (e) => {
     setSearch(e.target.value);
@@ -166,6 +182,7 @@ const ProfileManager = () => {
       content={
         hasSidebar ? (
           <SidebarInformation
+            checkIns={checkIns}
             patient={currentPatient}
             isEditable={isEditable}
             isSubmitting={isSubmitting}
