@@ -1,5 +1,6 @@
 import hashlib
 import psycopg
+from psycopg.rows import dict_row
 import csv
 from pathlib import Path
 import os
@@ -197,16 +198,12 @@ def add_new_service_user(provider_username, patient_name, last_session, next_che
         ON CONFLICT (service_user_id) DO NOTHING
         ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
 
-        # Insert or update outreach details
-        cursor.execute('''
-        INSERT INTO outreach_details 
-        (service_user_id, last_session, check_in, follow_up_message)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (service_user_id) DO UPDATE SET
-            last_session = EXCLUDED.last_session,
-            check_in = EXCLUDED.check_in,
-            follow_up_message = EXCLUDED.follow_up_message
-        ''', (service_user_id, last_session, next_checkin, followup_message))
+        # # Insert or update outreach details
+        # cursor.execute('''
+        # INSERT INTO outreach_details 
+        # (service_user_id, last_session, check_in, follow_up_message)
+        # VALUES (%s, %s, %s, %s)
+        # ''', (service_user_id, last_session, next_checkin, followup_message))
 
         conn.commit()
         return True, f"Check-in saved successfully (ID: {service_user_id})"
@@ -218,4 +215,26 @@ def add_new_service_user(provider_username, patient_name, last_session, next_che
     finally:
         conn.close()
 
+
+def fetch_service_user_checkins(service_user_id):
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+        SELECT o.id, o.check_in, o.follow_up_message, o.last_session, o.created_at
+        FROM outreach_details o
+        WHERE o.service_user_id = %s
+        ORDER BY o.check_in ASC
+        LIMIT 3
+        ''', (service_user_id,))
+        
+        rows = cursor.fetchall()
+        result = [dict(row) for row in rows]
+        return True, result
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
 

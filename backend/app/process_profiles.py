@@ -13,11 +13,13 @@ def get_all_service_users(provider_username):
     cursor = conn.cursor()
     
     cursor.execute('''
-    SELECT p.service_user_id, p.service_user_name, p.location, p.status, 
+    SELECT DISTINCT ON (p.service_user_id) 
+           p.service_user_id, p.service_user_name, p.location, p.status, 
            o.last_session, o.check_in, o.follow_up_message
     FROM profiles p
     LEFT JOIN outreach_details o ON p.service_user_id = o.service_user_id
     WHERE p.provider = %s
+    ORDER BY p.service_user_id, o.created_at DESC NULLS LAST
     ''', (provider_username,))
     
     rows = cursor.fetchall()
@@ -38,7 +40,7 @@ def get_all_outreach(provider_username):
     cursor = conn.cursor()
     
     cursor.execute('''
-    SELECT p.service_user_name as name, o.last_session, o.check_in, o.follow_up_message
+    SELECT p.service_user_id, p.service_user_name as name, o.last_session, o.check_in, o.follow_up_message
     FROM outreach_details o
     JOIN profiles p ON o.service_user_id = p.service_user_id
     WHERE p.provider = %s
