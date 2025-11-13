@@ -9,7 +9,7 @@ numpy
 sentence-transformers==3.2.1
 PyPDF2
 python-dotenv
-fpdf
+fpdf2
 --only-binary :all:
 blis>=0.7.11
 spacy>=3.7.4
