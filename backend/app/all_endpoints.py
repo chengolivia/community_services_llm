@@ -19,7 +19,8 @@ from app.submodules import (
 )
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.database import update_conversation, add_new_service_user
+from app.database import update_conversation, add_new_service_user, fetch_service_user_checkins
+from app.generate_outreach import generate_check_ins_rule_based
 
 import socketio
 from datetime import timedelta
@@ -126,6 +127,16 @@ async def service_user_list(name):
 async def outreach_list(name):
     return get_all_outreach(name)
 
+@app.get("/service_user_check_ins/")
+async def service_user_check_ins(service_user_id: str):
+    """Get all check-ins for a specific service user, ordered by check-in date"""
+    success, result = fetch_service_user_checkins(service_user_id)
+    if success:
+        return result
+    else:
+        raise HTTPException(status_code=400, detail=result)
+    
+
 @app.post("/new_service_user/")
 async def create_item(item: NewServiceUser):
     print(f"[API] Received: {item.dict()}")
@@ -142,7 +153,20 @@ async def create_item(item: NewServiceUser):
     else:
         raise HTTPException(status_code=400, detail=message)
 
+class GenerateCheckInsRequest(BaseModel):
+    service_user_id: str
+    conversation_id: str
 
+@app.post("/generate_check_ins/")
+async def generate_check_ins_endpoint(request: GenerateCheckInsRequest):
+    success, result = generate_check_ins_rule_based(request.service_user_id, request.conversation_id)
+    if success:
+        return {"success": True, "check_ins": result}
+    else:
+        raise HTTPException(status_code=400, detail=result)
+
+
+    
 
 # Handle Socket Messages
 

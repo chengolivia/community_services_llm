@@ -7,6 +7,7 @@ import ProfileIcon from '../icons/Profile.png';
 // New PatientSidebar component
 const SidebarInformation = ({ 
   patient = {}, 
+  checkIns = [],
   isEditable = false,
   isSubmitting = false, 
   onSubmit, 
@@ -22,8 +23,9 @@ const SidebarInformation = ({
 }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // month is 0-indexed 
+    return date.toLocaleDateString('en-US', {
       year: 'numeric', 
       month: 'short', 
       day: 'numeric' 
@@ -78,7 +80,7 @@ const SidebarInformation = ({
           )}
         </div>
         
-        <div className={globalClassName}>
+        {/* <div className={globalClassName}>
           <div className="header-with-actions">
             <div className="section-label">
               <img src={ClockIcon} alt="Clock Icon" className="icon" />
@@ -128,7 +130,69 @@ const SidebarInformation = ({
               </div>
             )}
           </div>
-        </div>
+        </div> */}
+
+        {/* Replace single check-in with multiple check-ins */}
+        {!isEditable && checkIns.length > 0 ? (
+          <div>
+            <div className="section-label" style={{marginLeft: "20px", marginTop: "16px"}}>
+              <img src={ClockIcon} alt="Clock Icon" className="icon" />
+              Upcoming Check-ins
+            </div>
+            {checkIns.map((checkIn, index) => (
+              <div key={checkIn.id || index} className="check-in-item" style={{
+                margin: "10px 20px",
+                padding: "10px",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+                backgroundColor: "#f9f9f9"
+              }}>
+                <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                  <img src={ClockIcon} alt="Clock Icon" className="icon" style={{width: "16px", marginRight: "5px"}} />
+                  {formatDate(checkIn.check_in)}
+                </div>
+                <div className="message-box" style={{marginTop: "5px"}}>
+                  <img src={ChatIcon} alt="Chat Icon" className="icon" style={{width: "16px", marginRight: "5px"}} />
+                  {checkIn.follow_up_message}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : isEditable ? (
+          // Keep original editable fields for backward compatibility
+          <>
+            {/* <div className={globalClassName}>
+              <div className="header-with-actions">
+                <div className="section-label">
+                  <img src={ClockIcon} alt="Clock Icon" className="icon" />
+                  Recommended check-in
+                </div>
+              </div>
+              <input 
+                type="date" 
+                id="nextCheckIn"
+                value={nextCheckIn}
+                onChange={(e) => setNextCheckIn(e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <div className="section-label" style={{marginLeft: "20px", marginTop: "16px"}}>
+                <img src={ChatIcon} alt="Chat Icon" className="icon" />
+                Recommended follow-up message
+              </div>
+              
+              <div className="message-box">
+                <textarea 
+                  id="followUpMessage" 
+                  placeholder="Enter follow-up message"
+                  value={followUpMessage}
+                  onChange={(e) => setFollowUpMessage(e.target.value)}
+                ></textarea>
+              </div>
+            </div> */}
+          </>
+        ) : null}
         
         {isEditable && (
           <div className="save-button-container">

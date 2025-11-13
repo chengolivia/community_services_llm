@@ -13,6 +13,22 @@ const OutreachCalendar = () => {
     const [allOutreach, setAllOutreach] = useState([]);
     const [currentPatient, setCurrentPatient] = useState({});
     const { user } = useContext(WellnessContext);
+    const [checkIns, setCheckIns] = useState([]);
+
+    useEffect(() => {
+        if (currentPatient?.service_user_id) {
+            fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
+                .then(res => res.json())
+                .then(data => setCheckIns(data))
+                .catch(error => {
+                    console.error('[Check-ins] Error fetching:', error);
+                    setCheckIns([]);
+                });
+        } else {
+            setCheckIns([]);
+        }
+    }, [currentPatient?.service_user_id]);
+
 
     const all_months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -100,6 +116,7 @@ const OutreachCalendar = () => {
 
     let updateSidebar = (patient) => {
         setCurrentPatient({
+            'service_user_id': patient.service_user_id || '',
             'service_user_name': patient.name || '', 
             'last_session': patient.last_session || '', 
             'check_in': patient.check_in || '', 
@@ -133,6 +150,7 @@ const OutreachCalendar = () => {
                 hasSidebar ? (
                 <SidebarInformation
                     patient={currentPatient}
+                    checkIns={checkIns}
                     isEditable={false}
                     onSubmit={()=>{}}
                     onClose={() => setSidebar(false)}

@@ -32,6 +32,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [selectedServiceUser, setSelectedServiceUser] = useState(''); // '' for general, or user ID
   const [pendingServiceUser, setPendingServiceUser] = useState(null);
   const [showResetWarning, setShowResetWarning] = useState(false);
+  const [generatingCheckIns, setGeneratingCheckIns] = useState(false);
+  const [checkIns, setCheckIns] = useState([]);
 
   useEffect(() => {
   if (!user?.username) {
@@ -128,6 +130,21 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     .catch(console.error);
 }, [user.username]); 
 
+  // Fetch check-ins when service user changes
+  useEffect(() => {
+    if (selectedServiceUser) {
+      fetch(`${API_URL}/service_user_check_ins/?service_user_id=${selectedServiceUser}`)
+        .then(res => res.json())
+        .then(data => setCheckIns(data))
+        .catch(error => {
+          console.error('[Check-ins] Error fetching:', error);
+          setCheckIns([]);
+        });
+    } else {
+      setCheckIns([]);
+    }
+  }, [selectedServiceUser]);
+
   const handleScroll = (e) => {
     const { scrollTop, clientHeight, scrollHeight } = e.target;
     if (scrollTop + clientHeight >= scrollHeight - 50) {
@@ -197,7 +214,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
         tool,
         conversation_id: conversationID,
         username: user.username,
-        service_user_id: user.service_user_id || null,
+        service_user_id: selectedServiceUser || null,
       });
     } else {
       console.error('[GenericChat] Socket is not connected.');
@@ -283,6 +300,38 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     setShowResetWarning(false);
   };
 
+  const handleGenerateCheckIns = async () => {
+    if (!selectedServiceUser) {
+      alert("Please select a service user first");
+      return;
+    }
+    
+    setGeneratingCheckIns(true);
+    try {
+      const response = await fetch(`${API_URL}/generate_check_ins/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service_user_id: selectedServiceUser, 
+          conversation_id: conversationID,
+         })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        alert(`Generated ${data.check_ins.length} check-ins successfully!`);
+        // Refresh check-ins
+        const refreshResponse = await fetch(`${API_URL}/service_user_check_ins/?service_user_id=${selectedServiceUser}`);
+        const refreshedCheckIns = await refreshResponse.json();
+        setCheckIns(refreshedCheckIns);
+      }
+    } catch (error) {
+      console.error('Error generating check-ins:', error);
+      alert('Failed to generate check-ins');
+    } finally {
+      setGeneratingCheckIns(false);
+    }
+  };
+
   return (
     <div className="resource-recommendation-container">
       <div className="content-area">
@@ -301,6 +350,19 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
                 ))}
               </optgroup>
           </select>
+          <button
+            className="submit-button"
+            style={{ 
+              width: 'auto', 
+              padding: '8px 16px',
+              fontSize: '14px',
+              whiteSpace: 'nowrap'
+            }}
+            onClick={handleGenerateCheckIns}
+            disabled={!selectedServiceUser || generatingCheckIns}
+          >
+            {generatingCheckIns ? 'Generating...' : 'Generate Check-ins'}
+          </button>
           <h2 className="instruction">
             What is the service user’s needs and goals for today’s meeting?
           </h2>
