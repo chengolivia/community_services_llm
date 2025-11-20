@@ -19,7 +19,7 @@ from app.submodules import (
 )
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.database import update_conversation, add_new_service_user, fetch_service_user_checkins
+from app.database import update_conversation, add_new_service_user, fetch_service_user_checkins, edit_service_user_outreach
 from app.generate_outreach import generate_check_ins_rule_based
 
 import socketio
@@ -133,6 +133,17 @@ async def service_user_check_ins(service_user_id: str):
     success, result = fetch_service_user_checkins(service_user_id)
     if success:
         return result
+    else:
+        raise HTTPException(status_code=400, detail=result)
+    
+@app.post("/service_user_outreach_edit/")
+async def service_user_outreach_edit(check_in_id: str, data: dict):
+    """Handle updates to service user outreach via sidebar"""
+    check_in_date = data.get('check_in')
+    follow_up_message = data.get('follow_up_message')
+    success, result = edit_service_user_outreach(check_in_id, check_in_date, follow_up_message)
+    if success:
+        return result 
     else:
         raise HTTPException(status_code=400, detail=result)
     
