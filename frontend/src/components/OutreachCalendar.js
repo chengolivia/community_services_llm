@@ -4,12 +4,15 @@ import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch } from '../utils/api';
 import '../styles/pages/calendar.css';
+import { API_URL } from '../config';
+
 
 // Constants
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
 
 const COLORS = [
   '#FFBC2A', '#9F69AF', '#F5511F', '#79C981', '#34A2ED',
@@ -42,6 +45,31 @@ const getDateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+
+// const OutreachCalendar = () => {
+//     const [weekCode, setWeekCode] = useState(null);
+//     const [hasSidebar, setSidebar] = useState(false);
+//     const [search, setSearch] = useState('');
+//     const [allOutreach, setAllOutreach] = useState([]);
+//     const [currentPatient, setCurrentPatient] = useState({});
+//     const { user } = useContext(WellnessContext);
+//     const [checkIns, setCheckIns] = useState([]);
+
+//     useEffect(() => {
+//         if (currentPatient?.service_user_id) {
+//             fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
+//                 .then(res => res.json())
+//                 .then(data => setCheckIns(data))
+//                 .catch(error => {
+//                     console.error('[Check-ins] Error fetching:', error);
+//                     setCheckIns([]);
+//                 });
+//         } else {
+//             setCheckIns([]);
+//         }
+//     }, [currentPatient?.service_user_id]);
+
+
 const OutreachCalendar = () => {
   const { user } = useContext(WellnessContext);
   
@@ -59,7 +87,7 @@ const OutreachCalendar = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await authenticatedFetch(`/outreach_list/?name=${user.username}`);
+      const response = await authenticatedFetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch outreach data');

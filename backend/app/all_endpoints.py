@@ -18,7 +18,8 @@ from app.login import (
     ACCESS_TOKEN_EXPIRE_MINUTES, 
     create_user
 )
-from app.database import update_conversation, add_new_service_user
+from app.database import update_conversation, add_new_service_user, fetch_service_user_checkins, edit_service_user_outreach
+from app.generate_outreach import generate_check_ins_rule_based
 
 # Environment configuration
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -172,6 +173,27 @@ async def service_user_list(name: str):
 async def outreach_list(name: str):
     return get_all_outreach(name)
 
+@app.get("/service_user_check_ins/")
+async def service_user_check_ins(service_user_id: str):
+    """Get all check-ins for a specific service user, ordered by check-in date"""
+    success, result = fetch_service_user_checkins(service_user_id)
+    if success:
+        return result
+    else:
+        raise HTTPException(status_code=400, detail=result)
+    
+@app.post("/service_user_outreach_edit/")
+async def service_user_outreach_edit(check_in_id: str, data: dict):
+    """Handle updates to service user outreach via sidebar"""
+    check_in_date = data.get('check_in')
+    follow_up_message = data.get('follow_up_message')
+    success, result = edit_service_user_outreach(check_in_id, check_in_date, follow_up_message)
+    if success:
+        return result 
+    else:
+        raise HTTPException(status_code=400, detail=result)
+    
+
 @app.post("/new_service_user/")
 async def create_service_user(item: NewWellness):
     print(f"[API] Creating service user: {item.dict()}")
@@ -189,7 +211,21 @@ async def create_service_user(item: NewWellness):
     
     return {"success": True, "message": message, "item": item}
 
-# Socket.IO setup
+class GenerateCheckInsRequest(BaseModel):
+    service_user_id: str
+    conversation_id: str
+
+@app.post("/generate_check_ins/")
+async def generate_check_ins_endpoint(request: GenerateCheckInsRequest):
+    success, result = generate_check_ins_rule_based(request.service_user_id, request.conversation_id)
+    if success:
+        return {"success": True, "check_ins": result}
+    else:
+        raise HTTPException(status_code=400, detail=result)
+    
+
+# Handle Socket Messages
+
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 

@@ -4,6 +4,7 @@ import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
 import { apiPost, apiGet } from '../utils/api';
+import { API_URL } from '../config';
 
 // Initial form state
 const INITIAL_FORM_STATE = {
@@ -14,19 +15,45 @@ const INITIAL_FORM_STATE = {
   location: '',
 };
 
+
+
 const ProfileManager = () => {
   const { user } = useContext(WellnessContext);
+  const [allNames, setAllNames] = useState([{}]);
 
   const [serviceUsers, setServiceUsers] = useState([]);
   const [hasSidebar, setSidebar] = useState(false);
   const [search, setSearch] = useState('');
+  // Form state
+  const [currentPatient, setCurrentPatient] = useState({});
+  const [isEditable, setIsEditable] = useState(false);
+  const [patientName, setPatientName] = useState('');
+  const [lastSession, setLastSession] = useState('');
+  const [nextCheckIn, setNextCheckIn] = useState('');
+  const [followUpMessage, setFollowUpMessage] = useState('');
+  const [checkIns, setCheckIns] = useState([]);
+  const [pendingCheckInEdits, setPendingCheckInEdits] = useState({});
+
+  useEffect(() => {
+    if (currentPatient?.service_user_id && !isEditable) {
+      fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
+        .then(res => res.json())
+        .then(data => setCheckIns(data))
+        .catch(error => {
+          console.error('[Check-ins] Error fetching:', error);
+          setCheckIns([]);
+        });
+    } else {
+      setCheckIns([]);
+    }
+  }, [currentPatient?.service_user_id, isEditable]);
+  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Form state
-  const [currentPatient, setCurrentPatient] = useState(null);
-  const [isEditable, setIsEditable] = useState(false);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
   // Fetch service users
@@ -125,6 +152,100 @@ const ProfileManager = () => {
     }
   }, [formData, user.username, fetchServiceUsers, closeSidebar]);
 
+  const getAllNames = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
+      const res = await response.json()
+      setAllNames(res);
+      console.log('[Load] Got', res.length, 'profiles');
+    } catch (error) {
+      console.error('[Load] Error:', error);
+      setAllNames([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getAllNames();
+  }, [user.username]);
+
+  const handleUpdatePatient = async (updatedData) => {
+    setIsSubmitting(true);
+    try {
+      // Update patient's last session
+      if (updatedData.last_session !== undefined) {
+        const response = await fetch(`${API_URL}/service_user/${currentPatient.service_user_id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            last_session: updatedData.last_session
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update patient');
+        }
+
+        // Update local state
+        setCurrentPatient(prev => ({
+          ...prev,
+          last_session: updatedData.last_session
+        }));
+        setLastSession(updatedData.last_session);
+      }
+
+      // Refresh the list
+      await getAllNames();
+      
+      alert('Changes saved successfully!');
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      alert(`Failed to update: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveAllCheckIns = async (allEdits) => {
+    setIsSubmitting(true);
+    try {
+      // Save all modified check-ins
+      for (const [id, data] of Object.entries(allEdits)) {
+        const response = await fetch(`${API_URL}/service_user_check_ins/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            check_in: data.check_in,
+            follow_up_message: data.follow_up_message
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update check-in ${id}`);
+        }
+      }
+
+      // Refresh check-ins after all updates
+      const checkInsResponse = await fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
+      const updatedCheckIns = await checkInsResponse.json();
+      setCheckIns(updatedCheckIns);
+
+      alert('All changes saved successfully!');
+      setPendingCheckInEdits({}); // Clear pending edits
+    } catch (error) {
+      console.error('Error updating check-ins:', error);
+      alert(`Failed to update check-ins: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="container">
       <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
@@ -199,7 +320,31 @@ const ProfileManager = () => {
           )}
         </div>
       </div>
-
+      
+      <Sidebar 
+      isOpen={hasSidebar}
+      content={
+        hasSidebar ? (
+          <SidebarInformation
+            checkIns={checkIns}
+            patient={currentPatient}
+            isEditable={isEditable}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit}
+            onUpdatePatient={handleUpdatePatient}
+            onSaveAllCheckIns={handleSaveAllCheckIns}
+            pendingCheckInEdits={pendingCheckInEdits}
+            setPendingCheckInEdits={setPendingCheckInEdits}
+            onClose={() => setSidebar(false)}
+            patientName={patientName}
+            setPatientName={setPatientName}
+            lastSession={lastSession}
+            setLastSession={setLastSession}
+          />
+        ) : null
+      }
+    />
+{/* 
       <Sidebar
         isOpen={hasSidebar}
         content={
@@ -215,7 +360,7 @@ const ProfileManager = () => {
             />
           ) : null
         }
-      />
+      /> */}
     </div>
   );
 };
