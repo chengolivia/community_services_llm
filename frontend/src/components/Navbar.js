@@ -1,6 +1,5 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import '../App.css';
 import HomeIcon from '../icons/Home.png';
 import WellnessGoalsIcon from '../icons/WellnessGoalsAssistant.png';
 import ProfileManagerIcon from '../icons/ProfileManager.png';
@@ -13,7 +12,6 @@ function Navbar() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { organization, user } = useContext(WellnessContext);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);

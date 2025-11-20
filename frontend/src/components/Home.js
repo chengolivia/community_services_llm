@@ -1,8 +1,9 @@
 import React, { useContext, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import '../App.css';
 import Logo from '../icons/Logo.png';
 import {WellnessContext } from './AppStateContextProvider';
+import '../styles/pages/home.css';
+
 
 function Home() {
   const { organization, setOrganization, user } = useContext(WellnessContext);

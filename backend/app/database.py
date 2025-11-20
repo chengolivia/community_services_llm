@@ -180,7 +180,7 @@ def generate_service_user_id(provider_username: str, patient_name: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]  # short, unique, anonymized
 
 
-def add_new_service_user(provider_username, patient_name, last_session, next_checkin, followup_message):
+def add_new_service_user(provider_username, patient_name, last_session, next_checkin, location,followup_message):
     """Create or update a service user's record using a deterministic hashed ID."""
     
     conn = psycopg.connect(CONNECTION_STRING)
@@ -196,14 +196,7 @@ def add_new_service_user(provider_username, patient_name, last_session, next_che
         INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (service_user_id) DO NOTHING
-        ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
-
-        # # Insert or update outreach details
-        # cursor.execute('''
-        # INSERT INTO outreach_details 
-        # (service_user_id, last_session, check_in, follow_up_message)
-        # VALUES (%s, %s, %s, %s)
-        # ''', (service_user_id, last_session, next_checkin, followup_message))
+        ''', (service_user_id, patient_name, provider_username, location, "Active"))
 
         conn.commit()
         return True, f"Check-in saved successfully (ID: {service_user_id})"
@@ -213,7 +206,26 @@ def add_new_service_user(provider_username, patient_name, last_session, next_che
         print(f"[DB Error] {e}")
         return False, f"Database error: {str(e)}"
     finally:
+        conn.close() 
+
+def edit_service_user_outreach(check_in_id, date, message):
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+        UPDATE outreach_details
+        SET check_in = %s, follow_up_message = %s
+        WHERE id = %s
+        ''', (date, message, check_in_id))
+        conn.commit()
+        return True, "Success"
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
         conn.close()
+        
 
 
 def fetch_service_user_checkins(service_user_id):
