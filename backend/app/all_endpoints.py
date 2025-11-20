@@ -138,11 +138,32 @@ async def register(register_data: RegisterRequest):
 async def root():
     return {"status": "ok", "message": "PeerCopilot Backend Running"}
 
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+def warmup_models():
+    """Background task to load embeddings after server starts"""
+    time.sleep(30)  # Wait for server to be fully ready
+    try:
+        print("[Warmup] Loading embeddings...")
+        from app.rag_utils import get_model_and_indices
+        get_model_and_indices()
+        print("[Warmup] Embeddings loaded successfully")
+    except Exception as e:
+        print(f"[Warmup] Failed to load embeddings: {e}")
+
+threading.Thread(target=warmup_models, daemon=True).start()
+
 # Service user endpoints
+class NewServiceUser(BaseModel):
+    patientName: str
+    lastSession: str
+    nextCheckIn: str
+    followUpMessage: str
+    username: str
+
 @app.get("/service_user_list/")
 async def service_user_list(name: str):
     return get_all_service_users(name)
