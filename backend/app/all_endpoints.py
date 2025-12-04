@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 import threading
 import json
 import time
@@ -21,6 +24,7 @@ from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.database import update_conversation, add_new_service_user, fetch_service_user_checkins, edit_service_user_outreach
 from app.generate_outreach import generate_check_ins_rule_based
+from app.notifications import notification_job
 
 import socketio
 from datetime import timedelta
@@ -32,7 +36,18 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_DEBUG_CPU_TYPE"] = "5"
 
-app = FastAPI()
+scheduler = BackgroundScheduler()
+scheduler.add_job(notification_job, CronTrigger(minute='*/15'), id='send_notifications')
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.start()
+    print("Scheduler started")
+    yield
+    scheduler.shutdown()
+    print("Scheduler stopped")
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
