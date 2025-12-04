@@ -29,7 +29,7 @@ function Register() {
 
     setIsLoading(true);
     try {
-      const response = await authenticatedFetch(`/api/auth/register`, {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, organization }),
