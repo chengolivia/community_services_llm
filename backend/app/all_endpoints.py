@@ -240,15 +240,18 @@ class NewServiceUser(BaseModel):
     username: str
 
 @app.get("/service_user_list/")
-async def service_user_list(name: str):
-    return get_all_service_users(name)
+async def service_user_list(current_user: UserData = Depends(get_current_user)):
+    return get_all_service_users(current_user.username, current_user.organization)
 
 @app.get("/outreach_list/")
-async def outreach_list(name: str):
-    return get_all_outreach(name)
+async def outreach_list(current_user: UserData = Depends(get_current_user)):
+    return get_all_outreach(current_user.username, current_user.organization)
 
 @app.get("/service_user_check_ins/")
-async def service_user_check_ins(service_user_id: str):
+async def service_user_check_ins(
+    service_user_id: str = None,
+    current_user: UserData = Depends(get_current_user)
+):
     """Get all check-ins for a specific service user, ordered by check-in date"""
     success, result = fetch_service_user_checkins(service_user_id)
     if success:

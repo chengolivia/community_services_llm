@@ -33,6 +33,7 @@ class LoginResponse(BaseModel):
 class UserData(BaseModel):
     username: str
     role: str
+    organization: str
 
 # JWT Token Verification Dependency
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserData:
@@ -52,11 +53,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         role: str = payload.get("role")
+        organization: str = payload.get("organization")
         
         if username is None or role is None:
             raise credentials_exception
             
-        return UserData(username=username, role=role)
+        return UserData(username=username, role=role, organization=organization)
     except InvalidTokenError:
         raise credentials_exception
 

@@ -3,8 +3,7 @@ import Sidebar from './Sidebar';
 import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
-import { apiPost, apiGet } from '../utils/api';
-import { API_URL } from '../config';
+import { apiPost, apiGet, authenticatedFetch } from '../utils/api';
 
 // Initial form state
 const INITIAL_FORM_STATE = {
@@ -36,7 +35,7 @@ const ProfileManager = () => {
 
   useEffect(() => {
     if (currentPatient?.service_user_id && !isEditable) {
-      fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
+      authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
         .then(res => res.json())
         .then(data => setCheckIns(data))
         .catch(error => {
@@ -64,7 +63,7 @@ const ProfileManager = () => {
     setError(null);
     
     try {
-      const data = await apiGet(`/service_user_list/?name=${user.username}`);
+      const data = await apiGet(`/service_user_list/`);
       setServiceUsers(data || []);
       console.log('[ProfileManager] Loaded', data?.length || 0, 'profiles');
     } catch (err) {
@@ -155,7 +154,7 @@ const ProfileManager = () => {
   const getAllNames = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/service_user_list/?name=${user.username}`);
+      const response = await authenticatedFetch(`$/service_user_list/`);
       const res = await response.json()
       setAllNames(res);
       console.log('[Load] Got', res.length, 'profiles');
@@ -176,7 +175,7 @@ const ProfileManager = () => {
     try {
       // Update patient's last session
       if (updatedData.last_session !== undefined) {
-        const response = await fetch(`${API_URL}/service_user/${currentPatient.service_user_id}`, {
+        const response = await authenticatedFetch(`/service_user/${currentPatient.service_user_id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -215,7 +214,7 @@ const ProfileManager = () => {
     try {
       // Save all modified check-ins
       for (const [id, data] of Object.entries(allEdits)) {
-        const response = await fetch(`${API_URL}/service_user_check_ins/${id}`, {
+        const response = await authenticatedFetch(`/service_user_check_ins/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -232,7 +231,7 @@ const ProfileManager = () => {
       }
 
       // Refresh check-ins after all updates
-      const checkInsResponse = await fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
+      const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
       const updatedCheckIns = await checkInsResponse.json();
       setCheckIns(updatedCheckIns);
 

@@ -2,6 +2,8 @@ import React, { useContext, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
 import {WellnessContext } from './AppStateContextProvider';
+import { authenticatedFetch } from '../utils/api';
+
 import { API_URL } from '../config';
 
 import '../styles/pages/home.css';
@@ -39,7 +41,7 @@ function Home() {
       return;
     }
     try {
-      const response = await fetch(`${API_URL}/api/notification-settings`, {
+      const response = await authenticatedFetch(`/api/notification-settings`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -76,7 +78,7 @@ function Home() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/notification-settings`, {
+      const response = await authenticatedFetch(`/api/notification-settings`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
