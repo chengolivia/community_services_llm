@@ -249,4 +249,47 @@ def fetch_service_user_checkins(service_user_id):
         return False, str(e)
     finally:
         conn.close()
+        
+def fetch_provider_checkins_by_date(provider, date):
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+        SELECT p.service_user_id, p.service_user_name,
+            o.check_in, o.follow_up_message
+        FROM profiles p
+        INNER JOIN outreach_details o ON p.service_user_id = o.service_user_id
+        WHERE p.provider = %s
+            AND o.check_in = %s
+        ''', (provider, date))
+        
+        rows = cursor.fetchall()
+        result = [dict(row) for row in rows]
+        return True, result
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
 
+def fetch_providers_to_notify_checkins(time_begin, time_end):
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT id, username, email, notification_time
+            FROM users 
+            WHERE notifications_enabled = TRUE
+                AND email IS NOT NULL
+                AND notification_time BETWEEN %s AND %s
+        ''', (time_begin, time_end))
+        rows = cursor.fetchall()
+        result = [dict(row) for row in rows]
+        return True, result
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
