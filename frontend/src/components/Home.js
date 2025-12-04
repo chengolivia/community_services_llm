@@ -1,13 +1,20 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
 import {WellnessContext } from './AppStateContextProvider';
+import { API_URL } from '../config';
+
 import '../styles/pages/home.css';
 
 
 function Home() {
   const { organization, setOrganization, user } = useContext(WellnessContext);
-  
+  const [showSettings, setShowSettings] = useState(false);
+  const [email, setEmail] = useState('');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationTime, setNotificationTime] = useState('08:00');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
   const handleOrganizationChange = (e) => {
     const newOrg = e.target.value.toLowerCase();
     console.log("Setting organization to:", newOrg); // For debugging
@@ -18,6 +25,86 @@ function Home() {
     console.log("Current organization:", organization);
   }, [organization]);
 
+  useEffect(() => {
+    if (showSettings) {
+      fetchSettings();
+    }
+  }, [showSettings]);
+
+  const fetchSettings = async () => {
+    const token = user.token || localStorage.getItem('accessToken');
+    
+    if (!token) {
+      setMessage('Not authenticated. Please log in again.');
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/notification-settings`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+          const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Expected JSON but got:', contentType);
+      console.error('Response status:', response.status);
+      return;
+    }
+      const data = await response.json();
+      if (data.success) {
+        setEmail(data.settings.email || '');
+        setNotificationsEnabled(data.settings.notifications_enabled || false);
+        setNotificationTime(data.settings.notification_time || '08:00');
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  };
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    const token = user.token || localStorage.getItem('accessToken');
+    
+    if (!token) {
+      setMessage('Not authenticated. Please log in again.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/notification-settings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: user.username,
+          email,
+          notifications_enabled: notificationsEnabled,
+          notification_time: notificationTime
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setMessage('Settings saved successfully!');
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage(`Error: ${data.message}`);
+      }
+    } catch (error) {
+      setMessage('Error saving settings');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
     
   // Redirect to login if not authenticated
   if (user.username === '' || !user.isAuthenticated) {
@@ -64,6 +151,64 @@ function Home() {
           <option value="clhs">CLHS</option>
         </select>
       </div>
+      <button 
+        className="settings-toggle-button"
+        onClick={() => setShowSettings(!showSettings)}
+      >
+        {showSettings ? 'Hide Settings' : 'Notification Settings'}
+      </button>
+      {showSettings && (
+        <div className="notification-settings-panel">
+          <h3>Notification Settings</h3>
+          <form onSubmit={handleSaveSettings} className="settings-form">
+            <div className="form-group">
+              <label htmlFor="email">Email Address:</label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                required
+              />
+            </div>
+
+            <div className="form-group checkbox-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={notificationsEnabled}
+                  onChange={(e) => setNotificationsEnabled(e.target.checked)}
+                />
+                Enable email notifications for check-ins
+              </label>
+            </div>
+
+            {notificationsEnabled && (
+              <div className="form-group">
+                <label htmlFor="notification-time">Daily notification time:</label>
+                <input
+                  type="time"
+                  id="notification-time"
+                  value={notificationTime}
+                  onChange={(e) => setNotificationTime(e.target.value)}
+                />
+                <small>You'll receive a daily summary of upcoming check-ins at this time</small>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="settings-toggle-button">
+              {loading ? 'Saving...' : 'Save Settings'}
+            </button>
+
+            {message && (
+              <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>
+                {message}
+              </div>
+            )}
+          </form>
+        </div>
+      )}
     </div>
   );
 }

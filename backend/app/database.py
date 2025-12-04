@@ -249,4 +249,121 @@ def fetch_service_user_checkins(service_user_id):
         return False, str(e)
     finally:
         conn.close()
+        
+def fetch_provider_checkins_by_date(provider, date):
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+        SELECT p.service_user_id, p.service_user_name,
+            o.check_in, o.follow_up_message
+        FROM profiles p
+        INNER JOIN outreach_details o ON p.service_user_id = o.service_user_id
+        WHERE p.provider = %s
+            AND o.check_in = %s
+        ''', (provider, date))
+        
+        rows = cursor.fetchall()
+        result = [dict(row) for row in rows]
+        return True, result
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
 
+def fetch_providers_to_notify_checkins(time_begin, time_end):
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT id, username, email, notification_time
+            FROM users 
+            WHERE notifications_enabled = TRUE
+                AND email IS NOT NULL
+                AND notification_time BETWEEN %s AND %s
+        ''', (time_begin, time_end))
+        rows = cursor.fetchall()
+        result = [dict(row) for row in rows]
+        return True, result
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
+
+def update_notification_settings(username, email, notifications_enabled, notification_time):
+    """
+    Update user's email and notification settings
+    
+    Arguments:
+        username: Username to update
+        email: Email address
+        notifications_enabled: Boolean for notifications on/off
+        notification_time: Time string in HH:MM format (e.g., "09:00")
+    
+    Returns:
+        Tuple: (success: bool, message: str)
+    """
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+        UPDATE users
+        SET email = %s, 
+            notifications_enabled = %s, 
+            notification_time = %s
+        WHERE username = %s
+        ''', (email, notifications_enabled, notification_time, username))
+        
+        conn.commit()
+        
+        if cursor.rowcount == 0:
+            return False, "User not found"
+        
+        return True, "Settings updated successfully"
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"[DB Error] {e}")
+        return False, f"Database error: {str(e)}"
+    finally:
+        conn.close()
+
+
+def get_notification_settings(username):
+    """
+    Get user's notification settings
+    
+    Arguments:
+        username: Username to query
+    
+    Returns:
+        Tuple: (success: bool, settings: dict or error message)
+    """
+    conn = psycopg.connect(CONNECTION_STRING)
+    conn.row_factory = dict_row
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+        SELECT email, notifications_enabled, notification_time
+        FROM users
+        WHERE username = %s
+        ''', (username,))
+        
+        row = cursor.fetchone()
+        
+        if row is None:
+            return False, "User not found"
+        
+        return True, dict(row)
+        
+    except Exception as e:
+        print(f"[DB Error] {e}")
+        return False, f"Database error: {str(e)}"
+    finally:
+        conn.close()
