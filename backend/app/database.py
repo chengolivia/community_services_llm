@@ -180,7 +180,7 @@ def generate_service_user_id(provider_username: str, patient_name: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]  # short, unique, anonymized
 
 
-def add_new_service_user(provider_username, patient_name, last_session, next_checkin, followup_message):
+def add_new_service_user(provider_username, patient_name, last_session, next_checkin, location,followup_message):
     """Create or update a service user's record using a deterministic hashed ID."""
     
     conn = psycopg.connect(CONNECTION_STRING)
@@ -196,7 +196,7 @@ def add_new_service_user(provider_username, patient_name, last_session, next_che
         INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (service_user_id) DO NOTHING
-        ''', (service_user_id, patient_name, provider_username, "Freehold, New Jersey", "Active"))
+        ''', (service_user_id, patient_name, provider_username, location, "Active"))
 
         conn.commit()
         return True, f"Check-in saved successfully (ID: {service_user_id})"

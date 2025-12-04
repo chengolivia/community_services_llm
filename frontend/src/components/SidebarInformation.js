@@ -6,12 +6,14 @@ import ProfileIcon from '../icons/Profile.png';
 import React, { useRef, useContext, useEffect, useState } from 'react';
 
 
-// New PatientSidebar component
+// Updated SidebarInformation component
 const SidebarInformation = ({ 
   patient = {}, 
   checkIns = [],
   isEditable = false,
   isSubmitting = false, 
+  formData = {},
+  onFormChange,
   onSubmit, 
   onUpdatePatient,
   onSaveAllCheckIns,
@@ -93,10 +95,37 @@ const SidebarInformation = ({
                 type="text" 
                 id="patientName" 
                 placeholder="Enter service user name"
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
+                value={formData.patientName || ''}
+                onChange={(e) => onFormChange('patientName', e.target.value)}
               />
             </div>
+          </div>
+        )}
+        {isEditable && (
+          <div className="input-section">
+            <div className="form-group">
+              <label className="section-label" htmlFor="location">
+                <img src={ProfileIcon} alt="Location Icon" className="icon" />
+                Location
+              </label>
+              <input 
+                type="text" 
+                id="location" 
+                placeholder="Enter location (e.g., city, clinic name)"
+                value={formData.location || ''}
+                onChange={(e) => onFormChange('location', e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {!isEditable && patient.location && (
+          <div className="info-section">
+            <div className="section-label">
+              <img src={ProfileIcon} alt="Location Icon" className="icon" />
+              Location
+            </div>
+            <div className="section-content">{patient.location}</div>
           </div>
         )}
 
