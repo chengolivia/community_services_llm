@@ -18,3 +18,5 @@ PyJWT
 Psycopg
 pgvector
 scikit-learn
+requests
+apscheduler
