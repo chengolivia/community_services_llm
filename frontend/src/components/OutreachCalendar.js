@@ -2,17 +2,15 @@ import React, { useEffect, useState, useContext, useCallback, useMemo } from 're
 import Sidebar from './Sidebar';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
-import { authenticatedFetch } from '../utils/api';
+import { authenticatedFetch, apiGet } from '../utils/api';
 import '../styles/pages/calendar.css';
 import { API_URL } from '../config';
-
 
 // Constants
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
-
 
 const COLORS = [
   '#FFBC2A', '#9F69AF', '#F5511F', '#79C981', '#34A2ED',
@@ -23,52 +21,27 @@ const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'F
 
 // Utility functions
 const parseCheckInDate = (checkInStr) => {
-  // Handle both YYYY-MM-DD and MM-DD-YYYY formats
+  if (!checkInStr) {
+    console.warn('Invalid or missing check-in date:', checkInStr);
+    return null;
+  }
   const parts = checkInStr.split('-').map(Number);
   
-  // Check if first part is a year (4 digits) - YYYY-MM-DD format
   if (parts[0] > 31) {
     const [year, month, day] = parts;
     return new Date(year, month - 1, day);
   } else {
-    // MM-DD-YYYY format
     const [month, day, year] = parts;
     return new Date(year, month - 1, day);
   }
 };
 
 const getDateKey = (date) => {
-  // Create a key for the specific date (not week start)
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();
   return `${year}-${month}-${day}`;
 };
-
-
-// const OutreachCalendar = () => {
-//     const [weekCode, setWeekCode] = useState(null);
-//     const [hasSidebar, setSidebar] = useState(false);
-//     const [search, setSearch] = useState('');
-//     const [allOutreach, setAllOutreach] = useState([]);
-//     const [currentPatient, setCurrentPatient] = useState({});
-//     const { user } = useContext(WellnessContext);
-//     const [checkIns, setCheckIns] = useState([]);
-
-//     useEffect(() => {
-//         if (currentPatient?.service_user_id) {
-//             fetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
-//                 .then(res => res.json())
-//                 .then(data => setCheckIns(data))
-//                 .catch(error => {
-//                     console.error('[Check-ins] Error fetching:', error);
-//                     setCheckIns([]);
-//                 });
-//         } else {
-//             setCheckIns([]);
-//         }
-//     }, [currentPatient?.service_user_id]);
-
 
 const OutreachCalendar = () => {
   const { user } = useContext(WellnessContext);
@@ -79,21 +52,41 @@ const OutreachCalendar = () => {
   const [hasSidebar, setSidebar] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Add missing state for sidebar
+  const [checkIns, setCheckIns] = useState([]);
+  const [pendingCheckInEdits, setPendingCheckInEdits] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [patientName, setPatientName] = useState('');
+  const [lastSession, setLastSession] = useState('');
+
+  // Fetch check-ins when patient changes
+  useEffect(() => {
+    const fetchCheckIns = async () => {
+      if (currentPatient?.service_user_id) {
+        try {
+          const data = await apiGet(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
+          setCheckIns(data);
+        } catch (error) {
+          console.error('[Check-ins] Error fetching:', error);
+          setCheckIns([]);
+        }
+      } else {
+        setCheckIns([]);
+      }
+    };
+    
+    fetchCheckIns();
+  }, [currentPatient?.service_user_id]);
 
   // Fetch outreach data
   const fetchOutreach = useCallback(async () => {
-    if (!user?.username) return;
-
     try {
       setIsLoading(true);
       setError(null);
-      const response = await authenticatedFetch(`${API_URL}/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch outreach data');
-      }
-      
-      const data = await response.json();
+      const data = await apiGet(`/service_user_list/`);
+      console.log('Outreach data:', data);
       setAllOutreach(data);
     } catch (err) {
       console.error('Error fetching outreach:', err);
@@ -101,7 +94,7 @@ const OutreachCalendar = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.username]);
+  }, []);
 
   useEffect(() => {
     fetchOutreach();
@@ -115,10 +108,8 @@ const OutreachCalendar = () => {
 
     allOutreach.forEach((outreach) => {
       const date = parseCheckInDate(outreach.check_in);
-      
-      // Skip invalid dates
-      if (isNaN(date.getTime())) {
-        console.warn('Invalid date for outreach:', outreach.check_in);
+      if (!date || isNaN(date.getTime())) {
+        console.warn('Skipping outreach with invalid date:', outreach);
         return;
       }
       
@@ -131,15 +122,14 @@ const OutreachCalendar = () => {
         };
       }
 
-      // Assign consistent color per patient
-      if (!patientColors[outreach.name]) {
-        patientColors[outreach.name] = COLORS[colorIndex % COLORS.length];
+      if (!patientColors[outreach.service_user_name]) {
+        patientColors[outreach.service_user_name] = COLORS[colorIndex % COLORS.length];
         colorIndex++;
       }
 
       grouped[dateKey].outreach.push({
         ...outreach,
-        color: patientColors[outreach.name]
+        color: patientColors[outreach.service_user_name]
       });
     });
 
@@ -149,7 +139,6 @@ const OutreachCalendar = () => {
   // Filter and render dates
   const dateComponents = useMemo(() => {
     const sortedDates = Object.keys(outreachByDate).sort((a, b) => {
-      // Sort by actual date, oldest first
       return outreachByDate[a].date.getTime() - outreachByDate[b].date.getTime();
     });
     
@@ -161,11 +150,11 @@ const OutreachCalendar = () => {
       const day = date.getDate();
       const dayOfWeek = DAYS_OF_WEEK[date.getDay()];
 
-      const filteredOutreach = outreach.filter((item) =>
-        item.name.toLowerCase().includes(searchLower)
-      );
+      const filteredOutreach = outreach.filter((item) => {
+        const name = (item.name || item.service_user_name || '').toLowerCase();
+        return name.includes(searchLower);
+      });
 
-      // Skip dates with no matching results
       if (filteredOutreach.length === 0 && search) {
         return null;
       }
@@ -180,15 +169,15 @@ const OutreachCalendar = () => {
           </div>
           <ul>
             {filteredOutreach.map((item) => (
-              <li key={item.id} onClick={() => handlePatientClick(item)}>
+              <li key={item.service_user_id} onClick={() => handlePatientClick(item)}>
                 <span className="dot" style={{ background: item.color }} />
-                Follow-up Wellness Check-in w/ {item.name}
+                Follow-up Wellness Check-in w/ {item.name || item.service_user_name}
               </li>
             ))}
           </ul>
         </div>
       );
-    }).filter(Boolean); // Remove null entries
+    }).filter(Boolean);
   }, [outreachByDate, search]);
 
   // Handlers
@@ -197,12 +186,7 @@ const OutreachCalendar = () => {
   }, []);
 
   const handlePatientClick = useCallback((patient) => {
-    setCurrentPatient({
-      service_user_name: patient.name || '',
-      last_session: patient.last_session || '',
-      check_in: patient.check_in || '',
-      follow_up_message: patient.follow_up_message || ''
-    });
+    setCurrentPatient(patient); // Pass the full patient object
     setSidebar(true);
   }, []);
 
@@ -211,7 +195,61 @@ const OutreachCalendar = () => {
     setCurrentPatient(null);
   }, []);
 
-  // Get current date info
+  // Add handlers for updating data
+  const handleUpdatePatient = async (updatedData) => {
+    setIsSubmitting(true);
+    try {
+      if (updatedData.last_session !== undefined) {
+        await authenticatedFetch(`/service_user/${currentPatient.service_user_id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            last_session: updatedData.last_session
+          })
+        });
+
+        setCurrentPatient(prev => ({
+          ...prev,
+          last_session: updatedData.last_session
+        }));
+      }
+
+      await fetchOutreach();
+      alert('Changes saved successfully!');
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      alert(`Failed to update: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveAllCheckIns = async (allEdits) => {
+    setIsSubmitting(true);
+    try {
+      for (const [id, data] of Object.entries(allEdits)) {
+        await authenticatedFetch(`/service_user_check_ins/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            check_in: data.check_in,
+            follow_up_message: data.follow_up_message
+          })
+        });
+      }
+
+      const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
+      const updatedCheckIns = await checkInsResponse.json();
+      setCheckIns(updatedCheckIns);
+
+      alert('All changes saved successfully!');
+      setPendingCheckInEdits({});
+    } catch (error) {
+      console.error('Error updating check-ins:', error);
+      alert(`Failed to update check-ins: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const currentMonth = MONTHS[new Date().getMonth()];
   const currentYear = new Date().getFullYear();
 
@@ -263,10 +301,20 @@ const OutreachCalendar = () => {
         content={
           hasSidebar && currentPatient ? (
             <SidebarInformation
+              checkIns={checkIns}
               patient={currentPatient}
               isEditable={false}
+              isSubmitting={isSubmitting}
               onSubmit={() => {}}
+              onUpdatePatient={handleUpdatePatient}
+              onSaveAllCheckIns={handleSaveAllCheckIns}
+              pendingCheckInEdits={pendingCheckInEdits}
+              setPendingCheckInEdits={setPendingCheckInEdits}
               onClose={handleCloseSidebar}
+              patientName={patientName}
+              setPatientName={setPatientName}
+              lastSession={lastSession}
+              setLastSession={setLastSession}
             />
           ) : null
         }

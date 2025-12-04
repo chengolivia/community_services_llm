@@ -2,6 +2,8 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WellnessContext } from './AppStateContextProvider';
 import Logo from '../icons/Logo.png';
+import { authenticatedFetch } from '../utils/api';
+
 import { API_URL } from '../config';
 import { Link } from 'react-router-dom';
 import '../styles/pages/login.css';
@@ -21,7 +23,7 @@ function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await authenticatedFetch(`/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,12 +1,10 @@
 import os
 import psycopg
 from psycopg.rows import dict_row
-from app.generate_outreach import autogenerate_conversations
 from app.database import CONNECTION_STRING
 
-def get_all_service_users(provider_username):
+def get_all_service_users(provider_username, organization):
     """Get all service users for a given provider with their latest outreach details."""
-    # autogenerate_conversations(provider_username)
 
     conn = psycopg.connect(CONNECTION_STRING)
     conn.row_factory = dict_row  # Return results as dictionaries
@@ -31,7 +29,7 @@ def get_all_service_users(provider_username):
     
     return result
 
-def get_all_outreach(provider_username):
+def get_all_outreach(provider_username, organization):
     """Get all outreach details for service users of a given provider."""
     # autogenerate_conversations(provider_username)
     

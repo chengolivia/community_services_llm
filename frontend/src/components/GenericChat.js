@@ -8,6 +8,8 @@ import '../styles/components/chat.css';
 import { WellnessContext } from './AppStateContextProvider';
 import { apiGet } from '../utils/api';
 import { API_URL } from '../config';
+import { authenticatedFetch } from '../utils/api';
+
 
 // Constants
 const SOCKET_CONFIG = {
@@ -146,10 +148,12 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   useEffect(() => {
     const fetchServiceUsers = async () => {
       if (!user?.username) return;
-      
+      const token = localStorage.getItem('accessToken');
+  console.log('[DEBUG] Token exists:', !!token);
+  console.log('[DEBUG] Token value:', token?.substring(0, 20) + '...');
       try {
         console.log('[Dropdown] Fetching service users...');
-        const data = await apiGet(`/service_user_list/?name=${user.username}`);
+        const data = await apiGet(`/service_user_list/`);
         console.log('[Dropdown] Received data:', data);
         setServiceUsers(data);
       } catch (error) {
@@ -217,7 +221,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   }, [socketServerUrl, setConversation]);
 
   useEffect(() => {
-    fetch(`${API_URL}/service_user_list/?name=${user.username}`)  
+    authenticatedFetch(`/service_user_list/`)  
       .then(res => res.json())
       .then(setServiceUsers)
       .catch(console.error);
@@ -226,7 +230,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   // Fetch check-ins when service user changes
   useEffect(() => {
     if (selectedServiceUser) {
-      fetch(`${API_URL}/service_user_check_ins/?service_user_id=${selectedServiceUser}`)
+      authenticatedFetch(`/service_user_check_ins/?service_user_id=${selectedServiceUser}`)
         .then(res => res.json())
         .then(data => setCheckIns(data))
         .catch(error => {
@@ -394,7 +398,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     
     setGeneratingCheckIns(true);
     try {
-      const response = await fetch(`${API_URL}/generate_check_ins/`, {
+      const response = await authenticatedFetch(`/generate_check_ins/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_user_id: selectedServiceUser, 
@@ -406,7 +410,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       if (data.success) {
         alert(`Generated ${data.check_ins.length} check-ins successfully!`);
         // Refresh check-ins
-        const refreshResponse = await fetch(`${API_URL}/service_user_check_ins/?service_user_id=${selectedServiceUser}`);
+        const refreshResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${selectedServiceUser}`);
         const refreshedCheckIns = await refreshResponse.json();
         setCheckIns(refreshedCheckIns);
       }

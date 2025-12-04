@@ -3,10 +3,8 @@ import ClockIcon from '../icons/Clock.png';
 import EditIcon from '../icons/Pencil.png';
 import ChatIcon from '../icons/Chat.png';
 import ProfileIcon from '../icons/Profile.png';
-import React, { useRef, useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-
-// Updated SidebarInformation component
 const SidebarInformation = ({ 
   patient = {}, 
   checkIns = [],
@@ -17,39 +15,39 @@ const SidebarInformation = ({
   onSubmit, 
   onUpdatePatient,
   onSaveAllCheckIns,
-  pendingCheckInEdits,
-  setPendingCheckInEdits,
   onClose,
-  patientName, 
-  setPatientName,
-  lastSession, 
-  setLastSession,
 }) => {
-  const formatDate = (dateString) => {
+  // Manage state internally
+  const [lastSession, setLastSession] = useState('');
+  const [pendingCheckInEdits, setPendingCheckInEdits] = useState({});
+
+  // Helper to format date for INPUT (YYYY-MM-DD)
+  const formatDateForInput = (dateString) => {
     if (!dateString) return '';
-    const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(year, month - 1, day); // month is 0-indexed 
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    
+    // If already in YYYY-MM-DD format, return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   };
 
-  const globalClassName = isEditable ? "input-section" : "info-section";
-
-  const [editedData, setEditedData] = useState({
-    patientName: patient.service_user_name || '',
-    lastSession: formatDate(patient.last_session),
-  });
-
-  
+  // Initialize when patient changes
   useEffect(() => {
-    setEditedData({
-      patientName: patient.service_user_name || '',
-      lastSession: formatDate(patient.last_session),
-    });
-  }, [patient]);
+    if (patient?.last_session) {
+      setLastSession(formatDateForInput(patient.last_session));
+    } else {
+      setLastSession('');
+    }
+    setPendingCheckInEdits({}); // Reset edits when patient changes
+  }, [patient?.service_user_id]);
 
   const handleCheckInEdit = (checkInId, updatedData) => {
     setPendingCheckInEdits(prev => ({
@@ -72,6 +70,7 @@ const SidebarInformation = ({
     }
   };
 
+  const globalClassName = isEditable ? "input-section" : "info-section";
 
   return (
     <form onSubmit={(e) => {
@@ -101,6 +100,7 @@ const SidebarInformation = ({
             </div>
           </div>
         )}
+        
         {isEditable && (
           <div className="input-section">
             <div className="form-group">
@@ -134,19 +134,14 @@ const SidebarInformation = ({
             <img src={CalendarIcon} alt="Calendar Icon" className="icon" />
             Last session
           </div>
-          {(
-            <input 
-              type="date" 
-              id="lastSession"
-              value={lastSession || " "}
-              onChange={(e) => setLastSession(e.target.value)}
-            />
-          )}
+          <input 
+            type="date" 
+            id="lastSession"
+            value={lastSession}
+            onChange={(e) => setLastSession(e.target.value)}
+          />
         </div>
         
-        
-       
-        {/* Replace single check-in with multiple check-ins */}
         {checkIns.length > 0 && (
           <div>
             <div className="section-label" style={{marginLeft: "20px", marginTop: "16px"}}>
@@ -158,23 +153,21 @@ const SidebarInformation = ({
                 key={checkIn.id || index} 
                 checkIn={checkIn}
                 onEdit={handleCheckInEdit}
-                formatDate={formatDate}
               />
             ))}
           </div>
         )}
         
-        {(<div className="save-button-container">
-            <button 
-              onClick={handleSaveAll} 
-              disabled={isSubmitting}
-              type="button" 
-              className="save-button"
-            >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>)
-          }
+        <div className="save-button-container">
+          <button 
+            onClick={handleSaveAll} 
+            disabled={isSubmitting}
+            type="button" 
+            className="save-button"
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -183,7 +176,15 @@ const SidebarInformation = ({
 const CheckInItem = ({checkIn, onEdit}) => {
   const formatDateForInput = (dateString) => {
     if (!dateString) return '';
+    
+    // If already in YYYY-MM-DD, return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
@@ -192,7 +193,7 @@ const CheckInItem = ({checkIn, onEdit}) => {
 
   const [editedCheckIn, setEditedCheckIn] = useState({
     checkInDate: formatDateForInput(checkIn.check_in),
-    message: checkIn.follow_up_message
+    message: checkIn.follow_up_message || ''
   });
 
   const handleChange = (field, value) => {
@@ -208,6 +209,7 @@ const CheckInItem = ({checkIn, onEdit}) => {
       follow_up_message: field === 'message' ? value : editedCheckIn.message
     });
   };
+
   return (
     <div className="check-in-item" style={{
       margin: "10px 20px",
@@ -221,15 +223,11 @@ const CheckInItem = ({checkIn, onEdit}) => {
         <input 
           type="date"
           value={editedCheckIn.checkInDate}
-          onChange={(e) => setEditedCheckIn(prev => ({
-            ...prev,
-            checkInDate: e.target.value
-          }))}
+          onChange={(e) => handleChange('checkInDate', e.target.value)}
           style={{ border: "1px solid #ccc", padding: "5px", borderRadius: "4px" }}
         />
       </div>
       
-      {/* Remove the message-box wrapper and use a plain div */}
       <div style={{marginTop: "10px"}}>
         <div style={{display: "flex", alignItems: "center", marginBottom: "5px"}}>
           <img src={ChatIcon} alt="Chat Icon" className="icon" style={{width: "16px", marginRight: "5px"}} />
