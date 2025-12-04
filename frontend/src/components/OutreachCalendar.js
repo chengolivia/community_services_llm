@@ -4,7 +4,6 @@ import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch, apiGet } from '../utils/api';
 import '../styles/pages/calendar.css';
-import { API_URL } from '../config';
 
 // Constants
 const MONTHS = [

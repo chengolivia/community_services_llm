@@ -4,7 +4,6 @@ import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
 import { apiPost, apiGet, authenticatedFetch } from '../utils/api';
-import { API_URL } from '../config';
 
 // Initial form state
 const INITIAL_FORM_STATE = {

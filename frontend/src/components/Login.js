@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { WellnessContext } from './AppStateContextProvider';
 import Logo from '../icons/Logo.png';
 import { authenticatedFetch } from '../utils/api';
-
-import { API_URL } from '../config';
 import { Link } from 'react-router-dom';
 import '../styles/pages/login.css';
 

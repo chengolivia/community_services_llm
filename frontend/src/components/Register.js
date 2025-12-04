@@ -2,7 +2,6 @@ import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
 import { API_URL } from '../config';
-import { authenticatedFetch } from '../utils/api';
 
 import '../App.css';
 import { WellnessContext } from './AppStateContextProvider';
