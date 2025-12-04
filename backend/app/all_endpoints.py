@@ -5,7 +5,7 @@ import time
 import secrets
 from datetime import timedelta
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
@@ -22,9 +22,18 @@ from app.login import (
     authenticate_user, 
     create_access_token, 
     ACCESS_TOKEN_EXPIRE_MINUTES, 
-    create_user
+    create_user,
+    get_current_user,
+    UserData
 )
-from app.database import update_conversation, add_new_service_user, fetch_service_user_checkins, edit_service_user_outreach
+from app.database import (
+    update_conversation, 
+    add_new_service_user, 
+    fetch_service_user_checkins, 
+    edit_service_user_outreach,
+    get_notification_settings,
+    update_notification_settings
+)
 from app.generate_outreach import generate_check_ins_rule_based
 from app.notifications import notification_job
 
@@ -151,6 +160,54 @@ async def register(register_data: RegisterRequest):
         "organization": register_data.organization,
     }
 
+# Notification settings endpoints
+class NotificationSettingsUpdate(BaseModel):
+    username: str
+    email: str
+    notifications_enabled: bool
+    notification_time: str
+    
+@app.get("/api/notification-settings")
+async def get_user_notification_settings(current_user: UserData = Depends(get_current_user)):
+    """Get notification settings for a user"""
+    username = current_user.username
+    
+    success, result = get_notification_settings(username)
+    
+    if success:
+        return {"success": True, "settings": result}
+    else:
+        raise HTTPException(status_code=400, detail=result)
+
+
+@app.post("/api/notification-settings")
+async def update_user_notification_settings(
+    settings: NotificationSettingsUpdate,
+    current_user: UserData = Depends(get_current_user)
+):
+    """Update notification settings for a user"""
+    username = current_user.username
+    
+    # Use token username instead of trusting client
+    if username != settings.username:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    # Basic email validation
+    if '@' not in settings.email:
+        raise HTTPException(status_code=400, detail="Invalid email format")
+    
+    success, message = update_notification_settings(
+        username,
+        settings.email,
+        settings.notifications_enabled,
+        settings.notification_time
+    )
+    
+    if success:
+        return {"success": True, "message": message}
+    else:
+        raise HTTPException(status_code=400, detail=message)
+    
 # Health check endpoints
 @app.get("/")
 async def root():
