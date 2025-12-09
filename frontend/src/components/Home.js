@@ -4,8 +4,6 @@ import Logo from '../icons/Logo.png';
 import {WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch } from '../utils/api';
 
-import { API_URL } from '../config';
-
 import '../styles/pages/home.css';
 
 
