@@ -7,7 +7,7 @@ import hashlib
 import psycopg
 from psycopg.rows import dict_row
 import os
-from .utils import BASE_DIR
+from datetime import date as _date, datetime as _datetime
 
 CONNECTION_STRING = os.getenv("DATABASE_URL")
 
@@ -136,11 +136,15 @@ def fetch_service_user_checkins(service_user_id):
     finally:
         conn.close()
         
-def fetch_provider_checkins_by_date(provider, date):
+def fetch_provider_checkins_by_date(provider, check_in_date):
     conn = psycopg.connect(CONNECTION_STRING)
     conn.row_factory = dict_row
     cursor = conn.cursor()
     try:
+        # Ensure check_in_date is a string in YYYY-MM-DD (DB stores check_in as text)
+        if isinstance(check_in_date, (_date, _datetime)):
+            check_in_date = check_in_date.strftime("%Y-%m-%d")
+
         cursor.execute('''
         SELECT p.service_user_id, p.service_user_name,
             o.check_in, o.follow_up_message
@@ -148,7 +152,7 @@ def fetch_provider_checkins_by_date(provider, date):
         INNER JOIN outreach_details o ON p.service_user_id = o.service_user_id
         WHERE p.provider = %s
             AND o.check_in = %s
-        ''', (provider, date))
+        ''', (provider, check_in_date))
         
         rows = cursor.fetchall()
         result = [dict(row) for row in rows]
