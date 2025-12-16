@@ -173,7 +173,8 @@ def fetch_providers_to_notify_checkins(time_begin, time_end):
             FROM users 
             WHERE notifications_enabled = TRUE
                 AND email IS NOT NULL
-                AND notification_time BETWEEN %s AND %s
+                AND notification_time >= %s 
+                AND notification_time < %s
         ''', (time_begin, time_end))
         rows = cursor.fetchall()
         result = [dict(row) for row in rows]

@@ -361,6 +361,39 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     doc.save('Chat_History.pdf');
   }, [conversation]);
 
+  const printSidebar = useCallback(() => {
+    const sidebar = document.querySelector('.right-section');
+    if (!sidebar) {
+      alert('Nothing to print');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Print Sidebar</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
+            h3 { margin-top: 0; }
+            .resource-item { margin-bottom: 12px; }
+            .with-top-border { border-top: 1px solid #ddd; padding-top: 8px; margin-top: 8px; }
+          </style>
+        </head>
+        <body>
+          ${sidebar.innerHTML}
+          <script>
+            window.onload = function() { window.focus(); window.print(); setTimeout(()=>window.close(), 100); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }, []);
   // Service user switching
   const handleServiceUserChange = useCallback((e) => {
     const newUserId = e.target.value;
@@ -559,6 +592,15 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             onClick={exportChatToPDF}
           >
             Save Session History
+          </button>
+          <button
+            className="submit-button"
+            style={{ width: '100px', height: '100%', marginLeft: '20px' }}
+            onClick={printSidebar}
+            disabled={goalsList.length === 0 && resourcesList.length === 0}
+            aria-label="Print sidebar goals and resources"
+          >
+            Print Sidebar
           </button>
           {tool === 'wellness' && (
             <button

@@ -42,7 +42,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_DEBUG_CPU_TYPE"] = "5"
 
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler(timezone='America/New_York')
 scheduler.add_job(notification_job, CronTrigger(minute='*/15'), id='send_notifications')
 
 @asynccontextmanager

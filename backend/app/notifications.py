@@ -7,6 +7,7 @@ job to email providers with today's check-ins.
 import os
 import requests
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from app.database import fetch_provider_checkins_by_date, fetch_providers_to_notify_checkins
  
 
@@ -62,7 +63,8 @@ def notification_job():
     window (with a short tolerance).
     """
     print("Starting notification job...")
-    current_time = datetime.now()
+    eastern = ZoneInfo("America/New_York")
+    current_time = datetime.now(eastern).replace(microsecond=0)
     tolerance = timedelta(minutes=15)
     success, providers = fetch_providers_to_notify_checkins(current_time.time(), (current_time + tolerance).time())
     count_sent = 0
