@@ -141,9 +141,8 @@ def call_chatgpt_with_functions(messages, functions, stream=False, max_tokens=75
     Wrapper around OpenAI’s function-calling API.
     Always returns a single ChatCompletion object.
     """
-    # Use the ChatCompletion class directly
     response = openai.chat.completions.create(
-        model="gpt-4o-mini",        # or your preferred function-calling model
+        model="gpt-4o-mini", 
         messages=messages,
         functions=functions,
         function_call="auto",
@@ -151,7 +150,6 @@ def call_chatgpt_with_functions(messages, functions, stream=False, max_tokens=75
         max_tokens=max_tokens,
     )
 
-    # If someone accidentally returned a tuple/list, take the first element
     if isinstance(response, (tuple, list)):
         response = response[0]
     return response
