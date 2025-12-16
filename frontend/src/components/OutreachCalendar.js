@@ -222,33 +222,39 @@ const OutreachCalendar = () => {
     }
   };
 
-  const handleSaveAllCheckIns = async (allEdits) => {
-    setIsSubmitting(true);
-    try {
-      for (const [id, data] of Object.entries(allEdits)) {
-        await authenticatedFetch(`/service_user_check_ins/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            check_in: data.check_in,
-            follow_up_message: data.follow_up_message
-          })
-        });
-      }
 
-      const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
-      const updatedCheckIns = await checkInsResponse.json();
-      setCheckIns(updatedCheckIns);
-
-      alert('All changes saved successfully!');
-      setPendingCheckInEdits({});
-    } catch (error) {
-      console.error('Error updating check-ins:', error);
-      alert(`Failed to update check-ins: ${error.message}`);
-    } finally {
-      setIsSubmitting(false);
+const handleSaveAllCheckIns = async (allEdits) => {
+  setIsSubmitting(true);
+  try {
+    for (const [id, data] of Object.entries(allEdits)) {
+      // Change to POST /service_user_outreach_edit/
+      await authenticatedFetch(`/service_user_outreach_edit/`, {
+        method: 'POST',  // Changed from PUT
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          check_in_id: id,  // Match backend parameter
+          check_in: data.check_in,
+          follow_up_message: data.follow_up_message
+        })
+      });
     }
-  };
 
+    // Refresh check-ins
+    const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
+    const updatedCheckIns = await checkInsResponse.json();
+    setCheckIns(updatedCheckIns);
+
+    alert('All changes saved successfully!');
+    setPendingCheckInEdits({});
+  } catch (error) {
+    console.error('Error updating check-ins:', error);
+    alert(`Failed to update check-ins: ${error.message}`);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const currentMonth = MONTHS[new Date().getMonth()];
   const currentYear = new Date().getFullYear();
 

@@ -259,9 +259,11 @@ async def service_user_check_ins(
     else:
         raise HTTPException(status_code=400, detail=result)
     
+    
 @app.post("/service_user_outreach_edit/")
-async def service_user_outreach_edit(check_in_id: str, data: dict):
+async def service_user_outreach_edit(data: dict):
     """Handle updates to service user outreach via sidebar"""
+    check_in_id = data.get('check_in_id')
     check_in_date = data.get('check_in')
     follow_up_message = data.get('follow_up_message')
     success, result = edit_service_user_outreach(check_in_id, check_in_date, follow_up_message)
