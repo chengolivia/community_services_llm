@@ -64,7 +64,7 @@ def notification_job():
     """
     print("Starting notification job...")
     eastern = ZoneInfo("America/New_York")
-    current_time = datetime.now(eastern)
+    current_time = datetime.now(eastern).replace(microsecond=0)
     tolerance = timedelta(minutes=15)
     success, providers = fetch_providers_to_notify_checkins(current_time.time(), (current_time + tolerance).time())
     count_sent = 0
