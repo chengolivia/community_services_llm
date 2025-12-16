@@ -1,3 +1,4 @@
+// OutreachCalendar.js - Calendar view showing scheduled check-ins
 import React, { useEffect, useState, useContext, useCallback, useMemo } from 'react';
 import Sidebar from './Sidebar';
 import SidebarInformation from './SidebarInformation';
@@ -5,6 +6,12 @@ import { WellnessContext } from './AppStateContextProvider';
 import { useCheckIns } from '../hooks/useCheckIns';
 import { authenticatedFetch, apiGet } from '../utils/api';
 import '../styles/pages/calendar.css';
+
+/**
+ * parseCheckInDate - accepts several date formats and returns a Date or null
+ * @param {string} checkInStr
+ * @returns {Date|null}
+ */
 
 // Constants
 const MONTHS = [

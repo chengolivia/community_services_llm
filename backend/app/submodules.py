@@ -1,3 +1,9 @@
+"""Core pipeline: resource extraction, refinement, and orchestration for responses.
+
+This module exposes `construct_response` which calls RAG extraction and OpenAI
+APIs to build streaming responses.
+"""
+
 import os
 import re
 import time
@@ -15,6 +21,8 @@ from app.utils import (
 
 # Initialize
 openai.api_key = os.environ.get("SECRET_KEY")
+# NOTE: This eagerly loads embedding models and indices on import which can be
+# expensive; consider lazy-loading in production to reduce startup time.
 embedding_model, saved_indices, documents = get_model_and_indices()
 internal_prompts, external_prompts = get_all_prompts()
 

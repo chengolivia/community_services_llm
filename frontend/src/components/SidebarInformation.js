@@ -1,9 +1,22 @@
+// SidebarInformation.js - Panel for viewing/editing a service user's details and upcoming check-ins
 import CalendarIcon from '../icons/Calendar.png';
 import ClockIcon from '../icons/Clock.png';
 import EditIcon from '../icons/Pencil.png';
 import ChatIcon from '../icons/Chat.png';
 import ProfileIcon from '../icons/Profile.png';
 import React, { useEffect, useState } from 'react';
+
+/**
+ * SidebarInformation component
+ * @param {object} props
+ * @param {object} props.patient - Service user record
+ * @param {Array} props.checkIns - List of upcoming check-ins
+ * @param {boolean} props.isEditable - Whether the form is editable
+ * @param {object} props.formData - Controlled form data
+ * @param {function} props.onFormChange - Callback(field, value)
+ * @param {function} props.onSubmit - Callback to create/update patient
+ * @param {function} props.onSaveAllCheckIns - Callback to save check-in edits
+ */
 
 const SidebarInformation = ({ 
   patient = {}, 
@@ -174,6 +187,11 @@ const SidebarInformation = ({
   );
 };
 
+/**
+ * CheckInItem - small editable block for a single scheduled check-in
+ * @param {object} props.checkIn - check-in record with fields `check_in` and `follow_up_message`
+ * @param {function} props.onEdit - handler(checkInId, updatedData)
+ */
 const CheckInItem = ({checkIn, onEdit}) => {
   const formatDateForInput = (dateString) => {
     if (!dateString) return '';

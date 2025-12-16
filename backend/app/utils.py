@@ -1,3 +1,5 @@
+"""Small utility wrappers for PDF handling and OpenAI/ChatGPT access."""
+
 import openai
 import PyPDF2
 from fpdf import FPDF
@@ -29,7 +31,7 @@ def call_chatgpt_api(system_prompt,prompt,stream=True):
     Arguments:
         system_prompt: String, what the main system prompt is
             Tells ChatGPT the general scenario
-        prompt: Specific promt for ChatGPT
+        prompt: Specific prompt for ChatGPT
 
     Returns: String, result from ChatGPT"""
 

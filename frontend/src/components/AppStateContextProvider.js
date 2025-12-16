@@ -1,5 +1,17 @@
+// AppStateContextProvider.js - Central React context for sharing app state
+// Provides values used by chat and profile components (input text, conversation, user, etc.)
 import React, { createContext, useState } from 'react';
 
+/**
+ * Create a context provider wrapper for the given Context.
+ * Exposes a stable object of state and setter functions used across components.
+ *
+ * Provided values include:
+ * - inputText, setInputText
+ * - conversation, setConversation
+ * - chatConvo, setChatConvo
+ * - user, setUser
+ */
 const createContextProvider = (Context) => ({ children }) => {
   const [inputText, setInputText] = useState('');
   const [modelSelect, setModel] = useState('copilot');

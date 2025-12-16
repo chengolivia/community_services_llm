@@ -1,3 +1,5 @@
+"""RAG utilities: embedding loading, FAISS index creation, and resource processing."""
+
 import os
 import numpy as np
 import pandas as pd

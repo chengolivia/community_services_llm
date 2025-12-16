@@ -1,3 +1,4 @@
+// App.js - Main React application routes and layout
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';

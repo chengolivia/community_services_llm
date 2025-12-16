@@ -1,3 +1,5 @@
+// GenericChat.js - Chat UI component that handles user input, streaming responses,
+// and resource/goal display. Uses Socket.IO to receive incremental generation updates.
 import React, { useRef, useContext, useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -114,6 +116,15 @@ const ResourceItem = ({ content, className = '' }) => {
   );
 };
 
+/**
+ * GenericChat component: main chat UI
+ * @param {object} props
+ * @param {React.Context} props.context - React context provider for app state
+ * @param {string} props.title - Title to display
+ * @param {string} props.socketServerUrl - Socket.IO server URL
+ * @param {boolean} props.showLocation - Whether to show location input
+ * @param {string} props.tool - Tool identifier (e.g., 'wellness')
+ */
 function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const {
     inputText,

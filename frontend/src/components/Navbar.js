@@ -1,3 +1,4 @@
+// Navbar.js - Top navigation used across the app
 import React, { useState, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import HomeIcon from '../icons/Home.png';

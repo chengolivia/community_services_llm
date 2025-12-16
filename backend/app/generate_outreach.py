@@ -1,3 +1,9 @@
+"""Outreach helpers: detect urgency, generate follow-ups, and manage check-ins.
+
+Functions in this module interact with the database and the chat model to
+produce follow-up messages and schedule check-ins for service users.
+"""
+
 import psycopg
 import os 
 import openai 
@@ -28,6 +34,10 @@ check_in_delta_map = {
 }
 
 def detect_urgency(text):
+    """Detect urgency levels in text using spaCy lemmas and simple negation handling.
+
+    Returns a sorted list of urgency level names found in the input text.
+    """
     doc = nlp(text.lower())
     found = set()
 
@@ -241,55 +251,3 @@ def generate_check_ins_rule_based(service_user_id: str, conversation_id: str):
         return False, str(e)
     finally:
         conn.close()
-
-
-
-
-def autogenerate_conversations(username):
-    """Find all conversations without corresponding outreach generated
-    
-    Arguments:
-        username: string, provider's usernaem
-    
-    Returns: Nothing
-    
-    Side Effects: Writes new outreach events to the calendar"""
-
-    conn = psycopg.connect(CONNECTION_STRING)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT id FROM conversations
-        WHERE username = %s AND outreach_generated = FALSE
-    ''', (username,))
-    conversation_ids = cursor.fetchall()
-
-    for conv_id in conversation_ids:
-        conv_id = conv_id[0]
-        messages = load_messages_for_conversation(conv_id)
-        followup = generate_followup_message(messages)
-        service_user_id = f"User-{uuid.uuid4().hex[:8]}"
-        if followup['follow_up_date'] and followup['follow_up_message']:
-            cursor.execute('''
-                    INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (service_user_id) DO NOTHING
-            ''', (service_user_id, service_user_id, username, "Freehold, NJ", "Active"))
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            cursor.execute('''
-                INSERT INTO outreach_details (service_user_id, last_session, check_in, follow_up_message)
-                VALUES (%s, %s, %s, %s)
-            ''', (
-                service_user_id,
-                today_str,
-                followup['follow_up_date'],  # This will insert NULL if it's None
-                followup['follow_up_message']
-            ))
-
-        cursor.execute('''
-            UPDATE conversations
-            SET outreach_generated = TRUE
-            WHERE id = %s
-        ''', (conv_id,))
-
-    conn.commit()
-    conn.close()
