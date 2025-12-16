@@ -29,8 +29,9 @@ def send_message_from_peercopilot(recipient, subject, text):
 
     Returns the `requests.Response` object for inspection by callers.
     """
+    response = requests.post(
         "https://api.mailgun.net/v3/peercopilot.com/messages",
-  		auth=("api", os.getenv('MAILGUN_SENDING_KEY')),
+        auth=("api", os.getenv("MAILGUN_SENDING_KEY")),
         data={
             "from": "PeerCopilot <postmaster@peercopilot.com>",
             "to": recipient,
@@ -38,10 +39,14 @@ def send_message_from_peercopilot(recipient, subject, text):
             "text": text
         }
     )
+    if response.status_code >= 400:
+        print(f"[Mailgun] Send failed to {recipient}: {response.status_code} - {response.text}")
+    else:
+        print(f"[Mailgun] Sent to {recipient}: {response.status_code}")
     return response
 
 def send_daily_check_ins(todays_checkins_for_provider, service_provider_email):
-    opening = "Hello from PeerCopilot! \n Here is a reminder for today's check-ins: \n\n"
+    opening = "Hello from PeerCopilot! \nHere is a reminder for today's check-ins: \n\n"
     body = "\n".join([f"- {d['service_user_name']}: {d['follow_up_message']}" for d in todays_checkins_for_provider])
     closing = "\n ---- \n"
     full_text = opening + body + closing
@@ -67,8 +72,11 @@ def notification_job():
     for p in providers:
         success, todays_checkins = fetch_provider_checkins_by_date(p["username"], date.today())
         if success and len(todays_checkins) > 0:
-            send_daily_check_ins(todays_checkins, p["email"])
-            count_sent += 1
+            resp = send_daily_check_ins(todays_checkins, p["email"])
+            if resp is not None and getattr(resp, "status_code", 0) < 400:
+                count_sent += 1
+            else:
+                print(f"[Notification Job] Failed to send to {p['email']}")
     print(f"Notification job finished and {count_sent} messages sent...")
     
 
