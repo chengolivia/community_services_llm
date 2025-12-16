@@ -1,3 +1,10 @@
+"""Eligibility evaluation utilities.
+
+This module provides a main entry point `eligibility_check` which parses
+user input and evaluates eligibility against a set of benefit constraints.
+Helper functions compute scores, categorize results, and format output.
+"""
+
 from typing import Dict, Optional, List
 import ast
 import inspect
@@ -7,14 +14,16 @@ def eligibility_check(user_info: str) -> str:
     """
     Determines eligibility for various government benefits based on user information.
     Returns a formatted string with eligibility results and explanations.
-    
+
     Parameters:
-    user_info (dict): A dictionary containing user data (e.g., age, income, family status).
+        user_info (str | dict): Either a string containing a Python literal/dict-like
+            representation of user information or a string that includes such a dict.
 
     Returns:
-    str: Eligibility results with explanations for each benefit.
+        str: Eligibility results with explanations for each benefit.
     """
 
+    # Ensure the input contains a JSON-like dict string; callers may pass raw text
     if "{" not in user_info:
         user_info = "{" + user_info 
     
@@ -27,10 +36,13 @@ def eligibility_check(user_info: str) -> str:
     else:
         return ""
     
+    # Parse the extracted text as a Python literal (safer than eval for simple data structures)
     all_user_info = ast.literal_eval(cleaned_output)
 
     if 'relevance' in all_user_info and all_user_info['relevance'] == False:
         return "Irrelevant"
+
+    # NOTE: the function prints a formatted output for debugging; consider replacing with structured logging
 
     # Define benefit constraints with dynamic SSI conditions based on family and marital status
     benefit_constraints = {

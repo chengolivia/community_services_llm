@@ -1,3 +1,9 @@
+"""Outreach helpers: detect urgency, generate follow-ups, and manage check-ins.
+
+Functions in this module interact with the database and the chat model to
+produce follow-up messages and schedule check-ins for service users.
+"""
+
 import psycopg
 import os 
 import openai 
@@ -28,6 +34,10 @@ check_in_delta_map = {
 }
 
 def detect_urgency(text):
+    """Detect urgency levels in text using spaCy lemmas and simple negation handling.
+
+    Returns a sorted list of urgency level names found in the input text.
+    """
     doc = nlp(text.lower())
     found = set()
 

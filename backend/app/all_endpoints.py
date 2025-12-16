@@ -1,3 +1,8 @@
+"""FastAPI application and Socket.IO endpoints for the PeerCopilot backend.
+
+This module wires routes, background scheduler jobs, and socket event handlers.
+"""
+
 import asyncio
 import os
 import threading
@@ -150,6 +155,7 @@ def warmup_models():
     except Exception as e:
         print(f"[Warmup] Failed to load embeddings: {e}")
 
+# Start a background thread to warm up embeddings after server start (may be slow)
 threading.Thread(target=warmup_models, daemon=True).start()
 
 # Service user endpoints

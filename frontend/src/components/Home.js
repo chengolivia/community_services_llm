@@ -1,8 +1,13 @@
+// Home.js - Dashboard/home screen for logged-in users
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
 import {WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch } from '../utils/api';
+
+/**
+ * Home component - shows navigation tiles and notification settings
+ */
 
 import '../styles/pages/home.css';
 

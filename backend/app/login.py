@@ -1,3 +1,9 @@
+"""Authentication utilities and FastAPI auth endpoints.
+
+Provides JWT-based login, registration helpers, and token verification
+dependency for protecting routes.
+"""
+
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -133,6 +139,17 @@ def hash_password(password):
 
 
 def create_user(username, password, role='provider', organization='cspnj'):
+    """Create a new user record.
+
+    Arguments:
+        username: str
+        password: str
+        role: str
+        organization: str
+
+    Returns:
+        tuple: (success: bool, message: str)
+    """
     conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
 
@@ -165,12 +182,15 @@ async def get_current_user_info(current_user: UserData = Depends(get_current_use
     return current_user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create a JWT token for a given set of information
-    
+    """Create a JWT token for a given set of information.
+
     Arguments:
-        data: Username/authentication to encode
-    
-    Returns: Encoded version of data via JWT"""
+        data: dict: Data to encode into the token (e.g., {'sub': username, 'role': ...})
+        expires_delta: Optional[timedelta]: Lifetime for the token. If omitted a short default is used.
+
+    Returns:
+        str: Encoded JWT token
+    """
     
     to_encode = data.copy()
     
@@ -184,19 +204,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 def authenticate_user(username, password):
-    """Authenticate a username + password combo
-    
+    """Authenticate a username + password combo.
+
     Arguments:
-        username: string, username
-        password: string, password
+        username: str: username
+        password: str: password
+
+    Returns:
+        tuple: (success: bool, message: str, role: Optional[str], organization: Optional[str])
+
+    Side Effects: Queries the users table to verify credentials and fetch role/organization."""
     
-    Returns: Boolean success and string message 
-    
-    Side Effects: Checks if a username-password combo is valid"""
-    
+    # DEBUG: connection string printed during development - remove or replace with structured logging
     print(CONNECTION_STRING)
 
     conn = psycopg.connect(CONNECTION_STRING)
+    # DEBUG: duplicated print below; intended for development tracing
     print(CONNECTION_STRING)
     cursor = conn.cursor()
     

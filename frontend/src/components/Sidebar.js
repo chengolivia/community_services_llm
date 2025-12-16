@@ -1,3 +1,4 @@
+// Sidebar.js - Simple slide-over container used for detail panels
 import React from 'react';
 import '../styles/sidebar.css';
 

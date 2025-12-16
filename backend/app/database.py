@@ -1,3 +1,8 @@
+"""Database access helpers and convenience wrappers.
+
+Provides thin helpers for conversation and outreach CRUD operations.
+"""
+
 import hashlib
 import psycopg
 from psycopg.rows import dict_row

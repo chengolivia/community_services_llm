@@ -151,7 +151,9 @@ const ProfileManager = () => {
   const getAllNames = async () => {
     setIsLoading(true);
     try {
-      const response = await authenticatedFetch(`$/service_user_list/`);
+      // TODO: This endpoint reference looks like a typo (`$/service_user_list/`).
+      // Replace with `/service_user_list/` or use apiGet if intended.
+      const response = await authenticatedFetch(`/service_user_list/`);
       const res = await response.json()
       setAllNames(res);
       console.log('[Load] Got', res.length, 'profiles');
