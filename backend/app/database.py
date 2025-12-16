@@ -1,8 +1,6 @@
 import hashlib
 import psycopg
 from psycopg.rows import dict_row
-import csv
-from pathlib import Path
 import os
 from .utils import BASE_DIR
 
