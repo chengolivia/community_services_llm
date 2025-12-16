@@ -30,9 +30,7 @@ def get_all_service_users(provider_username, organization):
     return result
 
 def get_all_outreach(provider_username, organization):
-    """Get all outreach details for service users of a given provider."""
-    # autogenerate_conversations(provider_username)
-    
+    """Get all outreach details for service users of a given provider."""    
     conn = psycopg.connect(CONNECTION_STRING)
     conn.row_factory = dict_row
     cursor = conn.cursor()
