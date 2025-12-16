@@ -44,6 +44,7 @@ def notification_job():
     current_time = datetime.now()
     tolerance = timedelta(minutes=15)
     success, providers = fetch_providers_to_notify_checkins(current_time.time(), (current_time + tolerance).time())
+    count_sent = 0
     if not success:
         print(f"Error fetching providers: {providers}")
         return
@@ -51,6 +52,7 @@ def notification_job():
         success, todays_checkins = fetch_provider_checkins_by_date(p["username"], date.today())
         if success and len(todays_checkins) > 0:
             send_daily_check_ins(todays_checkins, p["email"])
-    print("Notification job finished...")
+            count_sent += 1
+    print("Notification job finished and {count_sent} messages sent...")
     
 
