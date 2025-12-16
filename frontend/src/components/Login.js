@@ -1,3 +1,4 @@
+// Login.js - Authentication UI for signing into PeerCoPilot
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WellnessContext } from './AppStateContextProvider';
@@ -15,6 +16,10 @@ function Login() {
   const { setUser, setOrganization } = useContext(WellnessContext);
   const navigate = useNavigate();
 
+  /**
+   * Submit login credentials to backend and store token on success.
+   * Sets user context and redirects to home on successful login.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');

@@ -17,6 +17,10 @@ function Register() {
   const { setUser, setOrganization } = useContext(WellnessContext);
 
 
+  /**
+   * Handle submitting registration credentials to backend.
+   * Sets user context and localStorage on success and redirects to home.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
