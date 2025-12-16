@@ -57,18 +57,18 @@ const SidebarInformation = ({
   };
 
   const handleSaveAll = async () => {
-    // Save patient data
-    if (onUpdatePatient && lastSession) {
-      await onUpdatePatient({
-        last_session: lastSession
-      });
-    }
-    
-    // Save all modified check-ins
+  if (isEditable) {
+    // New patient - create
+    await onSubmit();
+  } else {
+    // Existing patient - only save check-ins
     if (onSaveAllCheckIns && Object.keys(pendingCheckInEdits).length > 0) {
       await onSaveAllCheckIns(pendingCheckInEdits);
+    } else {
+      alert('No changes to save');
     }
-  };
+  }
+};
 
   const globalClassName = isEditable ? "input-section" : "info-section";
 
@@ -134,12 +134,13 @@ const SidebarInformation = ({
             <img src={CalendarIcon} alt="Calendar Icon" className="icon" />
             Last session
           </div>
-          <input 
+          {/* <input 
             type="date" 
             id="lastSession"
             value={lastSession}
             onChange={(e) => setLastSession(e.target.value)}
-          />
+          /> */}
+          <div className="section-content">{patient.last_session || '—'}</div>
         </div>
         
         {checkIns.length > 0 && (

@@ -209,42 +209,39 @@ const ProfileManager = () => {
     }
   };
 
-  const handleSaveAllCheckIns = async (allEdits) => {
-    setIsSubmitting(true);
-    try {
-      // Save all modified check-ins
-      for (const [id, data] of Object.entries(allEdits)) {
-        const response = await authenticatedFetch(`/service_user_check_ins/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            check_in: data.check_in,
-            follow_up_message: data.follow_up_message
-          })
-        });
 
-        if (!response.ok) {
-          throw new Error(`Failed to update check-in ${id}`);
-        }
-      }
-
-      // Refresh check-ins after all updates
-      const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
-      const updatedCheckIns = await checkInsResponse.json();
-      setCheckIns(updatedCheckIns);
-
-      alert('All changes saved successfully!');
-      setPendingCheckInEdits({}); // Clear pending edits
-    } catch (error) {
-      console.error('Error updating check-ins:', error);
-      alert(`Failed to update check-ins: ${error.message}`);
-    } finally {
-      setIsSubmitting(false);
+const handleSaveAllCheckIns = async (allEdits) => {
+  setIsSubmitting(true);
+  try {
+    for (const [id, data] of Object.entries(allEdits)) {
+      // Change to POST /service_user_outreach_edit/
+      await authenticatedFetch(`/service_user_outreach_edit/`, {
+        method: 'POST',  // Changed from PUT
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          check_in_id: id,  // Match backend parameter
+          check_in: data.check_in,
+          follow_up_message: data.follow_up_message
+        })
+      });
     }
-  };
 
+    // Refresh check-ins
+    const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
+    const updatedCheckIns = await checkInsResponse.json();
+    setCheckIns(updatedCheckIns);
+
+    alert('All changes saved successfully!');
+    setPendingCheckInEdits({});
+  } catch (error) {
+    console.error('Error updating check-ins:', error);
+    alert(`Failed to update check-ins: ${error.message}`);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   return (
     <div className="container">
       <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
@@ -330,6 +327,8 @@ const ProfileManager = () => {
             isEditable={isEditable}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit}
+            formData={formData}
+            onFormChange={handleFormChange}
             onUpdatePatient={handleUpdatePatient}
             onSaveAllCheckIns={handleSaveAllCheckIns}
             pendingCheckInEdits={pendingCheckInEdits}
@@ -343,23 +342,6 @@ const ProfileManager = () => {
         ) : null
       }
     />
-{/* 
-      <Sidebar
-        isOpen={hasSidebar}
-        content={
-          hasSidebar ? (
-            <SidebarInformation
-              patient={currentPatient}
-              isEditable={isEditable}
-              isSubmitting={isSubmitting}
-              formData={formData}
-              onFormChange={handleFormChange}
-              onSubmit={handleSubmit}
-              onClose={closeSidebar}
-            />
-          ) : null
-        }
-      /> */}
     </div>
   );
 };
