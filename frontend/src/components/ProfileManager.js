@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext, useCallback, useMemo } from 're
 import Sidebar from './Sidebar';
 import AddIcon from '../icons/Add.png';
 import SidebarInformation from './SidebarInformation';
+import { useCheckIns } from '../hooks/useCheckIns';
 import { WellnessContext } from './AppStateContextProvider';
 import { apiPost, apiGet, authenticatedFetch } from '../utils/api';
 
@@ -13,8 +14,6 @@ const INITIAL_FORM_STATE = {
   followUpMessage: '',
   location: '',
 };
-
-
 
 const ProfileManager = () => {
   const { user } = useContext(WellnessContext);
@@ -30,22 +29,20 @@ const ProfileManager = () => {
   const [lastSession, setLastSession] = useState('');
   const [nextCheckIn, setNextCheckIn] = useState('');
   const [followUpMessage, setFollowUpMessage] = useState('');
-  const [checkIns, setCheckIns] = useState([]);
-  const [pendingCheckInEdits, setPendingCheckInEdits] = useState({});
+  const {
+    checkIns,
+    isLoading: checkInsLoading,
+    error: checkInsError,
+    fetchCheckIns,
+    saveAllCheckIns,
+    updatePatientLastSession
+  } = useCheckIns();
 
   useEffect(() => {
     if (currentPatient?.service_user_id && !isEditable) {
-      authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`)
-        .then(res => res.json())
-        .then(data => setCheckIns(data))
-        .catch(error => {
-          console.error('[Check-ins] Error fetching:', error);
-          setCheckIns([]);
-        });
-    } else {
-      setCheckIns([]);
+      fetchCheckIns(currentPatient.service_user_id);
     }
-  }, [currentPatient?.service_user_id, isEditable]);
+  }, [currentPatient?.service_user_id, isEditable, fetchCheckIns]);
   
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -173,23 +170,9 @@ const ProfileManager = () => {
   const handleUpdatePatient = async (updatedData) => {
     setIsSubmitting(true);
     try {
-      // Update patient's last session
       if (updatedData.last_session !== undefined) {
-        const response = await authenticatedFetch(`/service_user/${currentPatient.service_user_id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            last_session: updatedData.last_session
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update patient');
-        }
-
-        // Update local state
+        await updatePatientLastSession(currentPatient.service_user_id, updatedData.last_session);
+        
         setCurrentPatient(prev => ({
           ...prev,
           last_session: updatedData.last_session
@@ -197,51 +180,27 @@ const ProfileManager = () => {
         setLastSession(updatedData.last_session);
       }
 
-      // Refresh the list
-      await getAllNames();
-      
+      await fetchServiceUsers();
       alert('Changes saved successfully!');
     } catch (error) {
-      console.error('Error updating patient:', error);
       alert(`Failed to update: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-
-const handleSaveAllCheckIns = async (allEdits) => {
-  setIsSubmitting(true);
-  try {
-    for (const [id, data] of Object.entries(allEdits)) {
-      // Change to POST /service_user_outreach_edit/
-      await authenticatedFetch(`/service_user_outreach_edit/`, {
-        method: 'POST',  // Changed from PUT
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          check_in_id: id,  // Match backend parameter
-          check_in: data.check_in,
-          follow_up_message: data.follow_up_message
-        })
-      });
+  // Replace handleSaveAllCheckIns with:
+  const handleSaveAllCheckIns = async (allEdits) => {
+    setIsSubmitting(true);
+    try {
+      await saveAllCheckIns(allEdits, currentPatient.service_user_id);
+      alert('All changes saved successfully!');
+    } catch (error) {
+      alert(`Failed to update check-ins: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Refresh check-ins
-    const checkInsResponse = await authenticatedFetch(`/service_user_check_ins/?service_user_id=${currentPatient.service_user_id}`);
-    const updatedCheckIns = await checkInsResponse.json();
-    setCheckIns(updatedCheckIns);
-
-    alert('All changes saved successfully!');
-    setPendingCheckInEdits({});
-  } catch (error) {
-    console.error('Error updating check-ins:', error);
-    alert(`Failed to update check-ins: ${error.message}`);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
   return (
     <div className="container">
       <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
@@ -331,8 +290,6 @@ const handleSaveAllCheckIns = async (allEdits) => {
             onFormChange={handleFormChange}
             onUpdatePatient={handleUpdatePatient}
             onSaveAllCheckIns={handleSaveAllCheckIns}
-            pendingCheckInEdits={pendingCheckInEdits}
-            setPendingCheckInEdits={setPendingCheckInEdits}
             onClose={() => setSidebar(false)}
             patientName={patientName}
             setPatientName={setPatientName}
