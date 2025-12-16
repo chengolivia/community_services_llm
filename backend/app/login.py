@@ -107,7 +107,16 @@ async def register(request: RegisterRequest):
     if not success:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
     
-    return {"message": message}
+    access_token = create_access_token(
+        data={"sub": request.username, "role": "provider", "organization": request.organization},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    return LoginResponse(
+        access_token=access_token,
+        role="provider",
+        organization=request.organization
+    )
 
 
 def hash_password(password):
@@ -201,7 +210,7 @@ def authenticate_user(username, password):
     conn.close()
     
     if not user:
-        return False, "Invalid username or password", None
+        return False, "Invalid username or password", None, None
     
     _, stored_password, stored_salt, role, organization = user
     

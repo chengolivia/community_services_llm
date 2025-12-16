@@ -18,14 +18,9 @@ import socketio
 
 from app.submodules import construct_response, fetch_goals_and_resources
 from app.process_profiles import get_all_outreach, get_all_service_users
-from app.login import (
-    authenticate_user, 
-    create_access_token, 
-    ACCESS_TOKEN_EXPIRE_MINUTES, 
-    create_user,
-    get_current_user,
-    UserData
-)
+from app.login import get_current_user, UserData
+from app.login import router as auth_router
+
 from app.database import (
     update_conversation, 
     add_new_service_user, 
@@ -68,21 +63,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request/Response models
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    role: str
-    organization: str
-
-class RegisterRequest(BaseModel):
-    username: str
-    password: str
-    organization: str
+app.include_router(auth_router)
+# Request/Response model
 
 class NewWellness(BaseModel):
     patientName: str
@@ -98,67 +80,6 @@ async def add_keep_alive_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["Connection"] = "keep-alive"
     return response
-
-# Auth endpoints
-@app.post("/api/auth/login")
-async def login(login_data: LoginRequest):
-    print(f"Login attempt for user: {login_data.username}")
-    success, _, role, organization = authenticate_user(
-        login_data.username, 
-        login_data.password
-    )
-    
-    if not success:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token = create_access_token(
-        data={
-            "sub": login_data.username, 
-            "role": role, 
-            "organization": organization
-        },
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        role=role,
-        organization=organization
-    )
-
-@app.post("/api/auth/register")
-async def register(register_data: RegisterRequest):
-    """Register a new user and auto-login."""
-    success, message = create_user(
-        username=register_data.username,
-        password=register_data.password,
-        role="provider",
-        organization=register_data.organization
-    )
-
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-
-    access_token = create_access_token(
-        data={
-            "sub": register_data.username,
-            "role": "provider",
-            "organization": register_data.organization,
-        },
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": "provider",
-        "organization": register_data.organization,
-    }
 
 # Notification settings endpoints
 class NotificationSettingsUpdate(BaseModel):
