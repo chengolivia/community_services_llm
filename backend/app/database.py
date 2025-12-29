@@ -140,7 +140,8 @@ def update_conversation(metadata, previous_text, service_user_id):
     """
     username = metadata.get("username")
     conversation_id = metadata.get("conversation_id")
-    
+    session_id = metadata.get("session_id")
+
     if not conversation_id:
         import uuid
         conversation_id = str(uuid.uuid4())
@@ -164,8 +165,10 @@ def update_conversation(metadata, previous_text, service_user_id):
         text = msg["content"]
         if sender and text:
             cursor.execute(
-                "INSERT INTO messages (conversation_id, sender, text, service_user_id) VALUES (%s, %s, %s, %s) ON CONFLICT (conversation_id, sender, text) DO NOTHING",
-                (conversation_id, sender, text, service_user_id)
+                """INSERT INTO messages (conversation_id, sender, text, service_user_id, session_id) 
+                   VALUES (%s, %s, %s, %s, %s) 
+                   ON CONFLICT (conversation_id, sender, text) DO NOTHING""",
+                (conversation_id, sender, text, service_user_id, session_id)
             )
 
     conn.commit()

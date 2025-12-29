@@ -4,6 +4,7 @@ import threading
 import time
 import secrets
 from datetime import timedelta
+import uuid
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -360,10 +361,13 @@ async def start_generation(sid, data):
     if not conversation_id:
         conversation_id = secrets.token_hex(16)
         await sio.emit("conversation_id", {"conversation_id": conversation_id}, room=sid)
-    
+    session_id = data.get("session_id") or str(uuid.uuid4())
+
     metadata = {
         'conversation_id': conversation_id,
-        'username': username
+        'username': username,
+        'session_id': session_id 
+
     }
     
     # Fetch goals and resources
