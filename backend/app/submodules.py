@@ -8,7 +8,7 @@ import os
 import re
 import time
 import concurrent.futures
-
+import googlemaps
 import numpy as np
 import openai
 import json 
@@ -31,6 +31,8 @@ embedding_model, saved_indices, documents = get_model_and_indices()
 internal_prompts, external_prompts = get_all_prompts()
 
 STORAGE_DIR = "vector_storage"
+google_maps_api = os.getenv("GOOGLE_API_KEY")
+gmaps = googlemaps.Client(key=google_maps_api)
 
 
 def simple_text_splitter(text, chunk_size=1000, chunk_overlap=100):
@@ -524,6 +526,32 @@ def library_tool(query: str, category: str, k: int = 3):
         
     return "\n---\n".join(results)
 
+def directions_tool(origin: str, destination: str, mode: str = "driving"):
+    """
+    Get detailed, step-by-step navigation instructions.
+    """
+    try:
+        result = gmaps.directions(origin, destination, mode=mode, departure_time="now")
+        if not result:
+            return "No routes found."
+        leg = result[0]['legs'][0]
+        full_instructions = [f"Total Trip: {leg['duration']['text']} ({leg['distance']['text']})\n"]
+        for i, step in enumerate(leg['steps'], 1):
+            # Clean up HTML tags (like <b>) that Google returns
+            import re
+            instruction = re.sub('<[^<]+?>', '', step['html_instructions'])
+            duration = step['duration']['text']
+            # Add specific transit details if they exist
+            if step.get('travel_mode') == 'TRANSIT':
+                details = step.get('transit_details', {})
+                line = details.get('line', {}).get('short_name', 'Transit')
+                stop = details.get('arrival_stop', {}).get('name', 'destination')
+                instruction += f" (Take {line} to {stop})"
+            full_instructions.append(f"{i}. {instruction} [{duration}]")
+        return "\n".join(full_instructions)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 def construct_response(
     situation: str,
     all_messages: list,
@@ -567,6 +595,26 @@ def construct_response(
                         }
                     },
                     "required": ["query", "category"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "directions_tool",
+                "description": "Get travel time and distance between two locations for driving or transit.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "origin": {"type": "string", "description": "Starting address or city"},
+                        "destination": {"type": "string", "description": "Ending address or city"},
+                        "mode": {
+                            "type": "string", 
+                            "enum": ["driving", "transit","walking", "bicycling"], 
+                            "description": "Method of travel"
+                        }
+                    },
+                    "required": ["origin", "destination", "mode"]
                 }
             }
         }
@@ -648,6 +696,14 @@ def construct_response(
                         category=func_args.get("category", "crisis")
                     )
                     print("Library tool output {}".format(output))
+                elif func_name == "directions_tool":
+                    output = directions_tool(
+                        origin=func_args.get("origin", ""),
+                        destination=func_args.get("destination", ""),
+                        mode=func_args.get("mode", "driving")
+                    )
+                    print("Direction tool output {}".format(output))
+                    
                 else:
                     output = "Error: Unknown tool."
 
