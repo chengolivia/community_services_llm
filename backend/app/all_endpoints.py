@@ -21,7 +21,7 @@ import json
 import time
 import socketio
 
-from app.submodules import construct_response, fetch_goals_and_resources
+from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import get_current_user, UserData
 from app.login import router as auth_router
