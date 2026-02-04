@@ -13,6 +13,7 @@ import numpy as np
 import openai
 import json 
 import pickle 
+from ddgs import DDGS
 
 from app.rag_utils import get_model_and_indices
 from app.utils import (
@@ -585,6 +586,22 @@ def check_eligibility(program: str, household_size: int, monthly_income: float):
 
     return "Error: Unknown benefit program. Currently supporting: SNAP."
 
+def web_search_tool(query: str):
+    """
+    Performs a live web search for real-time information.
+    """
+    try:
+        results = DDGS().text(query, max_results=4)
+        if not results:
+            return "No results found."
+        # Format results nicely for the LLM
+        formatted = ""
+        for r in results:
+            formatted += f"Title: {r['title']}\nLink: {r['href']}\nSnippet: {r['body']}\n\n"
+        return formatted
+    except Exception as e:
+        return f"Search failed: {str(e)}"
+
 def calculator_tool(expression: str):
     """
     A safe calculator for basic arithmetic. 
@@ -681,6 +698,20 @@ def construct_response(
                     "required": ["expression"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search_tool",
+                "description": "Search the internet for real-time info, news, or broad topics not in the library.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "The search keywords"}
+                    },
+                    "required": ["query"]
+                }
+            }
         }
     ]
 
@@ -772,7 +803,12 @@ def construct_response(
                         expression=func_args.get("expression", "0"),
                     )
                     print("Calculator tool output {}".format(output))
-                    
+                elif func_name == "web_search_tool":
+                    output = web_search_tool(
+                        query=func_args.get("query", ""),
+                    )
+                    print("Web Search tool output {}".format(output))
+
                 else:
                     output = "Error: Unknown tool."
 
