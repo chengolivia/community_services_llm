@@ -712,7 +712,23 @@ def construct_response(
                     "required": ["query"]
                 }
             }
-        }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "check_eligibility",
+                "description": "Check if a user qualifies for benefits like SNAP based on income/household size.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "program": {"type": "string", "enum": ["snap"], "description": "The benefit program name"},
+                        "household_size": {"type": "integer", "description": "Number of people in the household"},
+                        "monthly_income": {"type": "number", "description": "Total gross monthly income"}
+                    },
+                    "required": ["program", "household_size", "monthly_income"]
+                }
+            }
+        },
     ]
 
     orchestration_messages = [
@@ -808,7 +824,13 @@ def construct_response(
                         query=func_args.get("query", ""),
                     )
                     print("Web Search tool output {}".format(output))
-
+                elif func_name == "check_eligibility":
+                    output = check_eligibility(
+                        program=func_args.get("program", ""),
+                        household_size=func_args.get("household_size", ""),
+                        monthly_income=func_args.get("monthly_income",""),
+                    )
+                    print("Eligibility tool output {}".format(output))
                 else:
                     output = "Error: Unknown tool."
 
