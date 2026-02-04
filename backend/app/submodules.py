@@ -552,6 +552,56 @@ def directions_tool(origin: str, destination: str, mode: str = "driving"):
     except Exception as e:
         return f"Error: {str(e)}"
 
+def check_eligibility(program: str, household_size: int, monthly_income: float):
+    """
+    Checks eligibility based on official 2026 NJ income limits.
+    """
+    program = program.lower()
+    
+    # 2026 NJ SNAP Gross Income Limits (185% Federal Poverty Level)
+    # Source: NJ Dept of Human Services / USDA
+    snap_limits = {
+        1: 2413,
+        2: 3261,
+        3: 4109,
+        4: 4957,
+        5: 5805,
+        6: 6653,
+        7: 7501,
+        8: 8349
+    }
+    
+    if "snap" in program or "food stamp" in program:
+        # Get limit (add $848 for each person beyond 8)
+        if household_size <= 8:
+            limit = snap_limits.get(household_size)
+        else:
+            limit = 8349 + (848 * (household_size - 8))
+            
+        if monthly_income <= limit:
+            return f"✅ LIKELY ELIGIBLE. Household income (${monthly_income}) is BELOW the NJ SNAP gross limit (${limit}) for {household_size} people."
+        else:
+            return f"❌ LIKELY INELIGIBLE. Household income (${monthly_income}) is ABOVE the NJ SNAP gross limit (${limit})."
+
+    return "Error: Unknown benefit program. Currently supporting: SNAP."
+
+def calculator_tool(expression: str):
+    """
+    A safe calculator for basic arithmetic. 
+    Supports +, -, *, /, and round().
+    """
+    allowed_chars = "0123456789+-*/(). "
+    if any(char not in allowed_chars for char in expression):
+        return "Error: Invalid characters. Only numbers and basic math (+-*/) allowed."
+    
+    try:
+        # Evaluate using a restricted scope to prevent code injection
+        # (For production, consider libraries like 'simpleeval')
+        result = eval(expression, {"__builtins__": None}, {})
+        return str(result)
+    except Exception as e:
+        return f"Error calculating '{expression}': {str(e)}"
+
 def construct_response(
     situation: str,
     all_messages: list,
@@ -615,6 +665,20 @@ def construct_response(
                         }
                     },
                     "required": ["origin", "destination", "mode"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "calculator_tool",
+                "description": "Perform basic math calculations (e.g., converting hourly wage to monthly income).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "expression": {"type": "string", "description": "The math expression to evaluate, e.g., '15 * 35 * 4.33'"}
+                    },
+                    "required": ["expression"]
                 }
             }
         }
@@ -703,6 +767,11 @@ def construct_response(
                         mode=func_args.get("mode", "driving")
                     )
                     print("Direction tool output {}".format(output))
+                elif func_name == "calculator_tool":
+                    output = calculator_tool(
+                        expression=func_args.get("expression", "0"),
+                    )
+                    print("Calculator tool output {}".format(output))
                     
                 else:
                     output = "Error: Unknown tool."
