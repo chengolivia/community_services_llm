@@ -5,22 +5,11 @@ APIs to build streaming responses.
 """
 
 import os
-import re
-import time
-import concurrent.futures
-import numpy as np
 import openai
 import json 
-import pickle 
 
 from app.rag_utils import get_model_and_indices
-from app.utils import (
-    call_chatgpt_api_all_chats,
-    stream_process_chatgpt_response,
-    get_all_prompts,
-)
 from app.tools import *
-import faiss
 
 # Initialize
 openai.api_key = os.environ.get("SECRET_KEY")

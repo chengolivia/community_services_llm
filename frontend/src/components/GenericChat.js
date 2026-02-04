@@ -146,6 +146,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [conversationID, setConversationID] = useState('');
+  const [showFeedback, setShowFeedback] = useState(false);
   const [goals, setGoals] = useState([]); 
   const [resources, setResources] = useState([]);
   const [serviceUsers, setServiceUsers] = useState([]);
@@ -252,6 +253,30 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       setCheckIns([]);
     }
   }, [selectedServiceUser]);
+
+  const handleFeedbackSubmit = async (rating, comment) => {
+    if (!conversationID) {
+      alert("No active conversation to rate.");
+      return;
+    }
+
+    try {
+      // NOTE: Ensure authenticatedFetch supports JSON bodies correctly
+      await authenticatedFetch(`/submit_feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationID,
+          rating: rating,
+          feedback_text: comment
+        })
+      });
+      alert("Thank you for your feedback!");
+    } catch (error) {
+      console.error("Feedback error:", error);
+      alert("Failed to save feedback.");
+    }
+  };
 
   // Auto-scroll management
   const handleScroll = useCallback((e) => {
@@ -595,6 +620,18 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
           </button>
           <button
             className="submit-button"
+            style={{ 
+              width: '80px', 
+              height: '100%', 
+              marginLeft: '20px', 
+            }}
+            onClick={() => setShowFeedback(true)}
+            disabled={!conversationID} 
+          >
+            Feedback
+          </button>
+          <button
+            className="submit-button"
             style={{ width: '60px', height: '100%', marginLeft: '20px' }}
             onClick={exportChatToPDF}
           >
@@ -619,10 +656,97 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             </button>
           )}
         </div>
+        <FeedbackModal 
+          isOpen={showFeedback} 
+          onClose={() => setShowFeedback(false)} 
+          onSubmit={handleFeedbackSubmit} 
+        />
       </div>
     </div>
   );
 }
+
+const FeedbackModal = ({ isOpen, onClose, onSubmit }) => {
+  // 1 = Up (Helpful), 0 = Down (Not Helpful)
+  const [rating, setRating] = useState(null); 
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (rating === null) return;
+    setIsSubmitting(true);
+    await onSubmit(rating, comment);
+    setIsSubmitting(false);
+    onClose();
+    setRating(null); // Reset after submit
+    setComment('');
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content" style={{ maxWidth: '400px' }}>
+        <h3>Rate this Session</h3>
+        <p>Was this conversation helpful?</p>
+        
+        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', margin: '20px 0' }}>
+          <button 
+            onClick={() => setRating(1)}
+            className="submit-button"
+            style={{ 
+              background: rating === 1 ? '#4CAF50' : '#f0f0f0', 
+              color: rating === 1 ? 'white' : '#333',
+              border: rating === 1 ? 'none' : '1px solid #ccc',
+              flex: 1
+            }}
+          >
+            👍 Helpful
+          </button>
+          <button 
+            onClick={() => setRating(0)}
+            className="submit-button"
+            style={{ 
+              background: rating === 0 ? '#f44336' : '#f0f0f0', 
+              color: rating === 0 ? 'white' : '#333',
+              border: rating === 0 ? 'none' : '1px solid #ccc',
+              flex: 1
+            }}
+          >
+            👎 Not Helpful
+          </button>
+        </div>
+
+        <textarea
+          placeholder="Optional: What was missing or incorrect?"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          style={{ 
+            width: '100%', 
+            height: '80px', 
+            marginBottom: '15px', 
+            padding: '10px',
+            borderRadius: '8px',
+            border: '1px solid #ddd',
+            fontFamily: 'inherit',
+            resize: 'none'
+          }}
+        />
+
+        <div className="modal-buttons">
+          <button onClick={onClose} className="btn-cancel" disabled={isSubmitting}>Cancel</button>
+          <button 
+            onClick={handleSubmit} 
+            className="btn-confirm" 
+            disabled={rating === null || isSubmitting}
+          >
+            {isSubmitting ? 'Sending...' : 'Submit Feedback'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const WellnessGoals = () => (
   <GenericChat

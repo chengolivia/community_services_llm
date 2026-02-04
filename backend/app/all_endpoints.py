@@ -23,6 +23,8 @@ from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import get_current_user, UserData
 from app.login import router as auth_router
+from typing import Optional
+import psycopg
 
 from app.database import (
     update_conversation, 
@@ -401,6 +403,46 @@ def _background_stream(
 async def connect(sid, environ):
     print(f"[Socket.IO] Client connected: {sid}")
     await sio.emit("welcome", {"message": "Welcome from backend!"}, room=sid)
+
+class FeedbackRequest(BaseModel):
+    conversation_id: str
+    rating: int  # 1 for helpful, 0 for not (or 1-5 scale)
+    feedback_text: Optional[str] = ""
+
+@app.post("/submit_feedback")
+def submit_feedback(feedback: FeedbackRequest):
+    """
+    Receives feedback for a specific conversation and saves it to the DB.
+    """
+    if not feedback.conversation_id:
+        raise HTTPException(status_code=400, detail="Conversation ID is required")
+
+    try:
+        # Use your existing connection string
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            with conn.cursor() as cur:
+                
+                # Optional: Verify conversation exists first
+                # cur.execute("SELECT 1 FROM conversations WHERE id = %s", (feedback.conversation_id,))
+                # if not cur.fetchone():
+                #     raise HTTPException(status_code=404, detail="Conversation not found")
+
+                cur.execute(
+                    """
+                    INSERT INTO conversation_feedback 
+                    (conversation_id, rating, feedback_text)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (feedback.conversation_id, feedback.rating, feedback.feedback_text)
+                )
+            conn.commit()
+            
+        print(f"[Feedback] Saved for {feedback.conversation_id}: Rating {feedback.rating}")
+        return {"success": True, "message": "Feedback received"}
+
+    except Exception as e:
+        print(f"[Feedback Error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @sio.event
 async def disconnect(sid):
