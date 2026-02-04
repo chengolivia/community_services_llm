@@ -11,6 +11,7 @@ import concurrent.futures
 
 import numpy as np
 import openai
+import json 
 
 from app.rag_utils import get_model_and_indices
 from app.utils import (
@@ -347,6 +348,61 @@ def fetch_goals_and_resources(
 # RESPONSE CONSTRUCTION
 # ============================================================================
 
+def query_resources(
+    query: str,
+    org_key: str,
+    k: int = 5
+):
+    """
+    Search preloaded organization resources using FAISS embeddings.
+    
+    Args:
+        query: User query string
+        org_key: Organization ID (e.g., 'cspnj')
+        k: Number of top results to return
+
+    Returns:
+        List of dictionaries with 'resource_text' and FAISS similarity 'score'
+    """
+    doc_key = f'resource_{org_key}'
+    
+    if doc_key not in saved_indices:
+        print(f"[Warning] No resources loaded for {org_key}")
+        return []
+    
+    # Encode the query
+    query_emb = embedding_model.encode(query, convert_to_numpy=True).reshape(1, -1)
+    
+    # Search FAISS index
+    D, I = saved_indices[doc_key].search(query_emb, k=k)
+    
+    results = []
+    for score, idx in zip(D[0], I[0]):
+        if idx < len(documents[doc_key]):
+            results.append({
+                "resource_text": documents[doc_key][idx],
+                "score": float(score)
+            })
+    
+    return results
+
+def resources_tool(query: str, organization: str, k: int = 5):
+    """
+    GPT-accessible tool for fetching top organization resources.
+    Returns formatted string for GPT consumption.
+    """
+    top_resources = query_resources(query, organization.lower(), k=k)
+    if not top_resources:
+        return "No relevant resources found."
+    
+    lines = []
+    for r in top_resources:
+        # r['resource_text'] is already a formatted string if you used documents
+        lines.append(f"- {r['resource_text']} (score: {r['score']:.2f})")
+    
+    return "\n".join(lines)
+
+
 def construct_response(
     situation: str,
     all_messages: list,
@@ -356,33 +412,102 @@ def construct_response(
     external_resources: str,
     raw_prompt: str
 ):
-    """
-    Main response generation with streaming.
-    
-    Args:
-        situation: Current user message
-        all_messages: Previous messages
-        model: Model type ('chatgpt' or 'copilot')
-        organization: Organization identifier
-        full_response: Pre-computed goals/questions/resources
-        external_resources: External resource text
-        raw_prompt: Raw resource extraction output
-    
-    Yields:
-        Response chunks for streaming
-    """
-    print("[DEBUG] Constructing final response...")
-    print("[DEBUG] Situation is {}, all_messages {}".format(situation,all_messages))
+    # 1. Update the tool definition to the 'tools' format
+    tools = [
+        {
+            "type": "function", # Required wrapper
+            "function": {
+                "name": "resources_tool",
+                "description": "Search top organization resources given a user query.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "User query about services"},
+                        "organization": {"type": "string", "description": "Organization ID, e.g., 'cspnj'"},
+                        "k": {"type": "integer", "description": "Number of top results", "default": 5}
+                    },
+                    "required": ["query", "organization"]
+                }
+            }
+        }
+    ]
 
-    orchestration_messages = [{'role': 'system', 'content': 'You are a helpful assistant. You will help peer providers at CSPNJ by answering their questions.'}]
+    orchestration_messages = [
+        {"role": "system", "content": "You are a helpful assistant for CSPNJ peer providers. Use tools to fetch resources."}
+    ]
     orchestration_messages += all_messages
-    
-    response = call_chatgpt_api_all_chats(
-        orchestration_messages, 
-        stream=True, 
-        max_tokens=1000
+    orchestration_messages.append({"role": "user", "content": situation})
+
+    # 2. Use 'tools' instead of 'functions'
+    response = openai.chat.completions.create(
+        model="gpt-5.2",
+        messages=orchestration_messages,
+        tools=tools,           # Changed from functions
+        tool_choice="auto",    # Changed from function_call
+        stream=True
     )
 
-    print("[DEBUG] Streaming response from OpenAI...")
+    current_tool_call = None
+    full_args = ""
 
-    yield from stream_process_chatgpt_response(response)
+    for event in response:
+        choice = event.choices[0]
+        delta = choice.delta
+
+        if delta.content:
+            # Fix the SyntaxError by moving replacement logic out of the f-string braces
+            formatted_content = delta.content.replace("\n", "<br/>")
+            yield f"data: {formatted_content}\n\n"        # 3. Handle Tool Calls (streaming tool calls arrive in chunks)
+        if delta.tool_calls:
+            tc_delta = delta.tool_calls[0]
+            
+            if tc_delta.id:
+                current_tool_call = tc_delta # Capture ID and function name
+            if tc_delta.function and tc_delta.function.arguments:
+                full_args += tc_delta.function.arguments
+
+        # 4. Check if tool call is complete (finish_reason)
+        if choice.finish_reason == "tool_calls":
+            func_args = json.loads(full_args)
+            
+            # Execute your tool
+            tool_output = resources_tool(
+                query=func_args.get("query", ""),
+                organization=func_args.get("organization", organization),
+                k=func_args.get("k", 5)
+            )
+
+            # MUST append the assistant's tool call message first
+            orchestration_messages.append({
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": current_tool_call.id,
+                        "type": "function",
+                        "function": {
+                            "name": current_tool_call.function.name,
+                            "arguments": full_args
+                        }
+                    }
+                ]
+            })
+
+            # THEN append the tool result with matching ID
+            orchestration_messages.append({
+                "role": "tool", # New role name
+                "tool_call_id": current_tool_call.id, # Link to the call
+                "content": tool_output
+            })
+
+            # Final follow-up
+            followup = openai.chat.completions.create(
+                model="gpt-5.2",
+                messages=orchestration_messages,
+                stream=True
+            )
+            
+            for f_event in followup:
+                if f_event.choices[0].delta.content:
+                    formatted_content = f_event.choices[0].delta.content.replace("\n", "<br/>")
+                    yield f"data: {formatted_content}\n\n"
+    yield "[DONE]\n\n"
