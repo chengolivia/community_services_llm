@@ -3,10 +3,10 @@
 import os
 import numpy as np
 import pandas as pd
-import faiss
 import psycopg
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
+import faiss
 
 from .utils import BASE_DIR
 

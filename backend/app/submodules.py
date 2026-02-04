@@ -12,6 +12,7 @@ import concurrent.futures
 import numpy as np
 import openai
 import json 
+import pickle 
 
 from app.rag_utils import get_model_and_indices
 from app.utils import (
@@ -19,13 +20,114 @@ from app.utils import (
     stream_process_chatgpt_response,
     get_all_prompts,
 )
+import faiss
 
 # Initialize
 openai.api_key = os.environ.get("SECRET_KEY")
 # NOTE: This eagerly loads embedding models and indices on import which can be
 # expensive; consider lazy-loading in production to reduce startup time.
 embedding_model, saved_indices, documents = get_model_and_indices()
+
 internal_prompts, external_prompts = get_all_prompts()
+
+STORAGE_DIR = "vector_storage"
+
+
+def simple_text_splitter(text, chunk_size=1000, chunk_overlap=100):
+    """
+    A lightweight replacement for RecursiveCharacterTextSplitter.
+    """
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        chunks.append(chunk)
+        # Move the start pointer forward, but subtract overlap
+        start += (chunk_size - chunk_overlap)
+    return chunks
+def ingest_folder(folder_path, category_name):
+    """
+    Reads all files in a folder, chunks them, and adds them to your FAISS indices.
+    """
+    category_docs = []
+    
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".md") or filename.endswith(".html") or filename.endswith(".txt"):
+            with open(os.path.join(folder_path, filename), 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Split into smaller chunks so GPT doesn't get overwhelmed
+                chunks = simple_text_splitter(content, chunk_size=1000, chunk_overlap=100)
+                for i, chunk in enumerate(chunks):
+                    category_docs.append(f"Source: {filename} (Part {i})\n{chunk}")
+
+    # Create the FAISS index for this specific category
+    doc_key = f"cat_{category_name}"
+    embeddings = embedding_model.encode(category_docs, convert_to_numpy=True)
+
+    # Initialize FAISS (assuming you're using IndexFlatL2 for simplicity)
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    
+    # Save to your global dictionaries
+    saved_indices_peer[doc_key] = index
+    documents_peer[doc_key] = category_docs
+    print(f"Loaded {len(category_docs)} chunks into {doc_key}")
+
+def save_vector_store():
+    """Saves all currently loaded indices and documents to disk."""
+    if not os.path.exists(STORAGE_DIR):
+        os.makedirs(STORAGE_DIR)
+    
+    # 1. Save the text documents (the actual content GPT needs)
+    with open(os.path.join(STORAGE_DIR, "documents.pkl"), "wb") as f:
+        pickle.dump(documents_peer, f)
+    
+    # 2. Save each FAISS index individually
+    for key, index in saved_indices_peer.items():
+        index_path = os.path.join(STORAGE_DIR, f"{key}.index")
+        faiss.write_index(index, index_path)
+    
+    print(f"Successfully saved {len(saved_indices_peer)} indices to {STORAGE_DIR}")
+
+def load_vector_store():
+    """Loads indices and documents from disk into memory."""
+    global documents_peer, saved_indices_peer
+    
+    doc_path = os.path.join(STORAGE_DIR, "documents.pkl")
+    if not os.path.exists(doc_path):
+        print("No existing storage found. Starting fresh.")
+        return
+
+    # 1. Load the text documents
+    with open(doc_path, "rb") as f:
+        documents_peer = pickle.load(f)
+    
+    # 2. Load all .index files in the directory
+    for filename in os.listdir(STORAGE_DIR):
+        if filename.endswith(".index"):
+            key = filename.replace(".index", "")
+            index_path = os.path.join(STORAGE_DIR, filename)
+            saved_indices_peer[key] = faiss.read_index(index_path)
+            
+    print(f"Loaded {len(saved_indices_peer)} indices from disk.")
+
+saved_indices_peer = {}
+documents_peer = {}
+
+# 2. Try to load from disk first
+load_vector_store()
+
+# 3. Only ingest if the store is empty (or if you have new files)
+if not saved_indices_peer:
+
+    print("[DEBUG] Ingesting files for the first time...")
+    ingest_folder("library_resources/peer", "peer")
+    ingest_folder("library_resources/crisis", "crisis")
+    ingest_folder("library_resources/trans", "trans")
+    # Save after first ingestion
+    save_vector_store()
 
 # ============================================================================
 # RAG RESOURCE EXTRACTION
@@ -402,6 +504,25 @@ def resources_tool(query: str, organization: str, k: int = 5):
     
     return "\n".join(lines)
 
+def library_tool(query: str, category: str, k: int = 3):
+    """
+    Searches specialized document libraries (e.g., 'trans', 'crisis', 'legal').
+    """
+    doc_key = f"cat_{category.lower()}"
+    
+    if doc_key not in saved_indices_peer:
+        return f"Error: The category '{category}' does not exist. Available: trans, crisis, housing."
+    
+    # Standard FAISS search (same logic as your query_resources)
+    query_emb = embedding_model.encode(query, convert_to_numpy=True).reshape(1, -1)
+    D, I = saved_indices_peer[doc_key].search(query_emb, k=k)
+    
+    results = [documents_peer[doc_key][idx] for idx in I[0] if idx < len(documents_peer[doc_key])]
+    
+    if not results:
+        return "No specific documents found for that query."
+        
+    return "\n---\n".join(results)
 
 def construct_response(
     situation: str,
@@ -429,6 +550,25 @@ def construct_response(
                     "required": ["query", "organization"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "library_tool",
+                "description": "Search deep-dive documents for specific topics like LGBTQ/Trans issues, Crisis intervention, or Peer Support.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "The specific question to look up"},
+                        "category": {
+                            "type": "string", 
+                            "enum": ["trans", "crisis", "peer"], # Tell GPT what's available
+                            "description": "The topic area to search"
+                        }
+                    },
+                    "required": ["query", "category"]
+                }
+            }
         }
     ]
 
@@ -438,68 +578,87 @@ def construct_response(
     orchestration_messages += all_messages
     orchestration_messages.append({"role": "user", "content": situation})
 
-    # 2. Use 'tools' instead of 'functions'
     response = openai.chat.completions.create(
         model="gpt-5.2",
         messages=orchestration_messages,
-        tools=tools,           # Changed from functions
-        tool_choice="auto",    # Changed from function_call
+        tools=tools,
+        tool_choice="auto",
         stream=True
     )
 
-    current_tool_call = None
-    full_args = ""
+    # NEW: Use a dictionary to track multiple tool calls by their index
+    tool_calls_accum = {} 
 
     for event in response:
         choice = event.choices[0]
         delta = choice.delta
 
+        # 1. Handle normal text content
         if delta.content:
-            # Fix the SyntaxError by moving replacement logic out of the f-string braces
             formatted_content = delta.content.replace("\n", "<br/>")
-            yield f"data: {formatted_content}\n\n"        # 3. Handle Tool Calls (streaming tool calls arrive in chunks)
+            yield f"data: {formatted_content}\n\n"
+
+        # 2. Accumulate Tool Calls
         if delta.tool_calls:
-            tc_delta = delta.tool_calls[0]
-            
-            if tc_delta.id:
-                current_tool_call = tc_delta # Capture ID and function name
-            if tc_delta.function and tc_delta.function.arguments:
-                full_args += tc_delta.function.arguments
+            for tc_delta in delta.tool_calls:
+                idx = tc_delta.index
+                
+                # Initialize this tool call if it's the first time we see this index
+                if idx not in tool_calls_accum:
+                    tool_calls_accum[idx] = {"id": "", "name": "", "arguments": ""}
+                
+                if tc_delta.id:
+                    tool_calls_accum[idx]["id"] = tc_delta.id
+                if tc_delta.function:
+                    if tc_delta.function.name:
+                        tool_calls_accum[idx]["name"] = tc_delta.function.name
+                    if tc_delta.function.arguments:
+                        tool_calls_accum[idx]["arguments"] += tc_delta.function.arguments
 
-        # 4. Check if tool call is complete (finish_reason)
+        # 3. Check if we should execute the tools
         if choice.finish_reason == "tool_calls":
-            func_args = json.loads(full_args)
-            
-            # Execute your tool
-            tool_output = resources_tool(
-                query=func_args.get("query", ""),
-                organization=func_args.get("organization", organization),
-                k=func_args.get("k", 5)
-            )
-
-            # MUST append the assistant's tool call message first
-            orchestration_messages.append({
+            # Append the assistant's tool_calls message FIRST
+            assistant_tool_msg = {
                 "role": "assistant",
                 "tool_calls": [
                     {
-                        "id": current_tool_call.id,
+                        "id": tc["id"],
                         "type": "function",
-                        "function": {
-                            "name": current_tool_call.function.name,
-                            "arguments": full_args
-                        }
-                    }
+                        "function": {"name": tc["name"], "arguments": tc["arguments"]}
+                    } for tc in tool_calls_accum.values()
                 ]
-            })
+            }
+            orchestration_messages.append(assistant_tool_msg)
 
-            # THEN append the tool result with matching ID
-            orchestration_messages.append({
-                "role": "tool", # New role name
-                "tool_call_id": current_tool_call.id, # Link to the call
-                "content": tool_output
-            })
+            # Execute EACH tool call and append the results
+            for idx, tc in tool_calls_accum.items():
+                func_name = tc["name"]
+                func_args = json.loads(tc["arguments"]) # Now this will only have ONE object
+                
+                print(f"[DEBUG] Executing {func_name} with {func_args}")
+                
+                if func_name == "resources_tool":
+                    output = resources_tool(
+                        query=func_args.get("query", ""),
+                        organization=func_args.get("organization", organization)
+                    )
+                elif func_name == "library_tool":
+                    output = library_tool(
+                        query=func_args.get("query", ""),
+                        category=func_args.get("category", "crisis")
+                    )
+                    print("Library tool output {}".format(output))
+                else:
+                    output = "Error: Unknown tool."
 
-            # Final follow-up
+                # Add each result to history
+                orchestration_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": output
+                })
+
+            # 4. Final follow-up call with all results
             followup = openai.chat.completions.create(
                 model="gpt-5.2",
                 messages=orchestration_messages,
@@ -510,4 +669,5 @@ def construct_response(
                 if f_event.choices[0].delta.content:
                     formatted_content = f_event.choices[0].delta.content.replace("\n", "<br/>")
                     yield f"data: {formatted_content}\n\n"
+
     yield "[DONE]\n\n"
