@@ -371,76 +371,18 @@ def construct_response(
     Yields:
         Response chunks for streaming
     """
-    print(f"[Response] Starting at {time.time()}")
-    
-    # Check if goals are needed (currently always true)
-    needs_goals = True
-    verbosity = "medium"
-    
-    # Small talk branch (unused for now)
-    if not needs_goals:
-        chat_msgs = (
-            [{
-                "role": "system", 
-                "content": f"You are a helpful assistant for {organization}. "
-                          "Reply warmly and concisely."
-            }]
-            + all_messages
-            + [{"role": "user", "content": situation}]
-        )
-        response = call_chatgpt_api_all_chats(chat_msgs, stream=True, max_tokens=500)
-        yield from stream_process_chatgpt_response(response)
-        return
-    
-    # Brief goals only
-    if verbosity == "brief":
-        prompt = (
-            f"You are a concise assistant for {organization}. "
-            "Given the user's request, produce **up to three** SMART goals "
-            "as bullet points, each in one short sentence, tailored exactly "
-            "to their situation."
-        )
-        msgs = (
-            [{"role": "system", "content": prompt}]
-            + all_messages
-            + [{"role": "user", "content": situation}]
-        )
-        response = call_chatgpt_api_all_chats(msgs, stream=True, max_tokens=200)
-        yield from stream_process_chatgpt_response(response)
-        return
-    
-    # ChatGPT mode
-    if model == 'chatgpt':
-        msgs = (
-            [{
-                'role': 'system', 
-                'content': f"You are a Co-Pilot tool for {organization}, "
-                          "a peer-peer support org."
-            }]
-            + all_messages
-            + [{'role': 'user', 'content': situation}]
-        )
-        response = call_chatgpt_api_all_chats(msgs, max_tokens=750)
-        yield from stream_process_chatgpt_response(response)
-        return
-    
-    # Full copilot orchestration
-    print(f"[Response] Full orchestration at {time.time()}")
-    
-    orchestration_messages = [
-        {'role': 'system', 'content': internal_prompts['orchestration']},
-        {'role': 'system', 'content': external_resources}
-    ]
+    print("[DEBUG] Constructing final response...")
+    print("[DEBUG] Situation is {}, all_messages {}".format(situation,all_messages))
+
+    orchestration_messages = [{'role': 'system', 'content': 'You are a helpful assistant. You will help peer providers at CSPNJ by answering their questions.'}]
     orchestration_messages += all_messages
-    orchestration_messages += [
-        {"role": "user", "content": situation},
-        {"role": "user", "content": full_response}
-    ]
     
-    print(f"[Response] Streaming orchestration at {time.time()}")
     response = call_chatgpt_api_all_chats(
         orchestration_messages, 
         stream=True, 
         max_tokens=1000
     )
+
+    print("[DEBUG] Streaming response from OpenAI...")
+
     yield from stream_process_chatgpt_response(response)

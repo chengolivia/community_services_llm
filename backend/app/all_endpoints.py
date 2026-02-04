@@ -292,7 +292,7 @@ def _background_stream(
             organization, 
             full_response, 
             external_resources, 
-            raw_prompt
+            raw_prompt,
         )
         
         accumulated_text = ""
@@ -316,6 +316,7 @@ def _background_stream(
             ],
             service_user_id
         )
+        session_histories[sid].append({"role": "assistant", "content": accumulated_text})
 
     except Exception as e:
         print(f"[BackgroundStream] Error: {e}")
@@ -348,10 +349,15 @@ async def connect(sid, environ):
 async def disconnect(sid):
     print(f"[Socket.IO] Client disconnected: {sid}")
 
+session_histories = {}  # global dict: sid -> list of messages
+
 @sio.event
 async def start_generation(sid, data):
     """Initiate text generation based on user input."""
     print(f"[Socket.IO] start_generation from {sid} at {time.time()}")
+
+    if sid not in session_histories:
+        session_histories[sid] = []
 
     # Extract request data
     text = data.get("text", "")
@@ -371,29 +377,15 @@ async def start_generation(sid, data):
         'conversation_id': conversation_id,
         'username': username
     }
+   
+    full_response, external_resources, raw_prompt = "", "", ""
     
-    # Fetch goals and resources
-    needs_goals = True  # Currently always true, can be made dynamic
-    
-    if needs_goals:
-        loop = asyncio.get_running_loop()
-        goals, resources, full_response, external_resources, raw_prompt = \
-            await loop.run_in_executor(
-                None,
-                fetch_goals_and_resources,
-                text,
-                previous_text,
-                organization
-            )
+    text = data.get("text", "")
+    session_histories[sid].append({"role": "user", "content": text})
 
-        await sio.emit(
-            "goals_update",
-            {"goals": goals, "resources": resources},
-            room=sid
-        )
-    else:
-        full_response, external_resources, raw_prompt = "", "", ""
-    
+    # fetch full conversation
+    all_messages = session_histories[sid]
+
     print(f"Finished goals/resources at {time.time()}")
 
     # Start background streaming
@@ -401,7 +393,7 @@ async def start_generation(sid, data):
     threading.Thread(
         target=_background_stream,
         args=(
-            sid, text, previous_text, model, organization, 
+            sid, text, all_messages, model, organization, 
             loop, metadata, service_user_id, 
             full_response, external_resources, raw_prompt
         ),
