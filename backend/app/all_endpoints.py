@@ -12,7 +12,7 @@ from datetime import timedelta
 
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field 
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -36,6 +36,7 @@ from app.database import (
 )
 from app.generate_outreach import generate_check_ins_rule_based
 from app.notifications import notification_job
+import openai 
 
 # Environment configuration
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -166,6 +167,67 @@ class NewServiceUser(BaseModel):
     followUpMessage: str
     username: str
 
+class SidebarItem(BaseModel):
+    title: str = Field(description="A short, 3-5 word title for the goal or resource.")
+    details: str = Field(description="A single actionable sentence describing the next step or key info.")
+
+class SidebarState(BaseModel):
+    goals: list[SidebarItem] = Field(description="Current, active goals based on the ENTIRE conversation.")
+    resources: list[SidebarItem] = Field(description="All relevant resources mentioned so far.")
+
+def generate_sidebar_update(all_messages, sid, loop):
+    """
+    Analyzes the FULL conversation to produce a cumulative, detailed sidebar.
+    """
+    try:
+        # 1. Use the FULL history (filter out system/tool messages to save some tokens if you want)
+        # We keep 'user' and 'assistant' to understand the flow.
+        context_messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in all_messages 
+            if m["role"] in ["user", "assistant"]
+        ]
+
+        system_prompt = (
+            "You are the state manager for a peer support dashboard. "
+            "Analyze the ENTIRE conversation history provided below.\n"
+            "1. Identify 3-5 'Active Goals'. These should be tasks the user is currently working on. "
+            "   - If a goal was completed or abandoned in the chat, DO NOT include it.\n"
+            "   - Provide a 'details' sentence for each (e.g., 'Check eligibility tool for SNAP').\n"
+            "2. Identify 'Resources'. These are organizations, tools, or websites mentioned by the assistant. "
+            "   - Provide a 'details' sentence (e.g., 'Located at 123 Main St, open 9-5')."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}] + context_messages
+
+        # 2. Call GPT-4o-mini
+        client = openai.Client(api_key=os.environ.get("SECRET_KEY"))
+        
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-mini", 
+            messages=messages,
+            response_format=SidebarState
+        )
+        
+        state_data = completion.choices[0].message.parsed
+        
+        # 3. Serialize to dict for JSON transmission
+        # We need to convert Pydantic models to standard dicts for Socket.IO
+        update_payload = {
+            "goals": [item.model_dump() for item in state_data.goals],
+            "resources": [item.model_dump() for item in state_data.resources]
+        }
+
+        print(f"[Sidecar] Emitting update for {sid}: {len(state_data.goals)} goals")
+
+        asyncio.run_coroutine_threadsafe(
+            sio.emit("goals_update", update_payload, room=sid),
+            loop
+        )
+
+    except Exception as e:
+        print(f"[Sidecar] Error: {e}")
+        
 @app.get("/service_user_list/")
 async def service_user_list(current_user: UserData = Depends(get_current_user)):
     return get_all_service_users(current_user.username, current_user.organization)
@@ -284,6 +346,8 @@ def _background_stream(
     Runs construct_response in its own OS thread.
     Uses run_coroutine_threadsafe so .emit() coroutines are correctly awaited.
     """
+    accumulated_text = ""
+
     try:
         gen = construct_response(
             text, 
@@ -295,7 +359,6 @@ def _background_stream(
             raw_prompt,
         )
         
-        accumulated_text = ""
         for accumulated_text in accumulate_chunks(gen):
             asyncio.run_coroutine_threadsafe(
                 sio.emit("generation_update", {"chunk": accumulated_text}, room=sid),
@@ -317,6 +380,8 @@ def _background_stream(
             service_user_id
         )
         session_histories[sid].append({"role": "assistant", "content": accumulated_text})
+        print("[Background] Triggering sidebar update...")
+        generate_sidebar_update(session_histories[sid], sid, loop)
 
     except Exception as e:
         print(f"[BackgroundStream] Error: {e}")

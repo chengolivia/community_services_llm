@@ -146,8 +146,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [conversationID, setConversationID] = useState('');
-  const [goalsList, setGoalsList] = useState([]);
-  const [resourcesList, setResourcesList] = useState([]);
+  const [goals, setGoals] = useState([]); 
+  const [resources, setResources] = useState([]);
   const [serviceUsers, setServiceUsers] = useState([]);
   const [selectedServiceUser, setSelectedServiceUser] = useState('');
   const [pendingServiceUser, setPendingServiceUser] = useState(null);
@@ -207,10 +207,10 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       }
     });
 
-    newSocket.on('goals_update', ({ goals, resources }) => {
-      console.log('[Socket.io] goals_update:', goals, resources);
-      setGoalsList(goals);
-      setResourcesList(resources);
+    newSocket.on('goals_update', (data) => {
+      // data.goals is now an array of {title, details}
+      setGoals(data.goals);
+      setResources(data.resources);
     });
 
     newSocket.on('generation_complete', (data) => {
@@ -410,8 +410,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     setConversation([]);
     setChatConvo([]);
     setConversationID('');
-    setGoalsList([]);
-    setResourcesList([]);
+    setGoals([]);
+    setResources([]);
 
     if (socket) {
       socket.emit('reset_session', {
@@ -514,27 +514,34 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             <div ref={conversationEndRef} />
           </div>
         </div>
-
         <div className="right-section">
           <div className="goals-box">
-            <h3>Goals</h3>
-            <div className="scroll-container">
-              {goalsList.map((goal, idx) => (
-                <ResourceItem key={`goal-${idx}`} content={goal} />
+            <h3>Active Goals</h3>
+            <div className="scroll-area">
+              {goals.length === 0 && <p className="empty-state">No active goals.</p>}
+              {goals.map((item, index) => (
+                <div key={index} className="card-item">
+                  <div className="card-title"><strong>{item.title}</strong></div>
+                  <div className="card-details">{item.details}</div>
+                </div>
               ))}
             </div>
           </div>
 
           <div className="resources-box">
             <h3>Resources</h3>
-            <div className="scroll-container">
-              {resourcesList.map((res, idx) => (
-                <ResourceItem key={`resource-${idx}`} content={res} />
+            <div className="scroll-area">
+              {resources.length === 0 && <p className="empty-state">No resources yet.</p>}
+              {resources.map((item, index) => (
+                <div key={index} className="card-item">
+                  <div className="card-title"><strong>{item.title}</strong></div>
+                  <div className="card-details">{item.details}</div>
+                </div>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </div> 
 
       <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
         {showLocation && (
@@ -597,7 +604,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             className="submit-button"
             style={{ width: '100px', height: '100%', marginLeft: '20px' }}
             onClick={printSidebar}
-            disabled={goalsList.length === 0 && resourcesList.length === 0}
+            disabled={goals.length === 0 && resources.length === 0}
             aria-label="Print sidebar goals and resources"
           >
             Print Sidebar
