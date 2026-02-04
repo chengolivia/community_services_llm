@@ -5,10 +5,9 @@ import numpy as np
 import pandas as pd
 import psycopg
 from sentence_transformers import SentenceTransformer
-from pathlib import Path
 import faiss
-
-from .utils import BASE_DIR
+import pickle 
+import glob 
 
 # Environment configuration
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -20,66 +19,104 @@ CONNECTION_STRING = os.getenv("RESOURCE_DB_URL")
 _model = None
 _saved_indices = None
 _documents = None
+_saved_pages = None
+_documents_pages = None 
+
+all_organizations = ['cspnj','clhs']
+
+STORAGE_DIR = "vector_storage"
+
+def simple_text_splitter(text, chunk_size=1000, chunk_overlap=100):
+    """
+    A lightweight replacement for RecursiveCharacterTextSplitter.
+    """
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        chunks.append(chunk)
+        # Move the start pointer forward, but subtract overlap
+        start += (chunk_size - chunk_overlap)
+    return chunks
+
+def ingest_folder(folder_path, category_name,embedding_model,saved_indices_peer,documents_peer):
+    """
+    Reads all files in a folder, chunks them, and adds them to your FAISS indices.
+    """
+    category_docs = []
+    
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".md") or filename.endswith(".html") or filename.endswith(".txt"):
+            with open(os.path.join(folder_path, filename), 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Split into smaller chunks so GPT doesn't get overwhelmed
+                chunks = simple_text_splitter(content, chunk_size=1000, chunk_overlap=100)
+                for i, chunk in enumerate(chunks):
+                    category_docs.append(f"Source: {filename} (Part {i})\n{chunk}")
+
+    # Create the FAISS index for this specific category
+    doc_key = f"cat_{category_name}"
+    embeddings = embedding_model.encode(category_docs, convert_to_numpy=True)
+
+    # Initialize FAISS (assuming you're using IndexFlatL2 for simplicity)
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    
+    # Save to your global dictionaries
+    saved_indices_peer[doc_key] = index
+    documents_peer[doc_key] = category_docs
+    print(f"Loaded {len(category_docs)} chunks into {doc_key}")
+    return saved_indices_peer,documents_peer
+
+def save_vector_store(saved_indices_peer,documents_peer):
+    """Saves all currently loaded indices and documents to disk."""
+    if not os.path.exists(STORAGE_DIR):
+        os.makedirs(STORAGE_DIR)
+    
+    # 1. Save the text documents (the actual content GPT needs)
+    with open(os.path.join(STORAGE_DIR, "documents.pkl"), "wb") as f:
+        pickle.dump(documents_peer, f)
+    
+    # 2. Save each FAISS index individually
+    for key, index in saved_indices_peer.items():
+        index_path = os.path.join(STORAGE_DIR, f"{key}.index")
+        faiss.write_index(index, index_path)
+    
+    print(f"Successfully saved {len(saved_indices_peer)} indices to {STORAGE_DIR}")
+
+def load_vector_store():
+    """Loads indices and documents from disk into memory."""
+    saved_indices_peer = {}
+    documents_peer = {}
+    doc_path = os.path.join(STORAGE_DIR, "documents.pkl")
+    if not os.path.exists(doc_path):
+        print("No existing storage found. Starting fresh.")
+        return
+
+    # 1. Load the text documents
+    with open(doc_path, "rb") as f:
+        documents_peer = pickle.load(f)
+    
+    # 2. Load all .index files in the directory
+    for filename in os.listdir(STORAGE_DIR):
+        if filename.endswith(".index"):
+            key = filename.replace(".index", "")
+            index_path = os.path.join(STORAGE_DIR, filename)
+            saved_indices_peer[key] = faiss.read_index(index_path)
+            
+    print(f"Loaded {len(saved_indices_peer)} indices from disk.")
+    return saved_indices_peer, documents_peer
 
 def get_model_and_indices():
     """Lazy load embeddings model and indices."""
-    global _model, _saved_indices, _documents
+    global _model, _saved_indices, _documents, _saved_pages, _documents_pages
     if _model is None:
-        _model, _saved_indices, _documents = get_all_embeddings(['cspnj', 'clhs'])
-    return _model, _saved_indices, _documents
+        _model, _saved_indices, _documents = get_all_resources(all_organizations)
+        _saved_pages, _documents_pages = get_all_pages(all_organizations,_model)
+    return _model, _saved_indices, _documents, _saved_pages, _documents_pages
 
-def load_embeddings(file_path: str, documents: list, model) -> np.ndarray:
-    """
-    Load or compute embeddings and save them.
-    
-    Args:
-        file_path: Path to save/load embeddings
-        documents: List of document strings
-        model: SentenceTransformer model
-    
-    Returns:
-        Numpy array of embeddings
-    """
-    if os.path.exists(file_path):
-        return np.load(file_path)
-    
-    embeddings = model.encode(
-        documents, 
-        convert_to_tensor=False, 
-        show_progress_bar=True
-    )
-    embeddings = np.array(embeddings)
-    
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    np.save(file_path, embeddings)
-    
-    return embeddings
-
-def process_guidance_resources(guidance_types: list) -> dict:
-    """
-    Load guidance-specific resources and process them.
-    
-    Args:
-        guidance_types: List of guidance type names
-    
-    Returns:
-        Dictionary mapping guidance type to list of documents
-    """
-    documents_by_guidance = {}
-    
-    for guidance in guidance_types:
-        file_path = BASE_DIR / f"prompts/external/{guidance}.txt"
-        with open(file_path) as file:
-            resource_data = [
-                line for line in file.read().split("\n") 
-                if len(line) > 10
-            ]
-            documents_by_guidance[guidance] = [
-                f"{line}: {resource_data[i]}" 
-                for i, line in enumerate(resource_data)
-            ]
-    
-    return documents_by_guidance
 
 def create_faiss_index(embeddings: np.ndarray) -> faiss.Index:
     """
@@ -148,7 +185,7 @@ def process_resources(resource_list: list) -> tuple:
     
     return documents_dict, embeddings_dict
 
-def get_all_embeddings(resource_list: list) -> tuple:
+def get_all_resources(resource_list: list) -> tuple:
     """
     Get all embeddings for RAG system.
     
@@ -163,18 +200,9 @@ def get_all_embeddings(resource_list: list) -> tuple:
         'sentence-transformers/all-mpnet-base-v2', 
         token=os.getenv('HF_TOKEN')
     )
-    
-    # Process guidance resources
-    guidance_types = ['human_resource', 'peer', 'crisis', 'trans']
-    documents = process_guidance_resources(guidance_types)
-    
+
+    documents = {}
     saved_indices = {}
-    
-    # Create indices for guidance resources
-    for guidance, doc_list in documents.items():
-        embeddings_file = f"saved_embeddings/saved_embedding_{guidance}.npy"
-        embeddings = load_embeddings(embeddings_file, doc_list, model)
-        saved_indices[guidance] = create_faiss_index(embeddings)
     
     # Process organization resources
     org_resources, resource_embeddings = process_resources(resource_list)
@@ -183,13 +211,35 @@ def get_all_embeddings(resource_list: list) -> tuple:
         doc_key = f'resource_{org_key}'
         documents[doc_key] = org_resources[org_key]
         saved_indices[doc_key] = create_faiss_index(resource_embeddings[org_key])
-    
-    # Debug logging
-    example_docs = [
-        doc for doc in documents.get('resource_cspnj', [])
-        if 'Vineland' in doc and 'Salvation' in doc
-    ]
-    if example_docs:
-        print(f"[Debug] Found {len(example_docs)} Vineland Salvation resources")
-    
+        
     return model, saved_indices, documents
+
+def get_all_pages(org_list: list,embedding_model) -> tuple:
+    """
+    Get all embeddings for RAG system.
+    
+    Args:
+        resource_list: List of organization identifiers
+    
+    Returns:
+        Tuple of (model, indices_dict, documents_dict)
+    """
+
+    saved_indices_peer = {}
+    documents_peer = {}
+
+    # 2. Try to load from disk first
+    saved_indices_peer, documents_peer = load_vector_store()
+
+    # 3. Only ingest if the store is empty (or if you have new files)
+    if saved_indices_peer == {}:
+        print("[DEBUG] Ingesting files for the first time...")
+
+        for org in org_list:
+            all_folders = glob.glob("library_resources/{}/*".format(org))
+            for folder in all_folders:
+                saved_indices_peer, documents_peer = ingest_folder(folder, folder.split("/")[-1],embedding_model,saved_indices_peer, documents_peer)
+        # Save after first ingestion
+        save_vector_store(saved_indices_peer,documents_peer)
+
+    return saved_indices_peer, documents_peer

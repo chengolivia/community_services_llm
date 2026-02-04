@@ -26,118 +26,13 @@ import faiss
 openai.api_key = os.environ.get("SECRET_KEY")
 # NOTE: This eagerly loads embedding models and indices on import which can be
 # expensive; consider lazy-loading in production to reduce startup time.
-embedding_model, saved_indices, documents = get_model_and_indices()
-
-internal_prompts, external_prompts = get_all_prompts()
-
-STORAGE_DIR = "vector_storage"
-
-
-def simple_text_splitter(text, chunk_size=1000, chunk_overlap=100):
-    """
-    A lightweight replacement for RecursiveCharacterTextSplitter.
-    """
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunk = text[start:end]
-        chunks.append(chunk)
-        # Move the start pointer forward, but subtract overlap
-        start += (chunk_size - chunk_overlap)
-    return chunks
-def ingest_folder(folder_path, category_name):
-    """
-    Reads all files in a folder, chunks them, and adds them to your FAISS indices.
-    """
-    category_docs = []
-    
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".md") or filename.endswith(".html") or filename.endswith(".txt"):
-            with open(os.path.join(folder_path, filename), 'r', encoding='utf-8') as f:
-                content = f.read()
-                # Split into smaller chunks so GPT doesn't get overwhelmed
-                chunks = simple_text_splitter(content, chunk_size=1000, chunk_overlap=100)
-                for i, chunk in enumerate(chunks):
-                    category_docs.append(f"Source: {filename} (Part {i})\n{chunk}")
-
-    # Create the FAISS index for this specific category
-    doc_key = f"cat_{category_name}"
-    embeddings = embedding_model.encode(category_docs, convert_to_numpy=True)
-
-    # Initialize FAISS (assuming you're using IndexFlatL2 for simplicity)
-    dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(embeddings)
-    
-    # Save to your global dictionaries
-    saved_indices_peer[doc_key] = index
-    documents_peer[doc_key] = category_docs
-    print(f"Loaded {len(category_docs)} chunks into {doc_key}")
-
-def save_vector_store():
-    """Saves all currently loaded indices and documents to disk."""
-    if not os.path.exists(STORAGE_DIR):
-        os.makedirs(STORAGE_DIR)
-    
-    # 1. Save the text documents (the actual content GPT needs)
-    with open(os.path.join(STORAGE_DIR, "documents.pkl"), "wb") as f:
-        pickle.dump(documents_peer, f)
-    
-    # 2. Save each FAISS index individually
-    for key, index in saved_indices_peer.items():
-        index_path = os.path.join(STORAGE_DIR, f"{key}.index")
-        faiss.write_index(index, index_path)
-    
-    print(f"Successfully saved {len(saved_indices_peer)} indices to {STORAGE_DIR}")
-
-def load_vector_store():
-    """Loads indices and documents from disk into memory."""
-    global documents_peer, saved_indices_peer
-    
-    doc_path = os.path.join(STORAGE_DIR, "documents.pkl")
-    if not os.path.exists(doc_path):
-        print("No existing storage found. Starting fresh.")
-        return
-
-    # 1. Load the text documents
-    with open(doc_path, "rb") as f:
-        documents_peer = pickle.load(f)
-    
-    # 2. Load all .index files in the directory
-    for filename in os.listdir(STORAGE_DIR):
-        if filename.endswith(".index"):
-            key = filename.replace(".index", "")
-            index_path = os.path.join(STORAGE_DIR, filename)
-            saved_indices_peer[key] = faiss.read_index(index_path)
-            
-    print(f"Loaded {len(saved_indices_peer)} indices from disk.")
-
-saved_indices_peer = {}
-documents_peer = {}
-
-# 2. Try to load from disk first
-load_vector_store()
-
-# 3. Only ingest if the store is empty (or if you have new files)
-if not saved_indices_peer:
-
-    print("[DEBUG] Ingesting files for the first time...")
-    ingest_folder("library_resources/peer", "peer")
-    ingest_folder("library_resources/crisis", "crisis")
-    ingest_folder("library_resources/trans", "trans")
-    # Save after first ingestion
-    save_vector_store()
-
+embedding_model, saved_resources, documents_resources, saved_articles, documents_articles = get_model_and_indices()
 
 def construct_response(
     situation: str,
     all_messages: list,
     model: str,
     organization: str,
-    full_response: str,
-    external_resources: str,
-    raw_prompt: str
 ):
     # 1. Update the tool definition to the 'tools' format
     tools = [
@@ -311,8 +206,8 @@ def construct_response(
                     output = resources_tool(
                         query=func_args.get("query", ""),
                         organization=func_args.get("organization", organization),
-                        saved_indices=saved_indices,
-                        documents=documents,
+                        saved_indices=saved_resources,
+                        documents=documents_resources,
                         embedding_model=embedding_model
                     )
                 elif func_name == "library_tool":

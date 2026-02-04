@@ -8,7 +8,6 @@ import os
 import threading
 import time
 import secrets
-from datetime import timedelta
 
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +16,6 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import threading
-import json
 import time
 import socketio
 
@@ -338,9 +336,6 @@ def _background_stream(
     loop, 
     metadata, 
     service_user_id, 
-    full_response, 
-    external_resources, 
-    raw_prompt
 ):
     """
     Runs construct_response in its own OS thread.
@@ -354,9 +349,6 @@ def _background_stream(
             previous_text, 
             model, 
             organization, 
-            full_response, 
-            external_resources, 
-            raw_prompt,
         )
         
         for accumulated_text in accumulate_chunks(gen):
@@ -426,7 +418,6 @@ async def start_generation(sid, data):
 
     # Extract request data
     text = data.get("text", "")
-    previous_text = data.get("previous_text", [])
     model = data.get("model")
     organization = data.get("organization")
     conversation_id = data.get("conversation_id", "")
@@ -442,9 +433,7 @@ async def start_generation(sid, data):
         'conversation_id': conversation_id,
         'username': username
     }
-   
-    full_response, external_resources, raw_prompt = "", "", ""
-    
+       
     text = data.get("text", "")
     session_histories[sid].append({"role": "user", "content": text})
 
@@ -460,7 +449,6 @@ async def start_generation(sid, data):
         args=(
             sid, text, all_messages, model, organization, 
             loop, metadata, service_user_id, 
-            full_response, external_resources, raw_prompt
         ),
         daemon=True
     ).start()
