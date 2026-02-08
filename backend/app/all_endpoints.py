@@ -337,7 +337,8 @@ def _background_stream(
     organization, 
     loop, 
     metadata, 
-    service_user_id, 
+    service_user_id,
+    version,
 ):
     """
     Runs construct_response in its own OS thread.
@@ -350,7 +351,8 @@ def _background_stream(
             text, 
             previous_text, 
             model, 
-            organization, 
+            organization,
+            version,
         )
         
         for accumulated_text in accumulate_chunks(gen):
@@ -465,6 +467,7 @@ async def start_generation(sid, data):
     conversation_id = data.get("conversation_id", "")
     username = data.get("username")
     service_user_id = data.get("service_user_id")
+    version = data.get("version", "new")  # Default to "new" if not provided
     
     # Generate conversation ID if needed
     if not conversation_id:
@@ -490,7 +493,7 @@ async def start_generation(sid, data):
         target=_background_stream,
         args=(
             sid, text, all_messages, model, organization, 
-            loop, metadata, service_user_id, 
+            loop, metadata, service_user_id, version,
         ),
         daemon=True
     ).start()

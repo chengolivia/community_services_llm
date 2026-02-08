@@ -22,7 +22,29 @@ def construct_response(
     all_messages: list,
     model: str,
     organization: str,
+    version: str = "new",
 ):
+    # Route to appropriate version implementation
+    if version == "new":
+        # NEW VERSION: Current implementation with all tools
+        return _construct_response_new(situation, all_messages, model, organization)
+    elif version == "old":
+        # OLD VERSION: RAG retrieval → inject into prompt → GPT call (no tools)
+        return _construct_response_old(situation, all_messages, model, organization)
+    elif version == "vanilla":
+        # VANILLA GPT: Simple prompt → GPT call (no RAG, no tools)
+        return _construct_response_vanilla(situation, all_messages, model, organization)
+    else:
+        # Default to new version if unknown version
+        return _construct_response_new(situation, all_messages, model, organization)
+
+def _construct_response_new(
+    situation: str,
+    all_messages: list,
+    model: str,
+    organization: str,
+):
+    """New version: Current implementation with all tools."""
     # 1. Update the tool definition to the 'tools' format
     tools = [
         {
@@ -203,8 +225,8 @@ def construct_response(
                     output = library_tool(
                         query=func_args.get("query", ""),
                         category=func_args.get("category", "crisis"),
-                        saved_indices_peer=saved_indices_peer,
-                        documents_peer=documents_peer,
+                        saved_indices_peer=saved_articles,
+                        documents_peer=documents_articles,
                         embedding_model=embedding_model
                     )
                     print("Library tool output {}".format(output))
@@ -254,4 +276,104 @@ def construct_response(
                     formatted_content = f_event.choices[0].delta.content.replace("\n", "<br/>")
                     yield f"data: {formatted_content}\n\n"
 
+    yield "[DONE]\n\n"
+
+def _construct_response_old(
+    situation: str,
+    all_messages: list,
+    model: str,
+    organization: str,
+):
+    """Old version: RAG retrieval → inject into prompt → GPT call (no tools)."""
+    from app.tools import query_resources
+    
+    # Retrieve top resources using RAG
+    org_key = organization.lower() if organization else "cspnj"
+    top_resources = query_resources(
+        query=situation,
+        org_key=org_key,
+        k=5,
+        saved_indices=saved_resources,
+        documents=documents_resources,
+        embedding_model=embedding_model
+    )
+    
+    # Retrieve library articles (try different categories)
+    library_content = []
+    for category in ["crisis", "trans", "peer"]:
+        try:
+            doc_key = f"cat_{category}"
+            if doc_key in saved_articles:
+                query_emb = embedding_model.encode(situation, convert_to_numpy=True).reshape(1, -1)
+                D, I = saved_articles[doc_key].search(query_emb, k=2)
+                for idx in I[0]:
+                    if idx < len(documents_articles[doc_key]):
+                        library_content.append(documents_articles[doc_key][idx])
+        except Exception as e:
+            print(f"[Old Version] Error retrieving {category}: {e}")
+    
+    # Format retrieved content into prompt
+    rag_context = ""
+    if top_resources:
+        rag_context += "\n\nRelevant Resources:\n"
+        for r in top_resources:
+            rag_context += f"- {r['resource_text']}\n"
+    
+    if library_content:
+        rag_context += "\n\nRelevant Library Articles:\n"
+        for i, article in enumerate(library_content[:3], 1):  # Limit to top 3
+            rag_context += f"{i}. {article}\n\n"
+    
+    # Build messages with RAG context injected
+    system_prompt = "You are a helpful assistant for CSPNJ peer providers. Use the provided resources and articles to help answer questions."
+    user_message = situation + rag_context
+    
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    messages += all_messages
+    messages.append({"role": "user", "content": user_message})
+    
+    # Call GPT without tools
+    response = openai.chat.completions.create(
+        model="gpt-5.2",
+        messages=messages,
+        stream=True
+    )
+    
+    for event in response:
+        if event.choices[0].delta.content:
+            formatted_content = event.choices[0].delta.content.replace("\n", "<br/>")
+            yield f"data: {formatted_content}\n\n"
+    
+    yield "[DONE]\n\n"
+
+def _construct_response_vanilla(
+    situation: str,
+    all_messages: list,
+    model: str,
+    organization: str,
+):
+    """Vanilla GPT: Simple prompt → GPT call (no RAG, no tools)."""
+    # Build messages with simple system prompt
+    system_prompt = "You are a helpful assistant for CSPNJ peer providers. Answer questions based on your general knowledge."
+    
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    messages += all_messages
+    messages.append({"role": "user", "content": situation})
+    
+    # Call GPT without tools, without RAG
+    response = openai.chat.completions.create(
+        model="gpt-5.2",
+        messages=messages,
+        stream=True
+    )
+    
+    for event in response:
+        if event.choices[0].delta.content:
+            formatted_content = event.choices[0].delta.content.replace("\n", "<br/>")
+            yield f"data: {formatted_content}\n\n"
+    
     yield "[DONE]\n\n"

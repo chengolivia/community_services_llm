@@ -155,6 +155,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [generatingCheckIns, setGeneratingCheckIns] = useState(false);
   const [checkIns, setCheckIns] = useState([]);
+  const [version, setVersion] = useState('new'); // 'new', 'old', or 'vanilla'
 
   // Fetch service users
   useEffect(() => {
@@ -340,6 +341,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       conversation_id: conversationID,
       username: user.username,
       service_user_id: user.service_user_id || null,
+      version: version, // 'new', 'old', or 'vanilla'
     });
   }, [
     inputText,
@@ -496,19 +498,38 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       <div className="content-area">
         <div className={`left-section ${submitted ? 'submitted' : ''}`}>
           <h1 className="page-title">{title}</h1>
-          <select 
-              value={selectedServiceUser} 
-              onChange={handleServiceUserChange}
-          >
-              <option value="">General Inquiry (not user-specific)</option>
-              <optgroup label="Service Users">
-                {serviceUsers.map(user => (
-                  <option key={user.service_user_id} value={user.service_user_id}>
-                    {user.service_user_name}
-                  </option>
-                ))}
-              </optgroup>
-          </select>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+            <select 
+                value={selectedServiceUser} 
+                onChange={handleServiceUserChange}
+                style={{ flex: 1 }}
+            >
+                <option value="">General Inquiry (not user-specific)</option>
+                <optgroup label="Service Users">
+                  {serviceUsers.map(user => (
+                    <option key={user.service_user_id} value={user.service_user_id}>
+                      {user.service_user_name}
+                    </option>
+                  ))}
+                </optgroup>
+            </select>
+            <select
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                style={{ 
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  fontSize: '14px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+            >
+              <option value="new">New Version</option>
+              <option value="old">Old Version</option>
+              <option value="vanilla">Vanilla GPT</option>
+            </select>
+          </div>
           <button
             className="submit-button"
             style={{ 
