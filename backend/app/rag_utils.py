@@ -13,6 +13,9 @@ import psycopg
 from sentence_transformers import SentenceTransformer
 import faiss
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # --- Configuration ---
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
