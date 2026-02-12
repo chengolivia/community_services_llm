@@ -475,20 +475,22 @@ def _construct_response_new(
     model: str,
     organization: str,
 ):
-    """New version: Current implementation with all tools."""
-    print("Organization",organization)
-    # 1. Update the tool definition to the 'tools' format
+    print("Organization", organization)
+
     tools = [
         {
-            "type": "function", # Required wrapper
+            "type": "function",
             "function": {
                 "name": "resources_tool",
-                "description": "Search top organization resources given a user query. Use this whenever you need to find shelter, food banks, etc.",
+                "description": (
+                    "Find nearby local resources such as food banks, shelters, or clinics. "
+                    "Always use the user's location when searching."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "User query about services"},
-                        "k": {"type": "integer", "description": "Number of top results", "default": 5}
+                        "query": {"type": "string"},
+                        "k": {"type": "integer", "default": 5}
                     },
                     "required": ["query"]
                 }
@@ -498,15 +500,14 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "library_tool",
-                "description": "Search deep-dive documents for specific topics like LGBTQ/Trans issues, Crisis intervention, or Peer Support.",
+                "description": "Search deep-dive documents for peer support, crisis, or trans-related topics.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The specific question to look up"},
+                        "query": {"type": "string"},
                         "category": {
-                            "type": "string", 
-                            "enum": ["trans", "crisis", "peer"], # Tell GPT what's available
-                            "description": "The topic area to search"
+                            "type": "string",
+                            "enum": ["trans", "crisis", "peer"]
                         }
                     },
                     "required": ["query", "category"]
@@ -517,16 +518,15 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "directions_tool",
-                "description": "Get travel time and distance between two locations for driving or transit.",
+                "description": "Get distance and travel time between two locations.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "origin": {"type": "string", "description": "Starting address or city"},
-                        "destination": {"type": "string", "description": "Ending address or city"},
+                        "origin": {"type": "string"},
+                        "destination": {"type": "string"},
                         "mode": {
-                            "type": "string", 
-                            "enum": ["driving", "transit","walking", "bicycling"], 
-                            "description": "Method of travel"
+                            "type": "string",
+                            "enum": ["driving", "transit", "walking", "bicycling"]
                         }
                     },
                     "required": ["origin", "destination", "mode"]
@@ -537,11 +537,11 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "calculator_tool",
-                "description": "Perform basic math calculations (e.g., converting hourly wage to monthly income).",
+                "description": "Perform basic math calculations.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "expression": {"type": "string", "description": "The math expression to evaluate, e.g., '15 * 35 * 4.33'"}
+                        "expression": {"type": "string"}
                     },
                     "required": ["expression"]
                 }
@@ -551,11 +551,14 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "web_search_tool",
-                "description": "Search the internet for real-time info, news, or broad topics not in the library.",
+                "description": (
+                    "Search the internet for nearby local services, addresses, hours, "
+                    "or other information when internal resources are insufficient or unclear."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The search keywords"}
+                        "query": {"type": "string"}
                     },
                     "required": ["query"]
                 }
@@ -565,13 +568,13 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "check_eligibility",
-                "description": "Check if a user qualifies for benefits like SNAP based on income/household size.",
+                "description": "Check eligibility for benefits such as SNAP.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "program": {"type": "string", "enum": ["snap"], "description": "The benefit program name"},
-                        "household_size": {"type": "integer", "description": "Number of people in the household"},
-                        "monthly_income": {"type": "number", "description": "Total gross monthly income"}
+                        "program": {"type": "string", "enum": ["snap"]},
+                        "household_size": {"type": "integer"},
+                        "monthly_income": {"type": "number"}
                     },
                     "required": ["program", "household_size", "monthly_income"]
                 }
@@ -579,143 +582,98 @@ def _construct_response_new(
         },
     ]
 
-    prompt = """You are PeerCoPilot, a supportive AI assistant for peer providers at {}.
-    Use peer-friendly, non-clinical language grounded in CSPNJ-aligned values: mutuality, respect, shared humanity, choice, and self-direction. Speak with peers, not at them. Avoid jargon unless the peer uses it first.
-    Prioritize safety and accuracy. Do not invent facts, resources, policies, or services. If you are unsure, say so and ask a clarifying question or suggest checking together. Never guess.
-    When helpful, think intentionally about which tools to use and orchestrate across multiple tools to surface the most relevant, practical information. Use tools only when they add value, and clearly synthesize what you find.
-    Keep responses concise, supportive, and actionable. Focus on what’s most useful right now rather than covering everything.
-    Whenever appropriate, offer natural next steps—such as follow-up questions, related resources, or another way PeerCoPilot could support the peer—without being directive or pushy.
-    Use the 'resources_tool' whenever you need to find anything related resources or information. """.format(organization)
+    system_prompt = f"""
+    You are PeerCoPilot, a supportive AI assistant for peer providers at {organization}.
 
-    orchestration_messages = [
-        {"role": "system", "content": prompt}
-    ]
-    orchestration_messages += all_messages
-    
-    orchestration_messages.append({"role": "user", "content": situation})
+    Use peer-friendly, non-clinical language grounded in CSPNJ values.
+    Prioritize accuracy and safety. Never invent facts or resources.
 
-    response = openai.chat.completions.create(
-        model="gpt-5.2",
-        messages=orchestration_messages,
-        tools=tools,
-        tool_choice="auto",
-        stream=True
-    )
+    IMPORTANT TOOL RULES:
+    - You may call multiple tools in sequence.
+    - Do not answer from general knowledge alone when local resources are requested.
+    """
 
-    # NEW: Use a dictionary to track multiple tool calls by their index
-    tool_calls_accum = {} 
+    messages = [{"role": "system", "content": system_prompt}]
+    messages += all_messages
+    messages.append({"role": "user", "content": situation})
 
-    for event in response:
-        choice = event.choices[0]
-        delta = choice.delta
+    # ---- TOOL LOOP ----
+    while True:
+        response = openai.chat.completions.create(
+            model="gpt-5.2",
+            messages=messages,
+            tools=tools,
+            tool_choice="auto"
+        )
 
-        # 1. Handle normal text content
-        if delta.content:
-            formatted_content = delta.content.replace("\n", "<br/>")
-            yield f"data: {formatted_content}\n\n"
+        choice = response.choices[0]
 
-        # 2. Accumulate Tool Calls
-        if delta.tool_calls:
-            for tc_delta in delta.tool_calls:
-                idx = tc_delta.index
-                
-                # Initialize this tool call if it's the first time we see this index
-                if idx not in tool_calls_accum:
-                    tool_calls_accum[idx] = {"id": "", "name": "", "arguments": ""}
-                
-                if tc_delta.id:
-                    tool_calls_accum[idx]["id"] = tc_delta.id
-                if tc_delta.function:
-                    if tc_delta.function.name:
-                        tool_calls_accum[idx]["name"] = tc_delta.function.name
-                    if tc_delta.function.arguments:
-                        tool_calls_accum[idx]["arguments"] += tc_delta.function.arguments
+        # FINAL ANSWER (no more tools)
+        if choice.finish_reason != "tool_calls":
+            final_text = choice.message.content or ""
+            for chunk in final_text.split("\n"):
+                yield f"data: {chunk}<br/>\n\n"
+            break
 
-        # 3. Check if we should execute the tools
-        if choice.finish_reason == "tool_calls":
-            # Append the assistant's tool_calls message FIRST
-            assistant_tool_msg = {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {"name": tc["name"], "arguments": tc["arguments"]}
-                    } for tc in tool_calls_accum.values()
-                ]
-            }
-            orchestration_messages.append(assistant_tool_msg)
+        # ASSISTANT REQUESTED TOOLS
+        messages.append(choice.message)
 
-            # Execute EACH tool call and append the results
-            for idx, tc in tool_calls_accum.items():
-                func_name = tc["name"]
-                func_args = json.loads(tc["arguments"]) # Now this will only have ONE object
-                
-                print(f"[DEBUG] Executing {func_name} with {func_args}")
-                
-                if func_name == "resources_tool":
-                    output = resources_tool(
-                        query=func_args.get("query", ""),
-                        organization=organization,
-                        saved_indices=saved_resources,
-                        documents=documents_resources,
-                        embedding_model=embedding_model
-                    )
-                    print("Resource tool output {}".format(output))
-                elif func_name == "library_tool":
-                    output = library_tool(
-                        query=func_args.get("query", ""),
-                        category=func_args.get("category", "crisis"),
-                        saved_indices_peer=saved_articles,
-                        documents_peer=documents_articles,
-                        embedding_model=embedding_model
-                    )
-                    print("Library tool output {}".format(output))
-                elif func_name == "directions_tool":
-                    output = directions_tool(
-                        origin=func_args.get("origin", ""),
-                        destination=func_args.get("destination", ""),
-                        mode=func_args.get("mode", "driving")
-                    )
-                    print("Direction tool output {}".format(output))
-                elif func_name == "calculator_tool":
-                    output = calculator_tool(
-                        expression=func_args.get("expression", "0"),
-                    )
-                    print("Calculator tool output {}".format(output))
-                elif func_name == "web_search_tool":
-                    output = web_search_tool(
-                        query=func_args.get("query", ""),
-                    )
-                    print("Web Search tool output {}".format(output))
-                elif func_name == "check_eligibility":
-                    output = check_eligibility(
-                        program=func_args.get("program", ""),
-                        household_size=func_args.get("household_size", ""),
-                        monthly_income=func_args.get("monthly_income",""),
-                    )
-                    print("Eligibility tool output {}".format(output))
-                else:
-                    output = "Error: Unknown tool."
+        for tool_call in choice.message.tool_calls:
+            name = tool_call.function.name
+            args = json.loads(tool_call.function.arguments)
 
-                # Add each result to history
-                orchestration_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": output
-                })
+            print(f"[DEBUG] Executing {name} with {args}")
 
-            # 4. Final follow-up call with all results
-            followup = openai.chat.completions.create(
-                model="gpt-5.2",
-                messages=orchestration_messages,
-                stream=True
-            )
-            
-            for f_event in followup:
-                if f_event.choices[0].delta.content:
-                    formatted_content = f_event.choices[0].delta.content.replace("\n", "<br/>")
-                    yield f"data: {formatted_content}\n\n"
+            if name == "resources_tool":
+                output = resources_tool(
+                    query=args.get("query", ""),
+                    organization=organization,
+                    saved_indices=saved_resources,
+                    documents=documents_resources,
+                    embedding_model=embedding_model
+                )
+
+            elif name == "library_tool":
+                output = library_tool(
+                    query=args.get("query", ""),
+                    category=args.get("category", "peer"),
+                    saved_indices_peer=saved_articles,
+                    documents_peer=documents_articles,
+                    embedding_model=embedding_model
+                )
+
+            elif name == "directions_tool":
+                output = directions_tool(
+                    origin=args.get("origin", ""),
+                    destination=args.get("destination", ""),
+                    mode=args.get("mode", "driving")
+                )
+
+            elif name == "calculator_tool":
+                output = calculator_tool(
+                    expression=args.get("expression", "0")
+                )
+
+            elif name == "web_search_tool":
+                output = web_search_tool(
+                    query=args.get("query", "")
+                )
+
+            elif name == "check_eligibility":
+                output = check_eligibility(
+                    program=args.get("program", ""),
+                    household_size=args.get("household_size", 1),
+                    monthly_income=args.get("monthly_income", 0)
+                )
+
+            else:
+                output = "Error: Unknown tool."
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": output
+            })
 
     yield "[DONE]\n\n"
 
