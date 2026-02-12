@@ -147,7 +147,6 @@ async def health():
 
 def warmup_models():
     """Background task to load embeddings after server starts"""
-    time.sleep(30)  # Wait for server to be fully ready
     try:
         print("[Warmup] Loading embeddings...")
         from app.rag_utils import get_model_and_indices

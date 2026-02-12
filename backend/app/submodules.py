@@ -476,21 +476,21 @@ def _construct_response_new(
     organization: str,
 ):
     """New version: Current implementation with all tools."""
+    print("Organization",organization)
     # 1. Update the tool definition to the 'tools' format
     tools = [
         {
             "type": "function", # Required wrapper
             "function": {
                 "name": "resources_tool",
-                "description": "Search top organization resources given a user query.",
+                "description": "Search top organization resources given a user query. Use this whenever you need to find shelter, food banks, etc.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "User query about services"},
-                        "organization": {"type": "string", "description": "Organization ID, e.g., 'cspnj'"},
                         "k": {"type": "integer", "description": "Number of top results", "default": 5}
                     },
-                    "required": ["query", "organization"]
+                    "required": ["query"]
                 }
             }
         },
@@ -584,7 +584,8 @@ def _construct_response_new(
     Prioritize safety and accuracy. Do not invent facts, resources, policies, or services. If you are unsure, say so and ask a clarifying question or suggest checking together. Never guess.
     When helpful, think intentionally about which tools to use and orchestrate across multiple tools to surface the most relevant, practical information. Use tools only when they add value, and clearly synthesize what you find.
     Keep responses concise, supportive, and actionable. Focus on what’s most useful right now rather than covering everything.
-    Whenever appropriate, offer natural next steps—such as follow-up questions, related resources, or another way PeerCoPilot could support the peer—without being directive or pushy.""".format(organization)
+    Whenever appropriate, offer natural next steps—such as follow-up questions, related resources, or another way PeerCoPilot could support the peer—without being directive or pushy.
+    Use the 'resources_tool' whenever you need to find anything related resources or information. """.format(organization)
 
     orchestration_messages = [
         {"role": "system", "content": prompt}
@@ -655,7 +656,7 @@ def _construct_response_new(
                 if func_name == "resources_tool":
                     output = resources_tool(
                         query=func_args.get("query", ""),
-                        organization=func_args.get("organization", organization),
+                        organization=organization,
                         saved_indices=saved_resources,
                         documents=documents_resources,
                         embedding_model=embedding_model

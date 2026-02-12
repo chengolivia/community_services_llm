@@ -22,7 +22,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 CONNECTION_STRING = os.getenv("RESOURCE_DB_URL")
 MODEL_NAME = 'sentence-transformers/all-mpnet-base-v2'
-ALL_ORGS = ['cspnj', 'clhs']
+ALL_ORGS = ['cspnj', 'clhs','georgia']
 
 # --- Global Cache ---
 _CACHE = {
@@ -242,6 +242,3 @@ def migrate_folders():
                         title=filename,
                         content=content
                     )
-
-if __name__ == "__main__":
-    migrate_folders()
