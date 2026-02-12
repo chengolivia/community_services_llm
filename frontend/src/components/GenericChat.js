@@ -352,6 +352,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     organization,
     user,
     tool,
+    version,
     setConversation,
     setChatConvo,
     setInputText,

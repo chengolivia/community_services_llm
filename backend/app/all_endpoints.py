@@ -468,6 +468,7 @@ async def start_generation(sid, data):
     username = data.get("username")
     service_user_id = data.get("service_user_id")
     version = data.get("version", "new")  # Default to "new" if not provided
+    print(f"[Version] Using version: {version}")  # Add this line for debugging
     
     # Generate conversation ID if needed
     if not conversation_id:

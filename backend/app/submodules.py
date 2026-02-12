@@ -451,17 +451,22 @@ def construct_response(
     version: str = "new",
 ):
     # Route to appropriate version implementation
+    print(f"[construct_response] Version received: {version}")  # Add this
     if version == "new":
         # NEW VERSION: Current implementation with all tools
+        print("[construct_response] Routing to NEW VERSION")  # Add this
         return _construct_response_new(situation, all_messages, model, organization)
     elif version == "old":
         # OLD VERSION: RAG retrieval → inject into prompt → GPT call (no tools)
+        print("[construct_response] Routing to OLD VERSION")  # Add this
         return _construct_response_old(situation, all_messages, model, organization)
     elif version == "vanilla":
         # VANILLA GPT: Simple prompt → GPT call (no RAG, no tools)
+        print("[construct_response] Routing to VANILLA VERSION")  # Add this
         return _construct_response_vanilla(situation, all_messages, model, organization)
     else:
         # Default to new version if unknown version
+        print("[construct_response] Routing to NEW VERSION (default)")  # Add this
         return _construct_response_new(situation, all_messages, model, organization)
 
 def _construct_response_new(
