@@ -661,6 +661,7 @@ def _construct_response_new(
                         documents=documents_resources,
                         embedding_model=embedding_model
                     )
+                    print("Resource tool output {}".format(output))
                 elif func_name == "library_tool":
                     output = library_tool(
                         query=func_args.get("query", ""),
