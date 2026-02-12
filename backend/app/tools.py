@@ -1,6 +1,7 @@
 from ddgs import DDGS
 import googlemaps
 import os 
+import requests
 
 google_maps_api = os.getenv("GOOGLE_API_KEY")
 gmaps = googlemaps.Client(key=google_maps_api)
@@ -148,19 +149,56 @@ def check_eligibility(program: str, household_size: int, monthly_income: float):
 
     return "Error: Unknown benefit program. Currently supporting: SNAP."
 
-def web_search_tool(query: str):
+
+def web_search_tool(query: str, max_results: int = 4):
     """
-    Performs a live web search for real-time information.
+    Performs a live web search using Brave Search API.
     """
+
     try:
-        results = DDGS().text(query, max_results=4)
+        # Get API key from environment variable
+        api_key = os.getenv("BRAVE_API_KEY")
+        if not api_key:
+            return "Error: BRAVE_API_KEY environment variable not set"
+        
+        headers = {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": api_key
+        }
+        
+        params = {
+            "q": query,
+            "count": max_results,
+            "safesearch": "moderate"  # Options: off, moderate, strict
+        }
+        
+        response = requests.get(
+            "https://api.search.brave.com/res/v1/web/search",
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Check if we got results
+        results = data.get("web", {}).get("results", [])
         if not results:
             return "No results found."
+        
         # Format results nicely for the LLM
-        formatted = ""
-        for r in results:
-            formatted += f"Title: {r['title']}\nLink: {r['href']}\nSnippet: {r['body']}\n\n"
+        formatted = f"Search results for: {query}\n\n"
+        for i, r in enumerate(results[:max_results], 1):
+            formatted += f"{i}. {r['title']}\n"
+            formatted += f"   URL: {r['url']}\n"
+            formatted += f"   {r.get('description', '')}\n"
+        
         return formatted
+        
+    except requests.exceptions.RequestException as e:
+        return f"Search failed: {str(e)}"
     except Exception as e:
         return f"Search failed: {str(e)}"
 
