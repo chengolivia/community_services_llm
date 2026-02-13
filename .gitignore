@@ -13,6 +13,8 @@ backend/saved_embeddings/
 backend/saved_embeddings_backup/
 backend/nbs/saved_embeddings/
 node_modules/
+backend/library_resources/
+backend/vector_storage/
 package-lock.json
 data_analysis/
 frontend-react/node_modules/

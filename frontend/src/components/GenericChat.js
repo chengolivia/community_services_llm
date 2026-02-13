@@ -146,14 +146,16 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [conversationID, setConversationID] = useState('');
-  const [goalsList, setGoalsList] = useState([]);
-  const [resourcesList, setResourcesList] = useState([]);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [goals, setGoals] = useState([]); 
+  const [resources, setResources] = useState([]);
   const [serviceUsers, setServiceUsers] = useState([]);
   const [selectedServiceUser, setSelectedServiceUser] = useState('');
   const [pendingServiceUser, setPendingServiceUser] = useState(null);
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [generatingCheckIns, setGeneratingCheckIns] = useState(false);
   const [checkIns, setCheckIns] = useState([]);
+  const [version, setVersion] = useState('new'); // 'new', 'old', or 'vanilla'
 
   // Fetch service users
   useEffect(() => {
@@ -207,10 +209,10 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       }
     });
 
-    newSocket.on('goals_update', ({ goals, resources }) => {
-      console.log('[Socket.io] goals_update:', goals, resources);
-      setGoalsList(goals);
-      setResourcesList(resources);
+    newSocket.on('goals_update', (data) => {
+      // data.goals is now an array of {title, details}
+      setGoals(data.goals);
+      setResources(data.resources);
     });
 
     newSocket.on('generation_complete', (data) => {
@@ -252,6 +254,30 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       setCheckIns([]);
     }
   }, [selectedServiceUser]);
+
+  const handleFeedbackSubmit = async (rating, comment) => {
+    if (!conversationID) {
+      alert("No active conversation to rate.");
+      return;
+    }
+
+    try {
+      // NOTE: Ensure authenticatedFetch supports JSON bodies correctly
+      await authenticatedFetch(`/submit_feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationID,
+          rating: rating,
+          feedback_text: comment
+        })
+      });
+      alert("Thank you for your feedback!");
+    } catch (error) {
+      console.error("Feedback error:", error);
+      alert("Failed to save feedback.");
+    }
+  };
 
   // Auto-scroll management
   const handleScroll = useCallback((e) => {
@@ -315,6 +341,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       conversation_id: conversationID,
       username: user.username,
       service_user_id: user.service_user_id || null,
+      version: version, // 'new', 'old', or 'vanilla'
     });
   }, [
     inputText,
@@ -325,6 +352,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     organization,
     user,
     tool,
+    version,
     setConversation,
     setChatConvo,
     setInputText,
@@ -410,8 +438,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     setConversation([]);
     setChatConvo([]);
     setConversationID('');
-    setGoalsList([]);
-    setResourcesList([]);
+    setGoals([]);
+    setResources([]);
 
     if (socket) {
       socket.emit('reset_session', {
@@ -471,19 +499,38 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       <div className="content-area">
         <div className={`left-section ${submitted ? 'submitted' : ''}`}>
           <h1 className="page-title">{title}</h1>
-          <select 
-              value={selectedServiceUser} 
-              onChange={handleServiceUserChange}
-          >
-              <option value="">General Inquiry (not user-specific)</option>
-              <optgroup label="Service Users">
-                {serviceUsers.map(user => (
-                  <option key={user.service_user_id} value={user.service_user_id}>
-                    {user.service_user_name}
-                  </option>
-                ))}
-              </optgroup>
-          </select>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+            <select 
+                value={selectedServiceUser} 
+                onChange={handleServiceUserChange}
+                style={{ flex: 1 }}
+            >
+                <option value="">General Inquiry (not user-specific)</option>
+                <optgroup label="Service Users">
+                  {serviceUsers.map(user => (
+                    <option key={user.service_user_id} value={user.service_user_id}>
+                      {user.service_user_name}
+                    </option>
+                  ))}
+                </optgroup>
+            </select>
+            <select
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                style={{ 
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  fontSize: '14px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+            >
+              <option value="new">New Version</option>
+              <option value="old">Old Version</option>
+              <option value="vanilla">Vanilla GPT</option>
+            </select>
+          </div>
           <button
             className="submit-button"
             style={{ 
@@ -514,27 +561,34 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             <div ref={conversationEndRef} />
           </div>
         </div>
-
         <div className="right-section">
           <div className="goals-box">
-            <h3>Goals</h3>
-            <div className="scroll-container">
-              {goalsList.map((goal, idx) => (
-                <ResourceItem key={`goal-${idx}`} content={goal} />
+            <h3>Active Goals</h3>
+            <div className="scroll-area">
+              {goals.length === 0 && <p className="empty-state">No active goals.</p>}
+              {goals.map((item, index) => (
+                <div key={index} className="card-item">
+                  <div className="card-title"><strong>{item.title}</strong></div>
+                  <div className="card-details">{item.details}</div>
+                </div>
               ))}
             </div>
           </div>
 
           <div className="resources-box">
             <h3>Resources</h3>
-            <div className="scroll-container">
-              {resourcesList.map((res, idx) => (
-                <ResourceItem key={`resource-${idx}`} content={res} />
+            <div className="scroll-area">
+              {resources.length === 0 && <p className="empty-state">No resources yet.</p>}
+              {resources.map((item, index) => (
+                <div key={index} className="card-item">
+                  <div className="card-title"><strong>{item.title}</strong></div>
+                  <div className="card-details">{item.details}</div>
+                </div>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </div> 
 
       <div className={`input-section ${submitted ? 'input-bottom' : ''}`}>
         {showLocation && (
@@ -588,6 +642,18 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
           </button>
           <button
             className="submit-button"
+            style={{ 
+              width: '80px', 
+              height: '100%', 
+              marginLeft: '20px', 
+            }}
+            onClick={() => setShowFeedback(true)}
+            disabled={!conversationID} 
+          >
+            Feedback
+          </button>
+          <button
+            className="submit-button"
             style={{ width: '60px', height: '100%', marginLeft: '20px' }}
             onClick={exportChatToPDF}
           >
@@ -597,7 +663,7 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             className="submit-button"
             style={{ width: '100px', height: '100%', marginLeft: '20px' }}
             onClick={printSidebar}
-            disabled={goalsList.length === 0 && resourcesList.length === 0}
+            disabled={goals.length === 0 && resources.length === 0}
             aria-label="Print sidebar goals and resources"
           >
             Print Sidebar
@@ -612,10 +678,97 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
             </button>
           )}
         </div>
+        <FeedbackModal 
+          isOpen={showFeedback} 
+          onClose={() => setShowFeedback(false)} 
+          onSubmit={handleFeedbackSubmit} 
+        />
       </div>
     </div>
   );
 }
+
+const FeedbackModal = ({ isOpen, onClose, onSubmit }) => {
+  // 1 = Up (Helpful), 0 = Down (Not Helpful)
+  const [rating, setRating] = useState(null); 
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (rating === null) return;
+    setIsSubmitting(true);
+    await onSubmit(rating, comment);
+    setIsSubmitting(false);
+    onClose();
+    setRating(null); // Reset after submit
+    setComment('');
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content" style={{ maxWidth: '400px' }}>
+        <h3>Rate this Session</h3>
+        <p>Was this conversation helpful?</p>
+        
+        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', margin: '20px 0' }}>
+          <button 
+            onClick={() => setRating(1)}
+            className="submit-button"
+            style={{ 
+              background: rating === 1 ? '#4CAF50' : '#f0f0f0', 
+              color: rating === 1 ? 'white' : '#333',
+              border: rating === 1 ? 'none' : '1px solid #ccc',
+              flex: 1
+            }}
+          >
+            👍 Helpful
+          </button>
+          <button 
+            onClick={() => setRating(0)}
+            className="submit-button"
+            style={{ 
+              background: rating === 0 ? '#f44336' : '#f0f0f0', 
+              color: rating === 0 ? 'white' : '#333',
+              border: rating === 0 ? 'none' : '1px solid #ccc',
+              flex: 1
+            }}
+          >
+            👎 Not Helpful
+          </button>
+        </div>
+
+        <textarea
+          placeholder="Optional: What was missing or incorrect?"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          style={{ 
+            width: '100%', 
+            height: '80px', 
+            marginBottom: '15px', 
+            padding: '10px',
+            borderRadius: '8px',
+            border: '1px solid #ddd',
+            fontFamily: 'inherit',
+            resize: 'none'
+          }}
+        />
+
+        <div className="modal-buttons">
+          <button onClick={onClose} className="btn-cancel" disabled={isSubmitting}>Cancel</button>
+          <button 
+            onClick={handleSubmit} 
+            className="btn-confirm" 
+            disabled={rating === null || isSubmitting}
+          >
+            {isSubmitting ? 'Sending...' : 'Submit Feedback'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const WellnessGoals = () => (
   <GenericChat

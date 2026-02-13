@@ -20,8 +20,10 @@ const createContextProvider = (Context) => ({ children }) => {
   const [submitted] = useState(false);
   const [chatConvo, setChatConvo] = useState([]);
   const [inputLocationText, setInputLocationText] = useState('');
-  const [organization, setOrganization] = useState('cspnj');
-  
+  const [organization, setOrganization] = useState(() => {
+    // Try to get the saved organization, fallback to 'cspnj' if not found
+    return localStorage.getItem('organization') || 'cspnj';
+  });  
   // Initialize user state from localStorage if available
   const [user, setUser] = useState(() => {
     // This runs only once during initial render

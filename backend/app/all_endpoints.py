@@ -8,23 +8,23 @@ import os
 import threading
 import time
 import secrets
-from datetime import timedelta
 
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field 
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import threading
-import json
 import time
 import socketio
 
-from app.submodules import construct_response, fetch_goals_and_resources
+from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import get_current_user, UserData
 from app.login import router as auth_router
+from typing import Optional
+import psycopg
 
 from app.database import (
     update_conversation, 
@@ -36,6 +36,7 @@ from app.database import (
 )
 from app.generate_outreach import generate_check_ins_rule_based
 from app.notifications import notification_job
+import openai 
 
 # Environment configuration
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -146,7 +147,6 @@ async def health():
 
 def warmup_models():
     """Background task to load embeddings after server starts"""
-    time.sleep(30)  # Wait for server to be fully ready
     try:
         print("[Warmup] Loading embeddings...")
         from app.rag_utils import get_model_and_indices
@@ -166,6 +166,67 @@ class NewServiceUser(BaseModel):
     followUpMessage: str
     username: str
 
+class SidebarItem(BaseModel):
+    title: str = Field(description="A short, 3-5 word title for the goal or resource.")
+    details: str = Field(description="A single actionable sentence describing the next step or key info.")
+
+class SidebarState(BaseModel):
+    goals: list[SidebarItem] = Field(description="Current, active goals based on the ENTIRE conversation.")
+    resources: list[SidebarItem] = Field(description="All relevant resources mentioned so far.")
+
+def generate_sidebar_update(all_messages, sid, loop):
+    """
+    Analyzes the FULL conversation to produce a cumulative, detailed sidebar.
+    """
+    try:
+        # 1. Use the FULL history (filter out system/tool messages to save some tokens if you want)
+        # We keep 'user' and 'assistant' to understand the flow.
+        context_messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in all_messages 
+            if m["role"] in ["user", "assistant"]
+        ]
+
+        system_prompt = (
+            "You are the state manager for a peer support dashboard. "
+            "Analyze the ENTIRE conversation history provided below.\n"
+            "1. Identify 3-5 'Active Goals'. These should be tasks the user is currently working on. "
+            "   - If a goal was completed or abandoned in the chat, DO NOT include it.\n"
+            "   - Provide a 'details' sentence for each (e.g., 'Check eligibility tool for SNAP').\n"
+            "2. Identify 'Resources'. These are organizations, tools, or websites mentioned by the assistant. "
+            "   - Provide a 'details' sentence (e.g., 'Located at 123 Main St, open 9-5')."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}] + context_messages
+
+        # 2. Call GPT-4o-mini
+        client = openai.Client(api_key=os.environ.get("SECRET_KEY"))
+        
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-mini", 
+            messages=messages,
+            response_format=SidebarState
+        )
+        
+        state_data = completion.choices[0].message.parsed
+        
+        # 3. Serialize to dict for JSON transmission
+        # We need to convert Pydantic models to standard dicts for Socket.IO
+        update_payload = {
+            "goals": [item.model_dump() for item in state_data.goals],
+            "resources": [item.model_dump() for item in state_data.resources]
+        }
+
+        print(f"[Sidecar] Emitting update for {sid}: {len(state_data.goals)} goals")
+
+        asyncio.run_coroutine_threadsafe(
+            sio.emit("goals_update", update_payload, room=sid),
+            loop
+        )
+
+    except Exception as e:
+        print(f"[Sidecar] Error: {e}")
+        
 @app.get("/service_user_list/")
 async def service_user_list(current_user: UserData = Depends(get_current_user)):
     return get_all_service_users(current_user.username, current_user.organization)
@@ -275,27 +336,24 @@ def _background_stream(
     organization, 
     loop, 
     metadata, 
-    service_user_id, 
-    full_response, 
-    external_resources, 
-    raw_prompt
+    service_user_id,
+    version,
 ):
     """
     Runs construct_response in its own OS thread.
     Uses run_coroutine_threadsafe so .emit() coroutines are correctly awaited.
     """
+    accumulated_text = ""
+
     try:
         gen = construct_response(
             text, 
             previous_text, 
             model, 
-            organization, 
-            full_response, 
-            external_resources, 
-            raw_prompt
+            organization,
+            version,
         )
         
-        accumulated_text = ""
         for accumulated_text in accumulate_chunks(gen):
             asyncio.run_coroutine_threadsafe(
                 sio.emit("generation_update", {"chunk": accumulated_text}, room=sid),
@@ -316,6 +374,9 @@ def _background_stream(
             ],
             service_user_id
         )
+        session_histories[sid].append({"role": "assistant", "content": accumulated_text})
+        print("[Background] Triggering sidebar update...")
+        generate_sidebar_update(session_histories[sid], sid, loop)
 
     except Exception as e:
         print(f"[BackgroundStream] Error: {e}")
@@ -344,23 +405,69 @@ async def connect(sid, environ):
     print(f"[Socket.IO] Client connected: {sid}")
     await sio.emit("welcome", {"message": "Welcome from backend!"}, room=sid)
 
+class FeedbackRequest(BaseModel):
+    conversation_id: str
+    rating: int  # 1 for helpful, 0 for not (or 1-5 scale)
+    feedback_text: Optional[str] = ""
+
+@app.post("/submit_feedback")
+def submit_feedback(feedback: FeedbackRequest):
+    """
+    Receives feedback for a specific conversation and saves it to the DB.
+    """
+    if not feedback.conversation_id:
+        raise HTTPException(status_code=400, detail="Conversation ID is required")
+
+    try:
+        # Use your existing connection string
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            with conn.cursor() as cur:
+                
+                # Optional: Verify conversation exists first
+                # cur.execute("SELECT 1 FROM conversations WHERE id = %s", (feedback.conversation_id,))
+                # if not cur.fetchone():
+                #     raise HTTPException(status_code=404, detail="Conversation not found")
+
+                cur.execute(
+                    """
+                    INSERT INTO conversation_feedback 
+                    (conversation_id, rating, feedback_text)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (feedback.conversation_id, feedback.rating, feedback.feedback_text)
+                )
+            conn.commit()
+            
+        print(f"[Feedback] Saved for {feedback.conversation_id}: Rating {feedback.rating}")
+        return {"success": True, "message": "Feedback received"}
+
+    except Exception as e:
+        print(f"[Feedback Error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @sio.event
 async def disconnect(sid):
     print(f"[Socket.IO] Client disconnected: {sid}")
+
+session_histories = {}  # global dict: sid -> list of messages
 
 @sio.event
 async def start_generation(sid, data):
     """Initiate text generation based on user input."""
     print(f"[Socket.IO] start_generation from {sid} at {time.time()}")
 
+    if sid not in session_histories:
+        session_histories[sid] = []
+
     # Extract request data
     text = data.get("text", "")
-    previous_text = data.get("previous_text", [])
     model = data.get("model")
     organization = data.get("organization")
     conversation_id = data.get("conversation_id", "")
     username = data.get("username")
     service_user_id = data.get("service_user_id")
+    version = data.get("version", "new")  # Default to "new" if not provided
+    print(f"[Version] Using version: {version}")  # Add this line for debugging
     
     # Generate conversation ID if needed
     if not conversation_id:
@@ -371,29 +478,13 @@ async def start_generation(sid, data):
         'conversation_id': conversation_id,
         'username': username
     }
-    
-    # Fetch goals and resources
-    needs_goals = True  # Currently always true, can be made dynamic
-    
-    if needs_goals:
-        loop = asyncio.get_running_loop()
-        goals, resources, full_response, external_resources, raw_prompt = \
-            await loop.run_in_executor(
-                None,
-                fetch_goals_and_resources,
-                text,
-                previous_text,
-                organization
-            )
+       
+    text = data.get("text", "")
+    session_histories[sid].append({"role": "user", "content": text})
 
-        await sio.emit(
-            "goals_update",
-            {"goals": goals, "resources": resources},
-            room=sid
-        )
-    else:
-        full_response, external_resources, raw_prompt = "", "", ""
-    
+    # fetch full conversation
+    all_messages = session_histories[sid]
+
     print(f"Finished goals/resources at {time.time()}")
 
     # Start background streaming
@@ -401,9 +492,8 @@ async def start_generation(sid, data):
     threading.Thread(
         target=_background_stream,
         args=(
-            sid, text, previous_text, model, organization, 
-            loop, metadata, service_user_id, 
-            full_response, external_resources, raw_prompt
+            sid, text, all_messages, model, organization, 
+            loop, metadata, service_user_id, version,
         ),
         daemon=True
     ).start()
