@@ -1,8 +1,4 @@
-"""Authentication utilities and FastAPI auth endpoints.
-
-Provides JWT-based login, registration helpers, and token verification
-dependency for protecting routes.
-"""
+"""Authentication utilities and FastAPI auth endpoints with MFA support."""
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,15 +8,22 @@ import jwt
 from jwt.exceptions import InvalidTokenError
 import os
 from typing import Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from app.database import CONNECTION_STRING
 import hashlib
 import secrets
 import psycopg
+import pyotp
+import qrcode
+import io
+import base64
 
-SECRET_KEY = os.getenv("SECRET_KEY")  # Change this in production
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 2*60 # 2 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 2 * 60  # 2 hours
+
+# Global MFA toggle
+MFA_GLOBALLY_ENABLED = True
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 security = HTTPBearer()
@@ -29,6 +32,7 @@ security = HTTPBearer()
 class LoginRequest(BaseModel):
     username: str
     password: str
+    mfa_code: Optional[str] = None
 
 class LoginResponse(BaseModel):
     access_token: str
@@ -36,19 +40,28 @@ class LoginResponse(BaseModel):
     role: str
     organization: str
 
+class MFASetupResponse(BaseModel):
+    qr_code: str
+    secret: str
+
+class MFAVerifyRequest(BaseModel):
+    code: str
+
 class UserData(BaseModel):
     username: str
     role: str
     organization: str
 
-# JWT Token Verification Dependency
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    organization: Optional[str] = 'cspnj'
+
+# JWT Token Verification
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserData:
-    """
-    Dependency to verify JWT token and extract user info.
-    Use this in your protected routes.
-    """
+    """Dependency to verify JWT token and extract user info."""
     token = credentials.credentials
-        
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -57,25 +70,25 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
         username: str = payload.get("sub")
         role: str = payload.get("role")
         organization: str = payload.get("organization")
-                
+        
         if username is None or role is None:
             raise credentials_exception
             
         return UserData(username=username, role=role, organization=organization)
-    except InvalidTokenError as e:
+    except InvalidTokenError:
         raise credentials_exception
 
 # Login Endpoint
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    """
-    Authenticate user and return JWT token
-    """
-    success, message, role, organization = authenticate_user(request.username, request.password)
+    """Authenticate user and return JWT token"""
+    success, message, role, organization, mfa_enabled, mfa_secret = authenticate_user(
+        request.username, 
+        request.password
+    )
     
     if not success:
         raise HTTPException(
@@ -84,74 +97,222 @@ async def login(request: LoginRequest):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Check MFA if both globally enabled AND user has it enabled
+    if MFA_GLOBALLY_ENABLED and mfa_enabled:
+        if not request.mfa_code:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="MFA code required",
+            )
+        
+        if not verify_mfa_code(mfa_secret, request.mfa_code):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid MFA code",
+            )
+    
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": request.username, "role": role, "organization": organization},
         expires_delta=access_token_expires
     )
-    
+
     return LoginResponse(
         access_token=access_token,
         role=role,
         organization=organization
     )
 
-
-class RegisterRequest(BaseModel):
-    username: str
-    password: str
-    organization: Optional[str] = 'cspnj'
-
-@router.post("/register")
-async def register(request: RegisterRequest):
-    success, message = create_user(
-        username=request.username,
-        password=request.password,
-        role='provider',
-        organization=request.organization
-    )
-
-    if not success:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+# MFA Setup
+@router.post("/mfa/setup", response_model=MFASetupResponse)
+async def setup_mfa(current_user: UserData = Depends(get_current_user)):
+    """Generate MFA secret and QR code"""
     
-    access_token = create_access_token(
-        data={"sub": request.username, "role": "provider", "organization": request.organization},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    if not MFA_GLOBALLY_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA is disabled globally"
+        )
+    
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(
+        name=current_user.username,
+        issuer_name="PeerCopilot"
     )
     
-    return LoginResponse(
-        access_token=access_token,
-        role="provider",
-        organization=request.organization
+    # Generate QR code
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+    
+    # Store secret temporarily
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET mfa_secret = %s WHERE username = %s",
+        (secret, current_user.username)
+    )
+    conn.commit()
+    conn.close()
+    
+    return MFASetupResponse(
+        qr_code=f"data:image/png;base64,{img_str}",
+        secret=secret
     )
 
+# MFA Enable
+@router.post("/mfa/enable")
+async def enable_mfa(
+    request: MFAVerifyRequest,
+    current_user: UserData = Depends(get_current_user)
+):
+    """Enable MFA after verifying code"""
+    
+    if not MFA_GLOBALLY_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA is disabled globally"
+        )
+    
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT mfa_secret FROM users WHERE username = %s",
+        (current_user.username,)
+    )
+    result = cursor.fetchone()
+    
+    if not result or not result[0]:
+        conn.close()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA not set up. Call /mfa/setup first"
+        )
+    
+    secret = result[0]
+    
+    if not verify_mfa_code(secret, request.code):
+        conn.close()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid MFA code"
+        )
+    
+    cursor.execute(
+        "UPDATE users SET mfa_enabled = TRUE WHERE username = %s",
+        (current_user.username,)
+    )
+    conn.commit()
+    conn.close()
+    
+    return {"success": True, "message": "MFA enabled successfully"}
+
+# MFA Disable
+@router.post("/mfa/disable")
+async def disable_mfa(
+    request: MFAVerifyRequest,
+    current_user: UserData = Depends(get_current_user)
+):
+    """Disable MFA"""
+    
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT mfa_secret FROM users WHERE username = %s",
+        (current_user.username,)
+    )
+    result = cursor.fetchone()
+    
+    if not result or not result[0]:
+        conn.close()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA not enabled"
+        )
+    
+    secret = result[0]
+    
+    if not verify_mfa_code(secret, request.code):
+        conn.close()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid MFA code"
+        )
+    
+    cursor.execute(
+        "UPDATE users SET mfa_enabled = FALSE, mfa_secret = NULL WHERE username = %s",
+        (current_user.username,)
+    )
+    conn.commit()
+    conn.close()
+    
+    return {"success": True, "message": "MFA disabled successfully"}
+
+# MFA Status
+@router.get("/mfa/status")
+async def mfa_status(current_user: UserData = Depends(get_current_user)):
+    """Check if MFA is enabled"""
+    
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT mfa_enabled FROM users WHERE username = %s",
+        (current_user.username,)
+    )
+    result = cursor.fetchone()
+    conn.close()
+    
+    return {
+        "mfa_enabled": result[0] if result else False,
+        "mfa_globally_enabled": MFA_GLOBALLY_ENABLED
+    }
+
+# Helper Functions
+def verify_mfa_code(secret: str, code: str) -> bool:
+    """Verify TOTP code"""
+    totp = pyotp.TOTP(secret)
+    return totp.verify(code, valid_window=1)
+
+def authenticate_user(username, password):
+    """Authenticate user"""
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+    SELECT username, password_hash, salt, role, organization, mfa_enabled, mfa_secret 
+    FROM users 
+    WHERE username = %s
+    ''', (username,))
+    
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        return False, "Invalid username or password", None, None, False, None
+    
+    _, stored_password, stored_salt, role, organization, mfa_enabled, mfa_secret = user
+    
+    if verify_password(stored_password, stored_salt, password):
+        return True, "Authentication successful", role, organization, mfa_enabled or False, mfa_secret
+    else:
+        return False, "Invalid username or password", None, None, False, None
 
 def hash_password(password):
-    """Create secure password hash with salt
-    
-    Arguments:
-        password: string, password to hash
-    
-    Returns: a secret salt and a hashed password under that salt"""
+    """Create secure password hash"""
     salt = secrets.token_hex(16)
     pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), 
                                  salt.encode('utf-8'), 100000)
     return salt, pwdhash.hex()
 
-
 def create_user(username, password, role='provider', organization='cspnj'):
-    """Create a new user record.
-
-    Arguments:
-        username: str
-        password: str
-        role: str
-        organization: str
-
-    Returns:
-        tuple: (success: bool, message: str)
-    """
+    """Create new user"""
     conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
 
@@ -175,82 +336,50 @@ def create_user(username, password, role='provider', organization='cspnj'):
         conn.close()
         return False, f"Error creating user: {str(e)}"
 
-# Protected route example
-@router.get("/me", response_model=UserData)
-async def get_current_user_info(current_user: UserData = Depends(get_current_user)):
-    """
-    Get current user information (protected route example)
-    """
-    return current_user
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create a JWT token for a given set of information.
-
-    Arguments:
-        data: dict: Data to encode into the token (e.g., {'sub': username, 'role': ...})
-        expires_delta: Optional[timedelta]: Lifetime for the token. If omitted a short default is used.
-
-    Returns:
-        str: Encoded JWT token
-    """
-    
+    """Create JWT token"""
     to_encode = data.copy()
     
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta  # Use UTC!
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)  # Use UTC!
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
         
     to_encode.update({"exp": expire})
-        
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def authenticate_user(username, password):
-    """Authenticate a username + password combo.
-
-    Arguments:
-        username: str: username
-        password: str: password
-
-    Returns:
-        tuple: (success: bool, message: str, role: Optional[str], organization: Optional[str])
-
-    Side Effects: Queries the users table to verify credentials and fetch role/organization."""
-    
-    # DEBUG: connection string printed during development - remove or replace with structured logging
-
-    conn = psycopg.connect(CONNECTION_STRING)
-    # DEBUG: duplicated print below; intended for development tracing
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-    SELECT username, password_hash, salt, role, organization FROM users 
-    WHERE username = %s
-    ''', (username,))
-    
-    user = cursor.fetchone()
-    conn.close()
-    
-    if not user:
-        return False, "Invalid username or password", None, None
-    
-    _, stored_password, stored_salt, role, organization = user
-    
-    if verify_password(stored_password, stored_salt, password):
-        return True, "Authentication successful", role, organization
-    else:
-        return False, "Invalid username or password", None, None
-
 def verify_password(stored_password, stored_salt, provided_password):
-    """Verify password against stored hash
-    
-    Arguments:
-        stored_password: string, some stored password
-        stored_salt: Corresponding salt for that password
-        provided_password: What the user entered
-    
-    Returns: Boolean, whether the provided_password = stored password"""
+    """Verify password"""
     pwdhash = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'), 
                                 stored_salt.encode('utf-8'), 100000)
     return pwdhash.hex() == stored_password
+
+@router.post("/register")
+async def register(request: RegisterRequest):
+    """Register new user"""
+    success, message = create_user(
+        username=request.username,
+        password=request.password,
+        role='provider',
+        organization=request.organization
+    )
+
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+    
+    access_token = create_access_token(
+        data={"sub": request.username, "role": "provider", "organization": request.organization},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    return LoginResponse(
+        access_token=access_token,
+        role="provider",
+        organization=request.organization
+    )
+
+@router.get("/me", response_model=UserData)
+async def get_current_user_info(current_user: UserData = Depends(get_current_user)):
+    """Get current user info"""
+    return current_user

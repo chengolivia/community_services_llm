@@ -4,6 +4,7 @@ import { Link, Navigate } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
 import { WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch } from '../utils/api';
+import MFASetup from './MFASetup';
 import '../styles/pages/home.css';
 
 /**
@@ -17,7 +18,10 @@ function Home() {
   const [notificationTime, setNotificationTime] = useState('08:00');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-
+  const [showMfaSetup, setShowMfaSetup] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaGloballyEnabled, setMfaGloballyEnabled] = useState(true);
+  
   const handleOrganizationChange = (e) => {
     const newOrg = e.target.value.toLowerCase();
     console.log("Setting organization to:", newOrg);
@@ -33,6 +37,41 @@ function Home() {
       fetchSettings();
     }
   }, [showSettings]);
+
+  useEffect(() => {
+    checkMfaStatus();
+  }, []);
+  
+  const checkMfaStatus = async () => {
+    try {
+      const response = await authenticatedFetch('/api/auth/mfa/status');
+      const data = await response.json();
+      setMfaEnabled(data.mfa_enabled);
+      setMfaGloballyEnabled(data.mfa_globally_enabled);
+    } catch (error) {
+      console.error('Error checking MFA status:', error);
+    }
+  };
+  
+  const handleDisableMfa = async () => {
+    const code = prompt('Enter your current MFA code to disable:');
+    if (!code) return;
+  
+    try {
+      const response = await authenticatedFetch('/api/auth/mfa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ code })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('MFA disabled successfully');
+        setMfaEnabled(false);
+      }
+    } catch (error) {
+      alert('Failed to disable MFA. Invalid code?');
+    }
+  };
+  
 
   const fetchSettings = async () => {
     try {
@@ -188,6 +227,47 @@ function Home() {
           </form>
         </div>
       )}
+      {mfaGloballyEnabled && (
+        <div className="mfa-settings" style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #ddd' }}>
+          <h3>Two-Factor Authentication</h3>
+          {mfaEnabled ? (
+            <>
+              <p className="mfa-status-enabled" style={{ color: '#155724', background: '#d4edda', padding: '10px', borderRadius: '4px' }}>
+                ✓ MFA is enabled
+              </p>
+              <button 
+                onClick={handleDisableMfa} 
+                className="settings-toggle-button"
+                style={{ marginTop: '10px', background: '#dc3545' }}
+              >
+                Disable MFA
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ color: '#666' }}>MFA is not enabled</p>
+              <button 
+                onClick={() => setShowMfaSetup(true)} 
+                className="settings-toggle-button"
+                style={{ marginTop: '10px' }}
+              >
+                Set Up MFA
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {showMfaSetup && (
+        <MFASetup 
+          onClose={() => setShowMfaSetup(false)}
+          onSuccess={() => {
+            setMfaEnabled(true);
+            alert('MFA enabled successfully!');
+          }}
+        />
+      )}
+
     </div>
   );
 }

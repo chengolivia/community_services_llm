@@ -1,3 +1,4 @@
+// Login.js - Updated with MFA support
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WellnessContext } from './AppStateContextProvider';
@@ -9,6 +10,8 @@ import '../styles/pages/login.css';
 function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [showMfaInput, setShowMfaInput] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { setUser, setOrganization } = useContext(WellnessContext);
@@ -25,15 +28,25 @@ function Login() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ 
+          username, 
+          password,
+          mfa_code: mfaCode || undefined
+        }),
       });
 
       const data = await response.json();
 
+      if (response.status === 403 && data.detail === "MFA code required") {
+        setShowMfaInput(true);
+        setError('');
+        setIsLoading(false);
+        return;
+      }
+
       if (response.ok) {
         const { access_token, role, organization } = data;
 
-        // Set user context with login info
         setUser({
           username: username,
           role: role,
@@ -42,17 +55,17 @@ function Login() {
         });
         setOrganization(organization);
 
-        // Store in localStorage for persistence
         localStorage.setItem('accessToken', access_token);
         localStorage.setItem('userRole', role);
         localStorage.setItem('username', username);      
         localStorage.setItem('organization', organization);
-        // Store login timestamp for session validation
         localStorage.setItem('loginTimestamp', Date.now().toString());
 
         navigate('/');
       } else {
         setError(data.detail || 'Login failed. Please try again.');
+        setShowMfaInput(false);
+        setMfaCode('');
       }
     } catch (err) {
       setError('Server error. Please try again later.');
@@ -81,6 +94,7 @@ function Login() {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              disabled={showMfaInput}
               required
             />
           </div>
@@ -92,9 +106,28 @@ function Login() {
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={showMfaInput}
               required
             />
           </div>
+
+          {showMfaInput && (
+            <div className="form-group mfa-group">
+              <label htmlFor="mfa-code">Authenticator Code</label>
+              <input
+                type="text"
+                id="mfa-code"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength="6"
+                required
+                autoFocus
+                className="mfa-code-input"
+              />
+              <small>Enter the 6-digit code from your authenticator app</small>
+            </div>
+          )}
           
           <button 
             type="submit" 
@@ -103,6 +136,19 @@ function Login() {
           >
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
+
+          {showMfaInput && (
+            <button 
+              type="button"
+              onClick={() => {
+                setShowMfaInput(false);
+                setMfaCode('');
+              }}
+              className="back-button"
+            >
+              ← Back
+            </button>
+          )}
         </form>
         <p className="register-link">
           Don't have an account? <Link to="/register">Register here</Link>
