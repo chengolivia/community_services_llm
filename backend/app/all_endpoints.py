@@ -18,6 +18,7 @@ from apscheduler.triggers.cron import CronTrigger
 import threading
 import time
 import socketio
+from app.phi_scrubber import PHIScrubber
 
 from app.audit_logger import AuditLogger
 from app.submodules import construct_response
@@ -384,18 +385,45 @@ def _background_stream(
 
     try:
         # Log GPT request
-        AuditLogger.log_gpt_request(
-            username=metadata.get('username'),
-            user_role='provider',  # Get from metadata if available
-            patient_id=service_user_id,
-            conversation_id=metadata.get('conversation_id'),
-            prompt_length=len(text),
-            response_length=0  # Will update after completion
+        scrubbed_text = PHIScrubber.scrub_for_gpt(
+            text, 
+            patient_id=service_user_id
         )
         
+        # Also scrub conversation history
+        scrubbed_history = []
+        for msg in previous_text:
+            if isinstance(msg, dict) and 'content' in msg:
+                scrubbed_content = PHIScrubber.scrub_for_gpt(
+                    msg['content'],
+                    patient_id=service_user_id
+                )
+                scrubbed_history.append({
+                    'role': msg['role'],
+                    'content': scrubbed_content
+                })
+            else:
+                scrubbed_history.append(msg)
+        
+        # Log what was scrubbed
+        print(f"[PHI SCRUB] Original length: {len(text)}, Scrubbed length: {len(scrubbed_text)}")
+        if len(text) != len(scrubbed_text):
+            print("[PHI SCRUB] Scrubbed {}".format(scrubbed_text))
+
+        # Log GPT request with scrubbed flag
+        AuditLogger.log_gpt_request(
+            username=metadata.get('username'),
+            user_role='provider',
+            patient_id=service_user_id,
+            conversation_id=metadata.get('conversation_id'),
+            prompt_length=len(scrubbed_text),
+            response_length=0
+        )
+        
+        # Send scrubbed content to GPT
         gen = construct_response(
-            text, 
-            previous_text, 
+            scrubbed_text,  # Use scrubbed text
+            scrubbed_history,  # Use scrubbed history
             model, 
             organization,
             version,

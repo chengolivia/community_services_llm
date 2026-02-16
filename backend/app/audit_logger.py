@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 import json
 import os
 from app.database import CONNECTION_STRING
+from app.phi_scrubber import PHIScrubber
 
 class AuditLogger:
     """Centralized audit logger for HIPAA compliance."""
@@ -22,23 +23,13 @@ class AuditLogger:
         ip_address: Optional[str] = None,
         session_id: Optional[str] = None
     ):
-        """
-        Log an audit event.
-        
-        Args:
-            username: User performing the action
-            user_role: Role of the user (provider, admin, etc.)
-            action: Action performed (login, view_patient, update_record, etc.)
-            resource_type: Type of resource (patient, conversation, user, etc.)
-            resource_id: ID of the resource accessed
-            details: Additional context (dict) - will be stored as JSON
-            status: "success" or "failure"
-            ip_address: IP address of the request
-            session_id: Session/conversation ID if applicable
-        """
+        """Log an audit event with PHI scrubbing."""
         try:
             conn = psycopg.connect(CONNECTION_STRING)
             cursor = conn.cursor()
+            
+            # Scrub PHI from details
+            scrubbed_details = PHIScrubber.scrub_for_logging(details) if details else None
             
             cursor.execute('''
                 INSERT INTO audit_logs 
@@ -53,7 +44,7 @@ class AuditLogger:
                 action,
                 resource_type,
                 resource_id,
-                json.dumps(details) if details else None,
+                json.dumps(scrubbed_details) if scrubbed_details else None,
                 status,
                 session_id
             ))
@@ -62,11 +53,8 @@ class AuditLogger:
             conn.close()
             
         except Exception as e:
-            # CRITICAL: Audit logging failures should be visible
             print(f"[AUDIT LOG ERROR] Failed to log event: {e}")
-            print(f"[AUDIT LOG ERROR] Event: {action} by {username} on {resource_type}:{resource_id}")
-            # Don't raise - we don't want to break the app if logging fails
-    
+            
     @staticmethod
     def log_authentication(username: str, action: str, status: str, ip_address: Optional[str] = None, details: Optional[Dict] = None):
         """Log authentication events."""
