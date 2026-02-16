@@ -22,17 +22,20 @@ export const authenticatedFetch = async (endpoint, options = {}) => {
     ...options.headers,
   };
 
+  // FIX: Changed from fetch`...` to fetch(...)
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
   });
 
   // Handle 401 Unauthorized - token expired or invalid
-  if (response.status === 401) {
-    // Clear invalid token
+  if (response.status === 401) {    
+    // Clear invalid token and all session data
     localStorage.removeItem('accessToken');
     localStorage.removeItem('userRole');
     localStorage.removeItem('username');
+    localStorage.removeItem('organization');
+    localStorage.removeItem('loginTimestamp');
     
     // Redirect to login
     window.location.href = '/login';

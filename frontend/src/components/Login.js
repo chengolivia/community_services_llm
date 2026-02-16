@@ -1,4 +1,3 @@
-// Login.js - Authentication UI for signing into PeerCoPilot
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WellnessContext } from './AppStateContextProvider';
@@ -6,7 +5,6 @@ import Logo from '../icons/Logo.png';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../config';
 import '../styles/pages/login.css';
-
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -16,10 +14,6 @@ function Login() {
   const { setUser, setOrganization } = useContext(WellnessContext);
   const navigate = useNavigate();
 
-  /**
-   * Submit login credentials to backend and store token on success.
-   * Sets user context and redirects to home on successful login.
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -34,7 +28,6 @@ function Login() {
         body: JSON.stringify({ username, password }),
       });
 
-      // FIX: Get the data from response first
       const data = await response.json();
 
       if (response.ok) {
@@ -54,11 +47,12 @@ function Login() {
         localStorage.setItem('userRole', role);
         localStorage.setItem('username', username);      
         localStorage.setItem('organization', organization);
+        // Store login timestamp for session validation
+        localStorage.setItem('loginTimestamp', Date.now().toString());
 
-        // Redirect to home page after successful login
         navigate('/');
       } else {
-        setError(data.message || 'Login failed. Please try again.');
+        setError(data.detail || 'Login failed. Please try again.');
       }
     } catch (err) {
       setError('Server error. Please try again later.');
@@ -111,9 +105,8 @@ function Login() {
           </button>
         </form>
         <p className="register-link">
-          Don’t have an account? <Link to="/register">Register here</Link>
+          Don't have an account? <Link to="/register">Register here</Link>
         </p>
-
       </div>
     </div>
   );

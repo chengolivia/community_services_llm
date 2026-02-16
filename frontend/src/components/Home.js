@@ -2,16 +2,13 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
-import {WellnessContext } from './AppStateContextProvider';
+import { WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch } from '../utils/api';
+import '../styles/pages/home.css';
 
 /**
  * Home component - shows navigation tiles and notification settings
  */
-
-import '../styles/pages/home.css';
-
-
 function Home() {
   const { organization, setOrganization, user } = useContext(WellnessContext);
   const [showSettings, setShowSettings] = useState(false);
@@ -20,9 +17,10 @@ function Home() {
   const [notificationTime, setNotificationTime] = useState('08:00');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
   const handleOrganizationChange = (e) => {
     const newOrg = e.target.value.toLowerCase();
-    console.log("Setting organization to:", newOrg); // For debugging
+    console.log("Setting organization to:", newOrg);
     setOrganization(newOrg);
   };
 
@@ -37,27 +35,12 @@ function Home() {
   }, [showSettings]);
 
   const fetchSettings = async () => {
-    const token = user.token || localStorage.getItem('accessToken');
-    
-    if (!token) {
-      setMessage('Not authenticated. Please log in again.');
-      return;
-    }
     try {
+      // authenticatedFetch handles the token automatically
       const response = await authenticatedFetch(`/api/notification-settings`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
       });
-          const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.error('Expected JSON but got:', contentType);
-      console.error('Response status:', response.status);
-      return;
-    }
+
       const data = await response.json();
       if (data.success) {
         setEmail(data.settings.email || '');
@@ -66,6 +49,7 @@ function Home() {
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
+      setMessage('Failed to load settings. Please try again.');
     }
   };
 
@@ -73,21 +57,11 @@ function Home() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-    const token = user.token || localStorage.getItem('accessToken');
-    
-    if (!token) {
-      setMessage('Not authenticated. Please log in again.');
-      return;
-    }
 
     try {
+      // authenticatedFetch handles the token automatically
       const response = await authenticatedFetch(`/api/notification-settings`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify({
           username: user.username,
           email,

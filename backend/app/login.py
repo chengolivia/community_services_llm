@@ -12,7 +12,7 @@ import jwt
 from jwt.exceptions import InvalidTokenError
 import os
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.database import CONNECTION_STRING
 import hashlib
 import secrets
@@ -20,7 +20,7 @@ import psycopg
 
 SECRET_KEY = os.getenv("SECRET_KEY")  # Change this in production
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
+ACCESS_TOKEN_EXPIRE_MINUTES = 2*60 # 2 hours
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 security = HTTPBearer()
@@ -48,7 +48,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     Use this in your protected routes.
     """
     token = credentials.credentials
-    
+        
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -57,15 +57,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
         username: str = payload.get("sub")
         role: str = payload.get("role")
         organization: str = payload.get("organization")
-        
+                
         if username is None or role is None:
             raise credentials_exception
             
         return UserData(username=username, role=role, organization=organization)
-    except InvalidTokenError:
+    except InvalidTokenError as e:
         raise credentials_exception
 
 # Login Endpoint
@@ -89,12 +90,13 @@ async def login(request: LoginRequest):
         data={"sub": request.username, "role": role, "organization": organization},
         expires_delta=access_token_expires
     )
-
+    
     return LoginResponse(
         access_token=access_token,
         role=role,
         organization=organization
     )
+
 
 class RegisterRequest(BaseModel):
     username: str
@@ -195,11 +197,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     
     if expires_delta:
-        expire = datetime.now() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta  # Use UTC!
     else:
-        expire = datetime.now() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)  # Use UTC!
         
     to_encode.update({"exp": expire})
+        
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -216,18 +219,15 @@ def authenticate_user(username, password):
     Side Effects: Queries the users table to verify credentials and fetch role/organization."""
     
     # DEBUG: connection string printed during development - remove or replace with structured logging
-    print(CONNECTION_STRING)
 
     conn = psycopg.connect(CONNECTION_STRING)
     # DEBUG: duplicated print below; intended for development tracing
-    print(CONNECTION_STRING)
     cursor = conn.cursor()
     
     cursor.execute('''
     SELECT username, password_hash, salt, role, organization FROM users 
     WHERE username = %s
     ''', (username,))
-    print("EXECUTED")
     
     user = cursor.fetchone()
     conn.close()
