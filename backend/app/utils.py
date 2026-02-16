@@ -64,18 +64,18 @@ def call_chatgpt_api_all_chats(all_chats,stream=True,max_tokens=750,response_for
 
     if response_format is not None:
         response = openai.chat.completions.create(
-            model="gpt-4o-mini",  
+            model="gpt-5.2",  
             messages=all_chats,
             stream=stream,
-            max_tokens=max_tokens,
+            # max_tokens=max_tokens,
             response_format=response_format
         )
     else:
         response = openai.chat.completions.create(
-            model="gpt-4o-mini",  
+            model="gpt-5.2",  
             messages=all_chats,
             stream=stream,
-            max_tokens=max_tokens,
+            # max_tokens=max_tokens,
         )
     
     if stream:

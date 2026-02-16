@@ -49,9 +49,11 @@ def update_conversation(metadata, previous_text, service_user_id):
         sender = msg["role"]
         text = msg["content"]
         if sender and text:
+            # Compute hash for deduplication (avoids btree index size limits)
+            text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
             cursor.execute(
-                "INSERT INTO messages (conversation_id, sender, text, service_user_id) VALUES (%s, %s, %s, %s) ON CONFLICT (conversation_id, sender, text) DO NOTHING",
-                (conversation_id, sender, text, service_user_id)
+                "INSERT INTO messages (conversation_id, sender, text, text_hash, service_user_id) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (conversation_id, sender, text_hash) DO NOTHING",
+                (conversation_id, sender, text, text_hash, service_user_id)
             )
 
     conn.commit()

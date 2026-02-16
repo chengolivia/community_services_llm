@@ -86,14 +86,16 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   box-sizing: border-box;
-  overflow-y: auto;
+  
+  /* Use a fixed height so the children know what to overflow against */
+  height: calc(100vh - 200px); 
   gap: var(--spacing-xl);
-  margin-top: var(--spacing-xl);
-  min-width: 0;
-  max-height: calc(100vh - 200px); /* CHANGE from 100% */
-  overflow: hidden;
   position: sticky;
-  top: var(--spacing-xl); /* ADD THIS */
+  top: var(--spacing-xl);
+  
+  /* This prevents the whole sidebar from scrolling 
+     so individual boxes can scroll instead */
+  overflow: hidden; 
 }
 
 

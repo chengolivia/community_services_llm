@@ -7,7 +7,6 @@ produce follow-up messages and schedule check-ins for service users.
 import psycopg
 import os 
 import openai 
-import uuid
 import json 
 from datetime import datetime, timedelta
 from app.utils import call_chatgpt_api_all_chats

@@ -163,48 +163,28 @@
 /* ===========================
    GOALS & RESOURCES BOXES
    =========================== */
-
-.goals-box,
-.resources-box {
-  font-size: var(--font-base);
-  line-height: var(--line-height-normal);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.goals-box h3,
-.resources-box h3 {
-  font-size: var(--font-xl);
-  margin-top: 0;
-  margin-bottom: var(--spacing-md);
-  flex-shrink: 0;
-  font-weight: 600;
-}
-
-.scroll-container {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  padding-right: var(--spacing-sm);
-}
-
-.scroll-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scroll-container::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-  border-radius: var(--radius-xs);
-}
-
-.scroll-container::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: var(--radius-xs);
-}
-
-.scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-dark);
-}
-
+   .goals-box,
+   .resources-box {
+     flex: 1; /* Both boxes share the space 50/50 */
+     display: flex;
+     flex-direction: column;
+     
+     /* CRITICAL: Allows the box to be smaller than its text content */
+     min-height: 0; 
+   }
+   
+   /* We create a wrapper for the actual list to handle scrolling */
+   .scroll-area {
+     overflow-y: auto;
+     flex: 1;
+     padding-right: var(--spacing-sm);
+   }
+   
+   /* Custom Scrollbar Styles (Keep yours, just apply to .scroll-area) */
+   .scroll-area::-webkit-scrollbar {
+     width: 6px;
+   }
+   .scroll-area::-webkit-scrollbar-thumb {
+     background: var(--color-border);
+     border-radius: var(--radius-xs);
+   }
