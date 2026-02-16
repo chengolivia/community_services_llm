@@ -9,7 +9,7 @@ import threading
 import time
 import secrets
 
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field 
 from contextlib import asynccontextmanager
@@ -19,10 +19,13 @@ import threading
 import time
 import socketio
 
+from app.audit_logger import AuditLogger
 from app.submodules import construct_response
 from app.process_profiles import get_all_outreach, get_all_service_users
 from app.login import get_current_user, UserData
 from app.login import router as auth_router
+from app.audit_viewer import router as audit_router
+
 from typing import Optional
 import psycopg
 
@@ -70,6 +73,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(audit_router)
+
 # Request/Response model
 
 class NewWellness(BaseModel):
@@ -228,25 +233,50 @@ def generate_sidebar_update(all_messages, sid, loop):
         print(f"[Sidecar] Error: {e}")
         
 @app.get("/service_user_list/")
-async def service_user_list(current_user: UserData = Depends(get_current_user)):
-    return get_all_service_users(current_user.username, current_user.organization)
+async def service_user_list(current_user: UserData = Depends(get_current_user), req: Request = None):
+    result = get_all_service_users(current_user.username, current_user.organization)
+    
+    # Log PHI access
+    AuditLogger.log(
+        username=current_user.username,
+        user_role=current_user.role,
+        action="list_patients",
+        resource_type="patient_list",
+        status="success",
+        ip_address=req.client.host if req and req.client else None,
+        details={"count": len(result)}
+    )
+    
+    return result
 
 @app.get("/outreach_list/")
 async def outreach_list(current_user: UserData = Depends(get_current_user)):
     return get_all_outreach(current_user.username, current_user.organization)
 
+# Update service_user_check_ins endpoint:
 @app.get("/service_user_check_ins/")
 async def service_user_check_ins(
     service_user_id: str = None,
-    current_user: UserData = Depends(get_current_user)
+    current_user: UserData = Depends(get_current_user),
+    req: Request = None
 ):
-    """Get all check-ins for a specific service user, ordered by check-in date"""
+    """Get all check-ins for a specific service user"""
     success, result = fetch_service_user_checkins(service_user_id)
+    
     if success:
+        # Log PHI access
+        AuditLogger.log_phi_access(
+            username=current_user.username,
+            user_role=current_user.role,
+            action="view_patient_checkins",
+            patient_id=service_user_id,
+            ip_address=req.client.host if req and req.client else None,
+            details={"checkin_count": len(result)}
+        )
         return result
     else:
         raise HTTPException(status_code=400, detail=result)
-    
+
     
 @app.post("/service_user_outreach_edit/")
 async def service_user_outreach_edit(data: dict):
@@ -262,7 +292,7 @@ async def service_user_outreach_edit(data: dict):
     
 
 @app.post("/new_service_user/")
-async def create_service_user(item: NewWellness):
+async def create_service_user(item: NewWellness, current_user: UserData = Depends(get_current_user), req: Request = None):
     print(f"[API] Creating service user: {item.dict()}")
     success, message = add_new_service_user(
         item.username,
@@ -275,6 +305,16 @@ async def create_service_user(item: NewWellness):
     
     if not success:
         raise HTTPException(status_code=400, detail=message)
+    
+    # Log patient creation
+    AuditLogger.log_phi_access(
+        username=current_user.username,
+        user_role=current_user.role,
+        action="create_patient",
+        patient_id=item.patientName,
+        ip_address=req.client.host if req and req.client else None,
+        details={"patient_name": item.patientName, "location": item.location}
+    )
     
     return {"success": True, "message": message, "item": item}
 
@@ -339,13 +379,20 @@ def _background_stream(
     service_user_id,
     version,
 ):
-    """
-    Runs construct_response in its own OS thread.
-    Uses run_coroutine_threadsafe so .emit() coroutines are correctly awaited.
-    """
+    """Runs construct_response in its own OS thread."""
     accumulated_text = ""
 
     try:
+        # Log GPT request
+        AuditLogger.log_gpt_request(
+            username=metadata.get('username'),
+            user_role='provider',  # Get from metadata if available
+            patient_id=service_user_id,
+            conversation_id=metadata.get('conversation_id'),
+            prompt_length=len(text),
+            response_length=0  # Will update after completion
+        )
+        
         gen = construct_response(
             text, 
             previous_text, 
@@ -362,10 +409,6 @@ def _background_stream(
             time.sleep(0.1)
         
         # Update conversation in database
-        print(f"[DB] Updating conversation for user: {metadata.get('username')}, "
-              f"service_user: {service_user_id}, "
-              f"conversation: {metadata.get('conversation_id')}")
-        
         update_conversation(
             metadata,
             [
@@ -373,6 +416,16 @@ def _background_stream(
                 {'role': 'system', 'content': accumulated_text}
             ],
             service_user_id
+        )
+        
+        # Log completion
+        AuditLogger.log_gpt_request(
+            username=metadata.get('username'),
+            user_role='provider',
+            patient_id=service_user_id,
+            conversation_id=metadata.get('conversation_id'),
+            prompt_length=len(text),
+            response_length=len(accumulated_text)
         )
         session_histories[sid].append({"role": "assistant", "content": accumulated_text})
         print("[Background] Triggering sidebar update...")

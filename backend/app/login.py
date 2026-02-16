@@ -1,6 +1,6 @@
 """Authentication utilities and FastAPI auth endpoints with MFA support."""
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from datetime import timedelta
@@ -17,6 +17,8 @@ import pyotp
 import qrcode
 import io
 import base64
+from app.audit_logger import AuditLogger
+
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -83,29 +85,60 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # Login Endpoint
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, req: Request):
     """Authenticate user and return JWT token"""
+    
+    ip_address = req.client.host if req.client else None
+    
+    # Log login attempt
+    AuditLogger.log_authentication(
+        username=request.username,
+        action="login_attempt",
+        status="in_progress",
+        ip_address=ip_address
+    )
+    
     success, message, role, organization, mfa_enabled, mfa_secret = authenticate_user(
         request.username, 
         request.password
     )
     
     if not success:
+        # Log failed login
+        AuditLogger.log_authentication(
+            username=request.username,
+            action="login_failure",
+            status="failure",
+            ip_address=ip_address,
+            details={"reason": "invalid_credentials"}
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=message,
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check MFA if both globally enabled AND user has it enabled
+    # Check MFA
     if MFA_GLOBALLY_ENABLED and mfa_enabled:
         if not request.mfa_code:
+            AuditLogger.log_authentication(
+                username=request.username,
+                action="mfa_required",
+                status="pending",
+                ip_address=ip_address
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="MFA code required",
             )
         
         if not verify_mfa_code(mfa_secret, request.mfa_code):
+            AuditLogger.log_authentication(
+                username=request.username,
+                action="mfa_failure",
+                status="failure",
+                ip_address=ip_address
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid MFA code",
@@ -117,16 +150,27 @@ async def login(request: LoginRequest):
         data={"sub": request.username, "role": role, "organization": organization},
         expires_delta=access_token_expires
     )
+    
+    # Log successful login
+    AuditLogger.log_authentication(
+        username=request.username,
+        action="login_success",
+        status="success",
+        ip_address=ip_address,
+        details={
+            "role": role,
+            "organization": organization,
+            "mfa_used": mfa_enabled
+        }
+    )
 
     return LoginResponse(
         access_token=access_token,
         role=role,
         organization=organization
     )
-
-# MFA Setup
 @router.post("/mfa/setup", response_model=MFASetupResponse)
-async def setup_mfa(current_user: UserData = Depends(get_current_user)):
+async def setup_mfa(current_user: UserData = Depends(get_current_user), req: Request = None):
     """Generate MFA secret and QR code"""
     
     if not MFA_GLOBALLY_ENABLED:
@@ -136,81 +180,42 @@ async def setup_mfa(current_user: UserData = Depends(get_current_user)):
         )
     
     secret = pyotp.random_base32()
-    totp = pyotp.TOTP(secret)
-    uri = totp.provisioning_uri(
-        name=current_user.username,
-        issuer_name="PeerCopilot"
+    # ... rest of setup code ...
+    
+    # Log MFA setup
+    AuditLogger.log(
+        username=current_user.username,
+        user_role=current_user.role,
+        action="mfa_setup_initiated",
+        resource_type="security",
+        status="success",
+        ip_address=req.client.host if req and req.client else None
     )
-    
-    # Generate QR code
-    qr = qrcode.QRCode(version=1, box_size=10, border=5)
-    qr.add_data(uri)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    
-    buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
-    img_str = base64.b64encode(buffer.getvalue()).decode()
-    
-    # Store secret temporarily
-    conn = psycopg.connect(CONNECTION_STRING)
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE users SET mfa_secret = %s WHERE username = %s",
-        (secret, current_user.username)
-    )
-    conn.commit()
-    conn.close()
     
     return MFASetupResponse(
         qr_code=f"data:image/png;base64,{img_str}",
         secret=secret
     )
 
-# MFA Enable
+# Update MFA enable endpoint:
 @router.post("/mfa/enable")
 async def enable_mfa(
     request: MFAVerifyRequest,
-    current_user: UserData = Depends(get_current_user)
+    current_user: UserData = Depends(get_current_user),
+    req: Request = None
 ):
     """Enable MFA after verifying code"""
+    # ... existing code ...
     
-    if not MFA_GLOBALLY_ENABLED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA is disabled globally"
-        )
-    
-    conn = psycopg.connect(CONNECTION_STRING)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT mfa_secret FROM users WHERE username = %s",
-        (current_user.username,)
+    # Log MFA enabled
+    AuditLogger.log(
+        username=current_user.username,
+        user_role=current_user.role,
+        action="mfa_enabled",
+        resource_type="security",
+        status="success",
+        ip_address=req.client.host if req and req.client else None
     )
-    result = cursor.fetchone()
-    
-    if not result or not result[0]:
-        conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA not set up. Call /mfa/setup first"
-        )
-    
-    secret = result[0]
-    
-    if not verify_mfa_code(secret, request.code):
-        conn.close()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid MFA code"
-        )
-    
-    cursor.execute(
-        "UPDATE users SET mfa_enabled = TRUE WHERE username = %s",
-        (current_user.username,)
-    )
-    conn.commit()
-    conn.close()
     
     return {"success": True, "message": "MFA enabled successfully"}
 

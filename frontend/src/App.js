@@ -3,6 +3,7 @@ import React, { useContext, useCallback } from 'react';
 import { BrowserRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './components/Home';
+import AuditLogs from './components/AuditLogs';
 import Login from './components/Login';
 import {WellnessGoals} from './components/GenericChat';
 import {WellnessContextProvider, WellnessContext} from './components/AppStateContextProvider.js';
@@ -64,6 +65,7 @@ function AppContent() {
           <Route path="/wellness-goals" element={<WellnessGoals />} />
           <Route path="/profile-manager" element={<ProfileManager />} />
           <Route path="/outreach-calendar" element={<OutreachCalendar />} />
+          <Route path="/audit-logs" element={<AuditLogs />} />
         </Routes>
       </div>
     </div>
