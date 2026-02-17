@@ -22,3 +22,6 @@ requests
 apscheduler
 ddgs
 googlemaps
+scrubadub
+pyotp
+qrcode

@@ -9,6 +9,9 @@ from psycopg.rows import dict_row
 import os
 from datetime import date as _date, datetime as _datetime
 
+from dotenv import load_dotenv
+load_dotenv()
+
 CONNECTION_STRING = os.getenv("DATABASE_URL")
 
 def update_conversation(metadata, previous_text, service_user_id):
