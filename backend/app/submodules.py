@@ -24,7 +24,7 @@ from app.utils import (
 openai.api_key = os.environ.get("SECRET_KEY")
 # NOTE: This eagerly loads embedding models and indices on import which can be
 # expensive; consider lazy-loading in production to reduce startup time.
-embedding_model, saved_resources, documents_resources, saved_articles, documents_articles = get_model_and_indices()
+embedding_model, saved_resources, documents_resources, metadata_resources, saved_articles, documents_articles = get_model_and_indices()
 internal_prompts, external_prompts = get_all_prompts()
 
 
@@ -484,13 +484,24 @@ def _construct_response_new(
                 "name": "resources_tool",
                 "description": (
                     "Find nearby local resources such as food banks, shelters, or clinics. "
-                    "Always use the user's location when searching."
+                    "Use the location parameter to find resources near a specific place."
                 ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string"},
-                        "k": {"type": "integer", "default": 5}
+                        "query": {
+                            "type": "string",
+                            "description": "What to search for (e.g., 'food banks', 'legal aid')"
+                        },
+                        "location": {
+                            "type": "string",
+                            "description": "Where to search near. Can be city name, zip code, or address (e.g., 'Vineland', '07102', 'Newark, NJ'). Optional - omit for statewide results."
+                        },
+                        "k": {
+                            "type": "integer", 
+                            "default": 5,
+                            "description": "Number of results to return"
+                        }
                     },
                     "required": ["query"]
                 }
@@ -628,8 +639,11 @@ def _construct_response_new(
                 output = resources_tool(
                     query=args.get("query", ""),
                     organization=organization,
+                    location=args.get("location"),  # NEW: Pass location parameter
+                    k=args.get("k", 5),
                     saved_indices=saved_resources,
                     documents=documents_resources,
+                    metadata=metadata_resources,  # NEW: Pass metadata
                     embedding_model=embedding_model
                 )
 
