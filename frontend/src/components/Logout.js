@@ -1,17 +1,14 @@
-// Logout.js - Clears auth and redirects to login
 import React, { useContext } from 'react';
 import { WellnessContext } from './AppStateContextProvider';
 import { useNavigate } from 'react-router-dom';
-
-/**
- * Logout component - clears local state/localStorage and navigates to login
- */
 
 function Logout() {
   const { setUser, setOrganization, setConversation } = useContext(WellnessContext);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = (reason = 'manual') => {
+    console.log(`[Logout] User logged out: ${reason}`);
+    
     setUser({
       username: '',
       role: '',
@@ -24,15 +21,18 @@ function Logout() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('userRole');
     localStorage.removeItem('username');
+    localStorage.removeItem('organization');
+    localStorage.removeItem('loginTimestamp');
     
     navigate('/login');
   };
 
   return (
-    <button onClick={handleLogout} className="logout-button">
+    <button onClick={() => handleLogout('manual')} className="logout-button">
       Logout
     </button>
   );
 }
 
+export { Logout };
 export default Logout;

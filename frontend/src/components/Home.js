@@ -2,16 +2,14 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import Logo from '../icons/Logo.png';
-import {WellnessContext } from './AppStateContextProvider';
+import { WellnessContext } from './AppStateContextProvider';
 import { authenticatedFetch } from '../utils/api';
+import MFASetup from './MFASetup';
+import '../styles/pages/home.css';
 
 /**
  * Home component - shows navigation tiles and notification settings
  */
-
-import '../styles/pages/home.css';
-
-
 function Home() {
   const { organization, setOrganization, user } = useContext(WellnessContext);
   const [showSettings, setShowSettings] = useState(false);
@@ -20,9 +18,13 @@ function Home() {
   const [notificationTime, setNotificationTime] = useState('08:00');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showMfaSetup, setShowMfaSetup] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaGloballyEnabled, setMfaGloballyEnabled] = useState(true);
+  
   const handleOrganizationChange = (e) => {
     const newOrg = e.target.value.toLowerCase();
-    console.log("Setting organization to:", newOrg); // For debugging
+    console.log("Setting organization to:", newOrg);
     setOrganization(newOrg);
   };
 
@@ -36,28 +38,48 @@ function Home() {
     }
   }, [showSettings]);
 
-  const fetchSettings = async () => {
-    const token = user.token || localStorage.getItem('accessToken');
-    
-    if (!token) {
-      setMessage('Not authenticated. Please log in again.');
-      return;
-    }
+  useEffect(() => {
+    checkMfaStatus();
+  }, []);
+  
+  const checkMfaStatus = async () => {
     try {
+      const response = await authenticatedFetch('/api/auth/mfa/status');
+      const data = await response.json();
+      setMfaEnabled(data.mfa_enabled);
+      setMfaGloballyEnabled(data.mfa_globally_enabled);
+    } catch (error) {
+      console.error('Error checking MFA status:', error);
+    }
+  };
+  
+  const handleDisableMfa = async () => {
+    const code = prompt('Enter your current MFA code to disable:');
+    if (!code) return;
+  
+    try {
+      const response = await authenticatedFetch('/api/auth/mfa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ code })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('MFA disabled successfully');
+        setMfaEnabled(false);
+      }
+    } catch (error) {
+      alert('Failed to disable MFA. Invalid code?');
+    }
+  };
+  
+
+  const fetchSettings = async () => {
+    try {
+      // authenticatedFetch handles the token automatically
       const response = await authenticatedFetch(`/api/notification-settings`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
       });
-          const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.error('Expected JSON but got:', contentType);
-      console.error('Response status:', response.status);
-      return;
-    }
+
       const data = await response.json();
       if (data.success) {
         setEmail(data.settings.email || '');
@@ -66,6 +88,7 @@ function Home() {
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
+      setMessage('Failed to load settings. Please try again.');
     }
   };
 
@@ -73,21 +96,11 @@ function Home() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-    const token = user.token || localStorage.getItem('accessToken');
-    
-    if (!token) {
-      setMessage('Not authenticated. Please log in again.');
-      return;
-    }
 
     try {
+      // authenticatedFetch handles the token automatically
       const response = await authenticatedFetch(`/api/notification-settings`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify({
           username: user.username,
           email,
@@ -214,6 +227,47 @@ function Home() {
           </form>
         </div>
       )}
+      {mfaGloballyEnabled && (
+        <div className="mfa-settings" style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #ddd' }}>
+          <h3>Two-Factor Authentication</h3>
+          {mfaEnabled ? (
+            <>
+              <p className="mfa-status-enabled" style={{ color: '#155724', background: '#d4edda', padding: '10px', borderRadius: '4px' }}>
+                ✓ MFA is enabled
+              </p>
+              <button 
+                onClick={handleDisableMfa} 
+                className="settings-toggle-button"
+                style={{ marginTop: '10px', background: '#dc3545' }}
+              >
+                Disable MFA
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ color: '#666' }}>MFA is not enabled</p>
+              <button 
+                onClick={() => setShowMfaSetup(true)} 
+                className="settings-toggle-button"
+                style={{ marginTop: '10px' }}
+              >
+                Set Up MFA
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {showMfaSetup && (
+        <MFASetup 
+          onClose={() => setShowMfaSetup(false)}
+          onSuccess={() => {
+            setMfaEnabled(true);
+            alert('MFA enabled successfully!');
+          }}
+        />
+      )}
+
     </div>
   );
 }

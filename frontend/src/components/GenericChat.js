@@ -162,15 +162,10 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     const fetchServiceUsers = async () => {
       if (!user?.username) return;
       const token = localStorage.getItem('accessToken');
-  console.log('[DEBUG] Token exists:', !!token);
-  console.log('[DEBUG] Token value:', token?.substring(0, 20) + '...');
       try {
-        console.log('[Dropdown] Fetching service users...');
         const data = await apiGet(`/service_user_list/`);
-        console.log('[Dropdown] Received data:', data);
         setServiceUsers(data);
       } catch (error) {
-        console.error('[Dropdown] Error:', error);
       }
     };
 
