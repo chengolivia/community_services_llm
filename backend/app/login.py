@@ -227,7 +227,7 @@ async def disable_mfa(
 ):
     """Disable MFA"""
     
-    conn = psycopg.connect(CONNECTION_STRING)
+    conn = psycopg.connect(CONNECTION_STRING,sslmode="require")
     cursor = conn.cursor()
     cursor.execute(
         "SELECT mfa_secret FROM users WHERE username = %s",
@@ -265,7 +265,7 @@ async def disable_mfa(
 async def mfa_status(current_user: UserData = Depends(get_current_user)):
     """Check if MFA is enabled"""
     
-    conn = psycopg.connect(CONNECTION_STRING)
+    conn = psycopg.connect(CONNECTION_STRING,sslmode="require")
     cursor = conn.cursor()
     cursor.execute(
         "SELECT mfa_enabled FROM users WHERE username = %s",
@@ -287,7 +287,7 @@ def verify_mfa_code(secret: str, code: str) -> bool:
 
 def authenticate_user(username, password):
     """Authenticate user"""
-    conn = psycopg.connect(CONNECTION_STRING)
+    conn = psycopg.connect(CONNECTION_STRING,sslmode="require")
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -318,7 +318,7 @@ def hash_password(password):
 
 def create_user(username, password, role='provider', organization='cspnj'):
     """Create new user"""
-    conn = psycopg.connect(CONNECTION_STRING)
+    conn = psycopg.connect(CONNECTION_STRING,sslmode="require")
     cursor = conn.cursor()
 
     cursor.execute("SELECT username FROM users WHERE username = %s", (username,))

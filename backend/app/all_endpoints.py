@@ -506,7 +506,7 @@ def submit_feedback(feedback: FeedbackRequest):
 
     try:
         # Use your existing connection string
-        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        with psycopg.connect(os.environ["DATABASE_URL"],sslmode="require") as conn:
             with conn.cursor() as cur:
                 
                 # Optional: Verify conversation exists first
