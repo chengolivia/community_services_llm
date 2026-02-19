@@ -171,18 +171,30 @@ async def login(request: LoginRequest, req: Request):
     )
 @router.post("/mfa/setup", response_model=MFASetupResponse)
 async def setup_mfa(current_user: UserData = Depends(get_current_user), req: Request = None):
-    """Generate MFA secret and QR code"""
-    
     if not MFA_GLOBALLY_ENABLED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="MFA is disabled globally"
-        )
-    
+        raise HTTPException(status_code=400, detail="MFA is disabled globally")
+
     secret = pyotp.random_base32()
-    # ... rest of setup code ...
-    
-    # Log MFA setup
+
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=current_user.username,
+        issuer_name="PeerCopilot"
+    )
+    qr = qrcode.make(provisioning_uri)
+    buffer = io.BytesIO()
+    qr.save(buffer, format="PNG")
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET mfa_secret = %s WHERE username = %s",
+        (secret, current_user.username)
+    )
+    conn.commit()
+    conn.close()
+
     AuditLogger.log(
         username=current_user.username,
         user_role=current_user.role,
@@ -191,7 +203,7 @@ async def setup_mfa(current_user: UserData = Depends(get_current_user), req: Req
         status="success",
         ip_address=req.client.host if req and req.client else None
     )
-    
+
     return MFASetupResponse(
         qr_code=f"data:image/png;base64,{img_str}",
         secret=secret
@@ -199,15 +211,24 @@ async def setup_mfa(current_user: UserData = Depends(get_current_user), req: Req
 
 # Update MFA enable endpoint:
 @router.post("/mfa/enable")
-async def enable_mfa(
-    request: MFAVerifyRequest,
-    current_user: UserData = Depends(get_current_user),
-    req: Request = None
-):
-    """Enable MFA after verifying code"""
-    # ... existing code ...
-    
-    # Log MFA enabled
+async def enable_mfa(request: MFAVerifyRequest, current_user: UserData = Depends(get_current_user), req: Request = None):
+    conn = psycopg.connect(CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute("SELECT mfa_secret FROM users WHERE username = %s", (current_user.username,))
+    result = cursor.fetchone()
+
+    if not result or not result[0]:
+        conn.close()
+        raise HTTPException(status_code=400, detail="MFA setup not initiated")
+
+    if not verify_mfa_code(result[0], request.code):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid MFA code")
+
+    cursor.execute("UPDATE users SET mfa_enabled = TRUE WHERE username = %s", (current_user.username,))
+    conn.commit()
+    conn.close()
+
     AuditLogger.log(
         username=current_user.username,
         user_role=current_user.role,
@@ -216,8 +237,9 @@ async def enable_mfa(
         status="success",
         ip_address=req.client.host if req and req.client else None
     )
-    
+
     return {"success": True, "message": "MFA enabled successfully"}
+
 
 # MFA Disable
 @router.post("/mfa/disable")
