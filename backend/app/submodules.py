@@ -598,7 +598,27 @@ def _construct_response_new(
     messages.append({"role": "user", "content": situation})
 
     # ---- TOOL LOOP ----
+    MAX_TOOL_CALLS = 100  # Safety limit (buffer before OpenAI's 128 limit)
+    MAX_ITERATIONS = 25   # Max loop iterations to prevent runaway loops
+    total_tool_calls = 0
+    iteration_count = 0
+    
     while True:
+        iteration_count += 1
+        
+        # Safety check: prevent infinite loops
+        if iteration_count > MAX_ITERATIONS:
+            # Silently force final response - no user notification
+            response = openai.chat.completions.create(
+                model="gpt-5.2",
+                messages=messages + [{"role": "user", "content": "You have gathered sufficient information. Please provide your final comprehensive answer now."}],
+                stream=True
+            )
+            for event in response:
+                if event.choices[0].delta.content:
+                    yield f"data: {event.choices[0].delta.content.replace(chr(10), '<br/>')}\n\n"
+            break
+        
         response = openai.chat.completions.create(
             model="gpt-5.2",
             messages=messages,
@@ -613,6 +633,23 @@ def _construct_response_new(
             final_text = choice.message.content or ""
             for chunk in final_text.split("\n"):
                 yield f"data: {chunk}<br/>\n\n"
+            break
+
+        # Check tool call count before processing
+        num_tool_calls = len(choice.message.tool_calls) if choice.message.tool_calls else 0
+        total_tool_calls += num_tool_calls
+        
+        # Safety check: prevent exceeding OpenAI's limit
+        if total_tool_calls >= MAX_TOOL_CALLS:
+            # Silently force final response - no user notification
+            response = openai.chat.completions.create(
+                model="gpt-5.2",
+                messages=messages + [{"role": "user", "content": "You have gathered sufficient information. Please provide your final comprehensive answer now."}],
+                stream=True
+            )
+            for event in response:
+                if event.choices[0].delta.content:
+                    yield f"data: {event.choices[0].delta.content.replace(chr(10), '<br/>')}\n\n"
             break
 
         # ASSISTANT REQUESTED TOOLS
