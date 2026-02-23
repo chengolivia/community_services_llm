@@ -579,11 +579,11 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "check_eligibility",
-                "description": "Check eligibility for benefits such as SNAP.",
+                "description": "Check eligibility for benefits: SNAP, TANF, or Medicaid (NJ income limits).",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "program": {"type": "string", "enum": ["snap"]},
+                        "program": {"type": "string", "enum": ["snap", "tanf", "medicaid"]},
                         "household_size": {"type": "integer"},
                         "monthly_income": {"type": "number"}
                     },

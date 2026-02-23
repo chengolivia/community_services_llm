@@ -198,7 +198,7 @@ def generate_sidebar_update(all_messages, sid, loop):
             "Analyze the ENTIRE conversation history provided below.\n"
             "1. Identify 3-5 'Active Goals'. These should be tasks the user is currently working on. "
             "   - If a goal was completed or abandoned in the chat, DO NOT include it.\n"
-            "   - Provide a 'details' sentence for each (e.g., 'Check eligibility tool for SNAP').\n"
+            "   - Provide a 'details' sentence for each (e.g., 'Check eligibility for SNAP, TANF, or Medicaid').\n"
             "2. Identify 'Resources'. These are organizations, tools, or websites mentioned by the assistant. "
             "   - Provide a 'details' sentence (e.g., 'Located at 123 Main St, open 9-5')."
         )

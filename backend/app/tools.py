@@ -268,10 +268,10 @@ def directions_tool(origin: str, destination: str, mode: str = "driving"):
 
 def check_eligibility(program: str, household_size: int, monthly_income: float):
     """
-    Checks eligibility based on official 2026 NJ income limits.
+    Checks eligibility for SNAP, TANF, and Medicaid based on official NJ income limits.
     """
     program = program.lower()
-    
+
     # 2026 NJ SNAP Gross Income Limits (185% Federal Poverty Level)
     # Source: NJ Dept of Human Services / USDA
     snap_limits = {
@@ -284,20 +284,62 @@ def check_eligibility(program: str, household_size: int, monthly_income: float):
         7: 7501,
         8: 8349
     }
-    
+
+    # WFNJ/TANF Initial Maximum Allowable Income Levels (monthly), Jan 2025
+    tanf_limits = {
+        1: 321,
+        2: 638,
+        3: 839,
+        4: 966,
+        5: 1092,
+        6: 1221,
+        7: 1341,
+        8: 1442
+    }
+
+    # NJFamilyCare Adults (Age 19-64) 0-138% FPL, effective Jan 1 2025
+    medicaid_limits = {
+        1: 1800,
+        2: 2433,
+        3: 3065,
+        4: 3698,
+        5: 4330,
+        6: 4963
+    }
+
     if "snap" in program or "food stamp" in program:
         # Get limit (add $848 for each person beyond 8)
         if household_size <= 8:
             limit = snap_limits.get(household_size)
         else:
             limit = 8349 + (848 * (household_size - 8))
-            
+
         if monthly_income <= limit:
             return f"✅ LIKELY ELIGIBLE. Household income (${monthly_income}) is BELOW the NJ SNAP gross limit (${limit}) for {household_size} people."
         else:
             return f"❌ LIKELY INELIGIBLE. Household income (${monthly_income}) is ABOVE the NJ SNAP gross limit (${limit})."
 
-    return "Error: Unknown benefit program. Currently supporting: SNAP."
+    if "tanf" in program or "work first" in program or "wfnj" in program:
+        if household_size <= 8:
+            limit = tanf_limits.get(household_size)
+        else:
+            limit = 1442 + (99 * (household_size - 8))
+        if monthly_income <= limit:
+            return f"✅ LIKELY ELIGIBLE. Household income (${monthly_income}) is BELOW the NJ TANF (WFNJ) initial maximum allowable income (${limit}) for {household_size} people."
+        else:
+            return f"❌ LIKELY INELIGIBLE. Household income (${monthly_income}) is ABOVE the NJ TANF (WFNJ) limit (${limit})."
+
+    if "medicaid" in program or "njfamilycare" in program or "familycare" in program:
+        if household_size <= 6:
+            limit = medicaid_limits.get(household_size)
+        else:
+            limit = 4963 + (633 * (household_size - 6))
+        if monthly_income <= limit:
+            return f"✅ LIKELY ELIGIBLE. Household income (${monthly_income}) is BELOW the NJ Medicaid (NJFamilyCare adults 0-138% FPL) limit (${limit}) for {household_size} people."
+        else:
+            return f"❌ LIKELY INELIGIBLE. Household income (${monthly_income}) is ABOVE the NJ Medicaid limit (${limit})."
+
+    return "Error: Unknown benefit program. Currently supporting: SNAP, TANF, Medicaid."
 
 
 def web_search_tool(query: str, max_results: int = 4):
