@@ -266,9 +266,9 @@ def directions_tool(origin: str, destination: str, mode: str = "driving"):
     except Exception as e:
         return f"Error: {str(e)}"
 
-def check_eligibility(program: str, household_size: int, monthly_income: float):
+def check_eligibility(program: str, household_size: int, monthly_income: float, location: str = None):
     """
-    Checks eligibility for SNAP, TANF, and Medicaid based on official NJ income limits.
+    Checks eligibility for SNAP, TANF, Medicaid, SSDI, SSI, Section 8 based on official limits.
     """
     program = program.lower()
 
@@ -307,6 +307,56 @@ def check_eligibility(program: str, household_size: int, monthly_income: float):
         6: 4963
     }
 
+    # SSA Substantial Gainful Activity (SGA) 2026 — earnings above = generally not disabled for SSDI
+    SGA_NON_BLIND_2026 = 1690
+    SGA_BLIND_2026 = 2830
+
+    # SSI Federal Benefit Rate 2026 + NJ Optional State Supplement (~$32, SSA-administered)
+    SSI_MAX_INDIVIDUAL = 994
+    SSI_MAX_COUPLE = 1491
+    SSI_NJ_SUPPLEMENT = 32
+
+    # Section 8 HCV Very Low Income Limits (50% AMI) — FY2025 HUD, effective June 1 2025
+    # Source: HUD FY2025 Adjusted HOME Income Limits, State of New Jersey
+    section8_limits = {
+        # Warren County
+        "warren":           {1: 44000, 2: 50300, 3: 56550, 4: 62850, 5: 67900, 6: 72950, 7: 77950, 8: 83000},
+        # Atlantic City-Hammonton
+        "atlantic":         {1: 35100, 2: 40100, 3: 45100, 4: 50100, 5: 54150, 6: 58150, 7: 62150, 8: 66150},
+        "hammonton":        {1: 35100, 2: 40100, 3: 45100, 4: 50100, 5: 54150, 6: 58150, 7: 62150, 8: 66150},
+        # Cape May
+        "cape may":         {1: 42250, 2: 48250, 3: 54300, 4: 60350, 5: 65200, 6: 70000, 7: 74850, 8: 79650},
+        # Bergen-Passaic
+        "bergen":           {1: 48000, 2: 54850, 3: 61700, 4: 68550, 5: 74050, 6: 79550, 7: 85050, 8: 90500},
+        "passaic":          {1: 48000, 2: 54850, 3: 61700, 4: 68550, 5: 74050, 6: 79550, 7: 85050, 8: 90500},
+        # Jersey City
+        "jersey city":      {1: 46900, 2: 53600, 3: 60300, 4: 67000, 5: 72400, 6: 77750, 7: 83100, 8: 88450},
+        "hudson":           {1: 46900, 2: 53600, 3: 60300, 4: 67000, 5: 72400, 6: 77750, 7: 83100, 8: 88450},
+        # Middlesex-Somerset-Hunterdon
+        "middlesex":        {1: 53700, 2: 61400, 3: 69050, 4: 76700, 5: 82850, 6: 89000, 7: 95150, 8: 101250},
+        "somerset":         {1: 53700, 2: 61400, 3: 69050, 4: 76700, 5: 82850, 6: 89000, 7: 95150, 8: 101250},
+        "hunterdon":        {1: 53700, 2: 61400, 3: 69050, 4: 76700, 5: 82850, 6: 89000, 7: 95150, 8: 101250},
+        # Monmouth-Ocean
+        "monmouth":         {1: 47900, 2: 54750, 3: 61600, 4: 68400, 5: 73900, 6: 79350, 7: 84850, 8: 90300},
+        "ocean":            {1: 47900, 2: 54750, 3: 61600, 4: 68400, 5: 73900, 6: 79350, 7: 84850, 8: 90300},
+        # Newark
+        "newark":           {1: 47400, 2: 54150, 3: 60900, 4: 67650, 5: 73100, 6: 78500, 7: 83900, 8: 89300},
+        "essex":            {1: 47400, 2: 54150, 3: 60900, 4: 67650, 5: 73100, 6: 78500, 7: 83900, 8: 89300},
+        # Philadelphia-Camden-Wilmington
+        "philadelphia":     {1: 41800, 2: 47800, 3: 53750, 4: 59700, 5: 64500, 6: 69300, 7: 74050, 8: 78850},
+        "camden":           {1: 41800, 2: 47800, 3: 53750, 4: 59700, 5: 64500, 6: 69300, 7: 74050, 8: 78850},
+        "gloucester":       {1: 41800, 2: 47800, 3: 53750, 4: 59700, 5: 64500, 6: 69300, 7: 74050, 8: 78850},
+        "burlington":       {1: 41800, 2: 47800, 3: 53750, 4: 59700, 5: 64500, 6: 69300, 7: 74050, 8: 78850},
+        # Trenton-Princeton
+        "trenton":          {1: 44450, 2: 50800, 3: 57150, 4: 63450, 5: 68550, 6: 73650, 7: 78700, 8: 83800},
+        "princeton":        {1: 44450, 2: 50800, 3: 57150, 4: 63450, 5: 68550, 6: 73650, 7: 78700, 8: 83800},
+        "mercer":           {1: 44450, 2: 50800, 3: 57150, 4: 63450, 5: 68550, 6: 73650, 7: 78700, 8: 83800},
+        # Vineland
+        "vineland":         {1: 32450, 2: 37100, 3: 41750, 4: 46350, 5: 50100, 6: 53800, 7: 57500, 8: 61200},
+        "cumberland":       {1: 32450, 2: 37100, 3: 41750, 4: 46350, 5: 50100, 6: 53800, 7: 57500, 8: 61200},
+        "bridgeton":        {1: 32450, 2: 37100, 3: 41750, 4: 46350, 5: 50100, 6: 53800, 7: 57500, 8: 61200},
+    }
+
     if "snap" in program or "food stamp" in program:
         # Get limit (add $848 for each person beyond 8)
         if household_size <= 8:
@@ -339,7 +389,75 @@ def check_eligibility(program: str, household_size: int, monthly_income: float):
         else:
             return f"❌ LIKELY INELIGIBLE. Household income (${monthly_income}) is ABOVE the NJ Medicaid limit (${limit})."
 
-    return "Error: Unknown benefit program. Currently supporting: SNAP, TANF, Medicaid."
+    if "ssdi" in program:
+        sga = SGA_BLIND_2026 if "blind" in program else SGA_NON_BLIND_2026
+        if monthly_income > sga:
+            return f"❌ From an earnings standpoint, LIKELY NOT ELIGIBLE. Gross monthly earnings (${monthly_income}) are ABOVE the SSA Substantial Gainful Activity (SGA) limit (${sga}/month). SSDI also requires work credits and medical eligibility."
+        else:
+            return f"✅ From an earnings standpoint, they may meet the SGA test. Gross monthly earnings (${monthly_income}) are at or below the SGA limit (${sga}/month). SSDI also requires sufficient work credits and medical eligibility (SSA determination)."
+
+    if "ssi" in program and "ssdi" not in program:
+        is_couple = household_size >= 2
+        max_benefit = SSI_MAX_COUPLE + SSI_NJ_SUPPLEMENT if is_couple else SSI_MAX_INDIVIDUAL + SSI_NJ_SUPPLEMENT
+        benefit_label = "couple" if is_couple else "individual"
+
+        countable_income = max(0, monthly_income - 20)
+
+        if countable_income >= max_benefit:
+            return (
+                f"❌ LIKELY INELIGIBLE for SSI. Countable income (~${countable_income:.0f}/mo after $20 exclusion) "
+                f"meets or exceeds the NJ SSI maximum benefit (${max_benefit}/mo for a {benefit_label}). "
+                f"SSI also requires resources under $2,000 (individual) or $3,000 (couple), and a qualifying disability or age 65+. "
+                f"SSA makes the final determination."
+            )
+        else:
+            return (
+                f"✅ POTENTIALLY ELIGIBLE for SSI. Countable income (~${countable_income:.0f}/mo) is below the "
+                f"NJ SSI maximum benefit (${max_benefit}/mo for a {benefit_label}, including NJ's ~$32 state supplement). "
+                f"Must also have resources under $2,000 (individual) or $3,000 (couple), "
+                f"be age 65+ OR have a qualifying disability, and be a U.S. citizen or qualifying non-citizen. "
+                f"SSA makes the final determination."
+            )
+
+    if "section 8" in program or "section8" in program or "hcv" in program or "housing choice" in program:
+        # Match location to known HMFA region
+        location_lower = location.lower().strip() if location else ""
+        limits = None
+
+        for region, region_limits in section8_limits.items():
+            if region in location_lower:
+                limits = region_limits
+                region_name = region.title()
+                break
+
+        # Default to Newark if no match found
+        if not limits:
+            limits = section8_limits["newark"]
+            region_name = "Newark (default — limits vary by county)"
+
+        annual_income = monthly_income * 12
+        if household_size <= 8:
+            annual_limit = limits.get(household_size)
+        else:
+            annual_limit = limits[8] + (5000 * (household_size - 8))
+
+        monthly_limit = annual_limit / 12
+
+        if annual_income <= annual_limit:
+            return (
+                f"✅ LIKELY INCOME-ELIGIBLE for Section 8 HCV. Annual income (~${annual_income:,.0f}) is at or below "
+                f"50% AMI for {household_size} people in the {region_name} area (${annual_limit:,}/yr or ~${monthly_limit:,.0f}/mo). "
+                f"Eligibility also requires U.S. citizenship or qualifying immigration status, passing a background check, "
+                f"and waitlists are often CLOSED — contact the local Housing Authority to apply."
+            )
+        else:
+            return (
+                f"❌ LIKELY INCOME-INELIGIBLE for Section 8 HCV. Annual income (~${annual_income:,.0f}) exceeds "
+                f"50% AMI for {household_size} people in the {region_name} area (${annual_limit:,}/yr or ~${monthly_limit:,.0f}/mo). "
+                f"Contact the local Housing Authority to confirm limits for their specific county."
+            )
+
+    return "Error: Unknown benefit program. Currently supporting: SNAP, TANF, Medicaid, SSDI, SSI, Section 8."
 
 
 def web_search_tool(query: str, max_results: int = 4):

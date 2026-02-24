@@ -579,13 +579,14 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "check_eligibility",
-                "description": "Check eligibility for benefits: SNAP, TANF, or Medicaid (NJ income limits).",
+                "description": "Check eligibility for benefits: SNAP, TANF, Medicaid, SSDI (SGA), SSI, or Section 8",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "program": {"type": "string", "enum": ["snap", "tanf", "medicaid"]},
+                        "program": {"type": "string", "enum": ["snap", "tanf", "medicaid", "ssdi", "ssi", "section 8"]},
                         "household_size": {"type": "integer"},
-                        "monthly_income": {"type": "number"}
+                        "monthly_income": {"type": "number"},
+                        "location": {"type": "string", "description": "City, zip code, or county in NJ. Required for Section 8 to determine correct AMI limits. If not provided for Section 8, ask the user for their location first."}
                     },
                     "required": ["program", "household_size", "monthly_income"]
                 }
@@ -714,7 +715,8 @@ def _construct_response_new(
                 output = check_eligibility(
                     program=args.get("program", ""),
                     household_size=args.get("household_size", 1),
-                    monthly_income=args.get("monthly_income", 0)
+                    monthly_income=args.get("monthly_income", 0),
+                    location=args.get("location")
                 )
 
             else:
