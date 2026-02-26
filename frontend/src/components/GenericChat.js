@@ -308,25 +308,19 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     setInputLocationText(e.target.value);
   }, [setInputLocationText]);
 
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  }, [inputText, isGenerating, socket, chatConvo, conversationID, organization, user, tool]);
 
   const handleSubmit = useCallback(() => {
     if (!inputText.trim() || isGenerating || !socket) return;
-
+  
     const messageText = inputText.trim();
     const userMsg = { sender: 'user', text: messageText };
-
+  
     setConversation(prev => [...prev, userMsg, { sender: 'bot', text: 'Loading...' }]);
     setChatConvo(prev => [...prev, { role: 'user', content: messageText }]);
     setInputText('');
     setIsGenerating(true);
-
-    console.log('[GenericChat] Emitting start_generation event');
+  
+    console.log('[GenericChat] Emitting start_generation event, service_user_id:', selectedServiceUser);
     socket.emit('start_generation', {
       text: messageText,
       previous_text: chatConvo,
@@ -335,8 +329,8 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
       tool,
       conversation_id: conversationID,
       username: user.username,
-      service_user_id: user.service_user_id || null,
-      version: version, // 'new', 'old', or 'vanilla'
+      service_user_id: selectedServiceUser || null, // ← FIXED: was user.service_user_id
+      version,
     });
   }, [
     inputText,
@@ -348,10 +342,20 @@ function GenericChat({ context, title, socketServerUrl, showLocation, tool }) {
     user,
     tool,
     version,
+    selectedServiceUser, // ← added
     setConversation,
     setChatConvo,
     setInputText,
   ]);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  }, [handleSubmit]); 
+
+  
 
   // Session management
   const handleNewSession = useCallback(() => {

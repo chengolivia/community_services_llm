@@ -27,7 +27,7 @@ from app.login import get_current_user, UserData
 from app.login import router as auth_router
 from app.audit_viewer import router as audit_router
 
-from typing import Optional
+from typing import Optional, Union
 import psycopg
 
 from app.database import (
@@ -36,7 +36,11 @@ from app.database import (
     fetch_service_user_checkins, 
     edit_service_user_outreach,
     get_notification_settings,
-    update_notification_settings
+    update_notification_settings,
+    delete_service_user_checkin,
+    add_service_user_checkin,
+    update_service_user_profile,
+    update_last_session_db,
 )
 from app.generate_outreach import generate_check_ins_rule_based
 from app.notifications import notification_job
@@ -592,3 +596,116 @@ async def reset_session(sid, data):
         "previous_service_user_id": data.get('previous_service_user_id'),
         "new_service_user_id": data.get('new_service_user_id')
     }, room=sid)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Add these endpoints to all_endpoints.py (app/main.py or wherever your routes live)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── Pydantic models ────────────────────────────────────────────────────────────
+
+class DeleteCheckIn(BaseModel):
+    check_in_id: Union[str, int]  # DB returns int IDs, frontend may send either
+
+
+class AddCheckIn(BaseModel):
+    service_user_id: str
+    check_in: str            # YYYY-MM-DD
+    follow_up_message: str = ""
+
+
+class UpdateServiceUser(BaseModel):
+    service_user_id: str
+    patientName: Optional[str] = None
+    location: Optional[str] = None
+    status: Optional[str] = None
+
+
+class UpdateLastSession(BaseModel):
+    service_user_id: str
+    last_session: str        # YYYY-MM-DD
+
+
+# ── Delete / complete a check-in ───────────────────────────────────────────────
+
+@app.post("/service_user_outreach_delete/")
+async def service_user_outreach_delete(
+    data: DeleteCheckIn,
+    current_user: UserData = Depends(get_current_user),
+    req: Request = None,
+):
+    """Mark a check-in as complete / delete it."""
+    success, result = delete_service_user_checkin(data.check_in_id)
+    if success:
+        AuditLogger.log_phi_access(
+            username=current_user.username,
+            user_role=current_user.role,
+            action="delete_checkin",
+            patient_id=data.check_in_id,
+            ip_address=req.client.host if req and req.client else None,
+        )
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=400, detail=result)
+
+
+# ── Add a new check-in ─────────────────────────────────────────────────────────
+
+@app.post("/service_user_outreach_add/")
+async def service_user_outreach_add(
+    data: AddCheckIn,
+    current_user: UserData = Depends(get_current_user),
+    req: Request = None,
+):
+    """Insert a brand-new check-in row for a service user."""
+    success, result = add_service_user_checkin(
+        data.service_user_id, data.check_in, data.follow_up_message
+    )
+    if success:
+        return {"success": True, "check_in_id": result}
+    else:
+        raise HTTPException(status_code=400, detail=result)
+
+
+# ── Update service user profile fields ────────────────────────────────────────
+
+@app.post("/update_service_user/")
+async def update_service_user(
+    data: UpdateServiceUser,
+    current_user: UserData = Depends(get_current_user),
+    req: Request = None,
+):
+    """Update name, location, or status for an existing service user."""
+    success, message = update_service_user_profile(
+        data.service_user_id,
+        patientName=data.patientName,
+        location=data.location,
+        status=data.status,
+    )
+    if success:
+        AuditLogger.log_phi_access(
+            username=current_user.username,
+            user_role=current_user.role,
+            action="update_patient",
+            patient_id=data.service_user_id,
+            ip_address=req.client.host if req and req.client else None,
+            details={"fields_updated": list(data.dict(exclude_none=True).keys())},
+        )
+        return {"success": True, "message": message}
+    else:
+        raise HTTPException(status_code=400, detail=message)
+
+
+# ── Update last session date ───────────────────────────────────────────────────
+
+@app.post("/update_last_session/")
+async def update_last_session(
+    data: UpdateLastSession,
+    current_user: UserData = Depends(get_current_user),
+    req: Request = None,
+):
+    """Update the last_session date for a service user's outreach record."""
+    success, message = update_last_session_db(data.service_user_id, data.last_session)
+    if success:
+        return {"success": True, "message": message}
+    else:
+        raise HTTPException(status_code=400, detail=message)

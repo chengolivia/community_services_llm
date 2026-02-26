@@ -71,33 +71,32 @@ def generate_service_user_id(provider_username: str, patient_name: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]  # short, unique, anonymized
 
 
-def add_new_service_user(provider_username, patient_name, last_session, next_checkin, location,followup_message):
-    """Create or update a service user's record using a deterministic hashed ID."""
-    
+def add_new_service_user(provider_username, patient_name, last_session, next_checkin, location, followup_message):
     conn = psycopg.connect(CONNECTION_STRING)
     cursor = conn.cursor()
-
     try:
-        # Generate deterministic, anonymized ID
         service_user_id = generate_service_user_id(provider_username, patient_name)
-        print(f"[DEBUG] Deterministic ID for {provider_username}/{patient_name}: {service_user_id}")
 
-        # Insert into profiles if not exists
         cursor.execute('''
-        INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (service_user_id) DO NOTHING
+            INSERT INTO profiles (service_user_id, service_user_name, provider, location, status)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (service_user_id) DO NOTHING
         ''', (service_user_id, patient_name, provider_username, location, "Active"))
+
+        # ← this part was missing entirely
+        if next_checkin:
+            cursor.execute('''
+                INSERT INTO outreach_details (service_user_id, last_session, check_in, follow_up_message)
+                VALUES (%s, %s, %s, %s)
+            ''', (service_user_id, last_session or None, next_checkin, followup_message or ''))
 
         conn.commit()
         return True, f"Check-in saved successfully (ID: {service_user_id})"
-
     except Exception as e:
         conn.rollback()
-        print(f"[DB Error] {e}")
         return False, f"Database error: {str(e)}"
     finally:
-        conn.close() 
+        conn.close()
 
 def edit_service_user_outreach(check_in_id, date, message):
     conn = psycopg.connect(CONNECTION_STRING)
@@ -263,3 +262,118 @@ def get_notification_settings(username):
         return False, f"Database error: {str(e)}"
     finally:
         conn.close()
+
+def delete_service_user_checkin(check_in_id):
+    try:
+        with psycopg.connect(CONNECTION_STRING) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM outreach_details WHERE id = %s",
+                    (int(check_in_id),),  # cast to int to be safe
+                )
+            conn.commit()
+        return True, "Deleted"
+    except Exception as e:
+        print(f"[DB] delete_service_user_checkin error: {e}")
+        return False, str(e)
+
+
+def add_service_user_checkin(service_user_id: str, check_in: str, follow_up_message: str = ""):
+    """Insert a new check-in row and return the new row's ID."""
+    try:
+        with psycopg.connect(CONNECTION_STRING) as conn:
+            with conn.cursor() as cur:
+                # Pull the latest last_session for this user so the row is consistent
+                cur.execute(
+                    """SELECT last_session FROM outreach_details
+                       WHERE service_user_id = %s
+                       ORDER BY created_at DESC LIMIT 1""",
+                    (service_user_id,),
+                )
+                row = cur.fetchone()
+                last_session = row[0] if row else None
+
+                cur.execute(
+                    """INSERT INTO outreach_details
+                       (service_user_id, last_session, check_in, follow_up_message)
+                       VALUES (%s, %s, %s, %s)
+                       RETURNING id""",
+                    (service_user_id, last_session, check_in, follow_up_message),
+                )
+                new_id = cur.fetchone()[0]
+            conn.commit()
+        return True, str(new_id)
+    except Exception as e:
+        print(f"[DB] add_service_user_checkin error: {e}")
+        return False, str(e)
+
+
+def update_service_user_profile(
+    service_user_id: str,
+    patientName: str = None,
+    location: str = None,
+    status: str = None,
+):
+    """Update name, location, and/or status in the profiles table."""
+    fields = []
+    values = []
+
+    if patientName is not None:
+        fields.append("service_user_name = %s")
+        values.append(patientName)
+    if location is not None:
+        fields.append("location = %s")
+        values.append(location)
+    if status is not None:
+        fields.append("status = %s")
+        values.append(status)
+
+    if not fields:
+        return True, "Nothing to update"
+
+    values.append(service_user_id)
+    sql = f"UPDATE profiles SET {', '.join(fields)} WHERE service_user_id = %s"
+
+    try:
+        with psycopg.connect(CONNECTION_STRING) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, values)
+            conn.commit()
+        return True, "Updated"
+    except Exception as e:
+        print(f"[DB] update_service_user_profile error: {e}")
+        return False, str(e)
+
+
+def update_last_session_db(service_user_id: str, last_session: str):
+    """Update last_session on the most recent outreach_details row for the user.
+    If no outreach row exists yet, insert a minimal one.
+    """
+    try:
+        with psycopg.connect(CONNECTION_STRING) as conn:
+            with conn.cursor() as cur:
+                # Try to update the existing row
+                cur.execute(
+                    """UPDATE outreach_details
+                       SET last_session = %s
+                       WHERE id = (
+                           SELECT id FROM outreach_details
+                           WHERE service_user_id = %s
+                           ORDER BY created_at DESC
+                           LIMIT 1
+                       )""",
+                    (last_session, service_user_id),
+                )
+                if cur.rowcount == 0:
+                    # No outreach row yet — insert a seed row
+                    cur.execute(
+                        """INSERT INTO outreach_details
+                           (service_user_id, last_session)
+                           VALUES (%s, %s)""",
+                        (service_user_id, last_session),
+                    )
+            conn.commit()
+        return True, "Last session updated"
+    except Exception as e:
+        print(f"[DB] update_last_session_db error: {e}")
+        return False, str(e)
