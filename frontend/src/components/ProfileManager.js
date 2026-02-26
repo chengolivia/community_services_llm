@@ -6,7 +6,7 @@ import SidebarInformation from './SidebarInformation';
 import { useCheckIns } from '../hooks/useCheckIns';
 import { WellnessContext } from './AppStateContextProvider';
 import { apiPost, apiGet } from '../utils/api';
-import { colorForStatus } from '../utils/colorUtils';
+import { statusConfig, STATUS_CONFIG } from '../utils/colorUtils';
 
 const INITIAL_FORM_STATE = {
   patientName: '',
@@ -16,6 +16,22 @@ const INITIAL_FORM_STATE = {
   location: '',
   status: '',
 };
+
+// Inline legend component — reused here and in OutreachCalendar
+export const StatusLegend = () => (
+  <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', padding: '6px 0' }}>
+    {Object.values(STATUS_CONFIG).map(({ color, bg, symbol, label }) => (
+      <span key={label} style={{
+        display: 'inline-flex', alignItems: 'center', gap: '5px',
+        padding: '2px 10px', borderRadius: '12px', fontSize: '13px',
+        background: bg, color, fontWeight: 600, border: `1px solid ${color}44`,
+      }}>
+        <span aria-hidden="true">{symbol}</span>
+        {label}
+      </span>
+    ))}
+  </div>
+);
 
 const ProfileManager = () => {
   const { user } = useContext(WellnessContext);
@@ -30,12 +46,7 @@ const ProfileManager = () => {
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
-  const {
-    checkIns,
-    fetchCheckIns,
-    saveAllCheckIns,
-    updatePatientLastSession,
-  } = useCheckIns();
+  const { checkIns, fetchCheckIns, saveAllCheckIns, updatePatientLastSession } = useCheckIns();
 
   useEffect(() => {
     if (currentPatient?.service_user_id && !isEditable) {
@@ -51,7 +62,6 @@ const ProfileManager = () => {
       const data = await apiGet('/service_user_list/');
       setServiceUsers(data || []);
     } catch (err) {
-      console.error('[ProfileManager] Error fetching users:', err);
       setError(err.message);
       setServiceUsers([]);
     } finally {
@@ -63,18 +73,16 @@ const ProfileManager = () => {
 
   const filteredServiceUsers = useMemo(() => {
     if (!search.trim()) return serviceUsers;
-    const searchLower = search.toLowerCase();
-    return serviceUsers.filter((u) => {
-      const name = u.service_user_name?.toLowerCase() || '';
-      const location = u.location?.toLowerCase() || '';
-      return name.includes(searchLower) || location.includes(searchLower);
-    });
+    const q = search.toLowerCase();
+    return serviceUsers.filter(u =>
+      (u.service_user_name?.toLowerCase() || '').includes(q) ||
+      (u.location?.toLowerCase() || '').includes(q)
+    );
   }, [serviceUsers, search]);
 
   const handleSearchChange = useCallback((e) => setSearch(e.target.value), []);
-  const handleFormChange = useCallback((field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
+  const handleFormChange = useCallback((field, value) =>
+    setFormData(prev => ({ ...prev, [field]: value })), []);
 
   const openSidebar = useCallback((patient, editable) => {
     setCurrentPatient(patient);
@@ -116,18 +124,13 @@ const ProfileManager = () => {
       if (updatedData.last_session !== undefined) {
         await updatePatientLastSession(currentPatient.service_user_id, updatedData.last_session);
       }
-      const patchPayload = {};
-      if (updatedData.service_user_name !== undefined) patchPayload.patientName = updatedData.service_user_name;
-      if (updatedData.location !== undefined) patchPayload.location = updatedData.location;
-      if (updatedData.status !== undefined) patchPayload.status = updatedData.status;
-
-      if (Object.keys(patchPayload).length > 0) {
-        await apiPost('/update_service_user/', {
-          service_user_id: currentPatient.service_user_id,
-          ...patchPayload,
-        });
+      const patch = {};
+      if (updatedData.service_user_name !== undefined) patch.patientName = updatedData.service_user_name;
+      if (updatedData.location !== undefined) patch.location = updatedData.location;
+      if (updatedData.status !== undefined) patch.status = updatedData.status;
+      if (Object.keys(patch).length > 0) {
+        await apiPost('/update_service_user/', { service_user_id: currentPatient.service_user_id, ...patch });
       }
-
       setCurrentPatient(prev => ({
         ...prev,
         service_user_name: updatedData.service_user_name ?? prev.service_user_name,
@@ -135,11 +138,10 @@ const ProfileManager = () => {
         status: updatedData.status ?? prev.status,
         last_session: updatedData.last_session ?? prev.last_session,
       }));
-
       await fetchServiceUsers();
       alert('Profile saved successfully!');
-    } catch (error) {
-      alert(`Failed to update: ${error.message}`);
+    } catch (err) {
+      alert(`Failed to update: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,8 +154,8 @@ const ProfileManager = () => {
       await fetchCheckIns(currentPatient.service_user_id);
       await fetchServiceUsers();
       alert('All changes saved successfully!');
-    } catch (error) {
-      alert(`Failed to update check-ins: ${error.message}`);
+    } catch (err) {
+      alert(`Failed to update check-ins: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -163,72 +165,41 @@ const ProfileManager = () => {
     <div className="container">
       <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
         <div className="search-container">
-          <input
-            type="text"
-            placeholder="Search by name or location..."
-            className="profile-search-box"
-            value={search}
-            onChange={handleSearchChange}
-            aria-label="Search service users"
-          />
+          <input type="text" placeholder="Search by name or location..."
+            className="profile-search-box" value={search} onChange={handleSearchChange}
+            aria-label="Search service users" />
           <button className="add" onClick={() => openSidebar({}, true)} aria-label="Add new service user">
-            <img src={AddIcon} alt="" />
-            Add
+            <img src={AddIcon} alt="" /> Add
           </button>
         </div>
 
-        {/* Status legend */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 0 4px', flexWrap: 'wrap' }}>
-          {[['Active', '#79C981'], ['Inactive', '#E57C7E'], ['Pending', '#FFBC2A']].map(([label, color]) => (
-            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block' }} />
-              {label}
-            </span>
-          ))}
-        </div>
+        <StatusLegend />
 
         <div className="table-wrapper">
           {isLoading ? (
             <div className="loading-message">Loading service users...</div>
           ) : error ? (
-            <div className="error-message">
-              <p>Error: {error}</p>
-              <button onClick={fetchServiceUsers}>Retry</button>
-            </div>
+            <div className="error-message"><p>Error: {error}</p><button onClick={fetchServiceUsers}>Retry</button></div>
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Location</th>
-                  <th>Last Session</th>
-                  <th>Next Check-in</th>
-                  <th>Status</th>
+                  <th>Name</th><th>Location</th><th>Last Session</th><th>Next Check-in</th><th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredServiceUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="empty-message">
-                      {search ? `No results found for "${search}"` : 'No service users found'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredServiceUsers.map((u) => (
-                    <tr
-                      key={u.service_user_id || u.id}
-                      onClick={() => openSidebar(u, false)}
-                      className="clickable-row"
-                    >
+                  <tr><td colSpan="5" className="empty-message">
+                    {search ? `No results found for "${search}"` : 'No service users found'}
+                  </td></tr>
+                ) : filteredServiceUsers.map((u) => {
+                  const cfg = statusConfig(u.status);
+                  return (
+                    <tr key={u.service_user_id || u.id} onClick={() => openSidebar(u, false)} className="clickable-row">
                       <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '50%',
-                          background: colorForStatus(u.status),
-                          flexShrink: 0,
-                        }} />
+                        <span aria-hidden="true" style={{ color: cfg.color, fontSize: '12px', flexShrink: 0 }}>
+                          {cfg.symbol}
+                        </span>
                         {u.service_user_name || '—'}
                       </td>
                       <td>{u.location || '—'}</td>
@@ -236,44 +207,35 @@ const ProfileManager = () => {
                       <td>{u.check_in || '—'}</td>
                       <td>
                         <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          background: colorForStatus(u.status) + '33', // 20% opacity
-                          color: colorForStatus(u.status),
-                          fontWeight: 600,
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '2px 8px', borderRadius: '12px', fontSize: '12px',
+                          background: cfg.bg, color: cfg.color, fontWeight: 600,
+                          border: `1px solid ${cfg.color}44`,
                         }}>
+                          <span aria-hidden="true">{cfg.symbol}</span>
                           {u.status || '—'}
                         </span>
                       </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
       </div>
 
-      <Sidebar
-        isOpen={hasSidebar}
-        content={
-          hasSidebar ? (
-            <SidebarInformation
-              checkIns={checkIns}
-              patient={currentPatient}
-              isEditable={isEditable}
-              isSubmitting={isSubmitting}
-              onSubmit={handleSubmit}
-              formData={formData}
-              onFormChange={handleFormChange}
-              onUpdatePatient={handleUpdatePatient}
-              onSaveAllCheckIns={handleSaveAllCheckIns}
-              onClose={() => setSidebar(false)}
-            />
-          ) : null
-        }
-      />
+      <Sidebar isOpen={hasSidebar} content={
+        hasSidebar ? (
+          <SidebarInformation
+            checkIns={checkIns} patient={currentPatient}
+            isEditable={isEditable} isSubmitting={isSubmitting}
+            onSubmit={handleSubmit} formData={formData} onFormChange={handleFormChange}
+            onUpdatePatient={handleUpdatePatient} onSaveAllCheckIns={handleSaveAllCheckIns}
+            onClose={() => setSidebar(false)}
+          />
+        ) : null
+      } />
     </div>
   );
 };

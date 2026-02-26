@@ -1,11 +1,12 @@
-// OutreachCalendar.js - Calendar view showing scheduled check-ins
+// OutreachCalendar.js
 import React, { useEffect, useState, useContext, useCallback, useMemo } from 'react';
 import Sidebar from './Sidebar';
 import SidebarInformation from './SidebarInformation';
 import { WellnessContext } from './AppStateContextProvider';
 import { useCheckIns } from '../hooks/useCheckIns';
 import { apiGet } from '../utils/api';
-import { colorForStatus } from '../utils/colorUtils';
+import { statusConfig } from '../utils/colorUtils';
+import { StatusLegend } from './ProfileManager';
 import '../styles/pages/calendar.css';
 
 const MONTHS = [
@@ -14,19 +15,14 @@ const MONTHS = [
 ];
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const parseCheckInDate = (checkInStr) => {
-  if (!checkInStr) return null;
-  const parts = checkInStr.split('-').map(Number);
-  if (parts[0] > 31) {
-    const [year, month, day] = parts;
-    return new Date(year, month - 1, day);
-  }
-  const [month, day, year] = parts;
-  return new Date(year, month - 1, day);
+const parseCheckInDate = (s) => {
+  if (!s) return null;
+  const parts = s.split('-').map(Number);
+  if (parts[0] > 31) return new Date(parts[0], parts[1] - 1, parts[2]);
+  return new Date(parts[2], parts[0] - 1, parts[1]);
 };
 
-const getDateKey = (date) =>
-  `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const getDateKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 const OutreachCalendar = () => {
   const { user } = useContext(WellnessContext);
@@ -38,32 +34,22 @@ const OutreachCalendar = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [completingId, setCompletingId] = useState(null);
-
-  const {
-    checkIns,
-    fetchCheckIns,
-    saveAllCheckIns,
-    updatePatientLastSession,
-  } = useCheckIns();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { checkIns, fetchCheckIns, saveAllCheckIns, updatePatientLastSession } = useCheckIns();
+
   useEffect(() => {
-    if (currentPatient?.service_user_id) {
-      fetchCheckIns(currentPatient.service_user_id);
-    }
+    if (currentPatient?.service_user_id) fetchCheckIns(currentPatient.service_user_id);
   }, [currentPatient?.service_user_id, fetchCheckIns]);
 
   const fetchOutreach = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      // Use outreach_list so we get one row per check-in (with check_in_id)
-      // Falls back to service_user_list if outreach_list isn't available
       const data = await apiGet('/outreach_list/');
-      console.log('[Calendar] Outreach data sample:', data[0]);
+      console.log('[Calendar] Sample item:', data[0]);
       setAllOutreach(data);
     } catch (err) {
-      console.error('Error fetching outreach:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -72,38 +58,26 @@ const OutreachCalendar = () => {
 
   useEffect(() => { fetchOutreach(); }, [fetchOutreach]);
 
-  // Group outreach by date
   const outreachByDate = useMemo(() => {
     const grouped = {};
-    allOutreach.forEach((outreach) => {
-      const date = parseCheckInDate(outreach.check_in);
+    allOutreach.forEach((item) => {
+      const date = parseCheckInDate(item.check_in);
       if (!date || isNaN(date.getTime())) return;
-      const dateKey = getDateKey(date);
-      if (!grouped[dateKey]) grouped[dateKey] = { date, outreach: [] };
-      grouped[dateKey].outreach.push({
-        ...outreach,
-        color: colorForStatus(outreach.status),
-      });
+      const key = getDateKey(date);
+      if (!grouped[key]) grouped[key] = { date, outreach: [] };
+      grouped[key].outreach.push({ ...item, cfg: statusConfig(item.status) });
     });
     return grouped;
   }, [allOutreach]);
 
-  /**
-   * Complete a single check-in from the calendar.
-   * Uses check_in_id (the outreach_details.id PK), not service_user_id.
-   */
   const handleCompleteCheckIn = useCallback(async (checkInId, e) => {
     e.stopPropagation();
-
     if (checkInId == null) {
-      alert('Cannot complete this check-in: missing ID. Try refreshing the page.');
+      alert('Cannot complete: missing check-in ID. Try refreshing.');
       return;
     }
-
-    console.log('[Calendar] Completing check-in ID:', checkInId, typeof checkInId);
-
+    console.log('[Calendar] Completing check_in_id:', checkInId, typeof checkInId);
     if (!window.confirm('Mark this check-in as complete and remove it from the calendar?')) return;
-
     setCompletingId(checkInId);
     try {
       await saveAllCheckIns({}, null, [checkInId], []);
@@ -114,77 +88,6 @@ const OutreachCalendar = () => {
       setCompletingId(null);
     }
   }, [saveAllCheckIns, fetchOutreach]);
-
-  const dateComponents = useMemo(() => {
-    const sortedDates = Object.keys(outreachByDate).sort(
-      (a, b) => outreachByDate[a].date.getTime() - outreachByDate[b].date.getTime()
-    );
-    const searchLower = search.toLowerCase();
-
-    return sortedDates.map((dateKey) => {
-      const { date, outreach } = outreachByDate[dateKey];
-      const month = MONTHS[date.getMonth()];
-      const day = date.getDate();
-      const dayOfWeek = DAYS_OF_WEEK[date.getDay()];
-      const year = date.getFullYear();
-
-      const filteredOutreach = outreach.filter((item) => {
-        const name = (item.name || item.service_user_name || '').toLowerCase();
-        return name.includes(searchLower);
-      });
-      if (filteredOutreach.length === 0 && search) return null;
-
-      return (
-        <div key={dateKey} className="day">
-          <div className="date black">{day}</div>
-          <div className="info">{dayOfWeek}, {month} {day}, {year}</div>
-          <ul>
-            {filteredOutreach.map((item, idx) => {
-              // check_in_id is the outreach_details PK — now returned by get_all_outreach
-              const checkInId = item.check_in_id;
-              const isCompleting = completingId === checkInId;
-
-              return (
-                <li
-                  key={`${item.service_user_id}-${item.check_in}-${idx}`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
-                >
-                  <span
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flex: 1 }}
-                    onClick={() => handlePatientClick(item)}
-                  >
-                    <span className="dot" style={{ background: item.color, flexShrink: 0 }} />
-                    Follow-up Wellness Check-in w/ {item.name || item.service_user_name}
-                  </span>
-
-                  <button
-                    onClick={(e) => handleCompleteCheckIn(checkInId, e)}
-                    disabled={isCompleting || checkInId == null}
-                    title={checkInId == null ? 'No check-in ID available' : 'Mark as complete and remove'}
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid #79C981',
-                      background: checkInId == null ? '#eee' : '#f0fbf1',
-                      color: checkInId == null ? '#aaa' : '#3a7d44',
-                      cursor: checkInId == null ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isCompleting ? '...' : '✓ Complete'}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      );
-    }).filter(Boolean);
-  }, [outreachByDate, search, completingId, handleCompleteCheckIn]);
-
-  const handleSearchChange = useCallback((e) => setSearch(e.target.value), []);
 
   const handlePatientClick = useCallback((patient) => {
     setCurrentPatient(patient);
@@ -225,70 +128,107 @@ const OutreachCalendar = () => {
     }
   };
 
-  const currentMonth = MONTHS[new Date().getMonth()];
-  const currentYear = new Date().getFullYear();
+  const dateComponents = useMemo(() => {
+    const sorted = Object.keys(outreachByDate).sort(
+      (a, b) => outreachByDate[a].date.getTime() - outreachByDate[b].date.getTime()
+    );
+    const q = search.toLowerCase();
+
+    return sorted.map((key) => {
+      const { date, outreach } = outreachByDate[key];
+      const filtered = outreach.filter(item =>
+        (item.name || item.service_user_name || '').toLowerCase().includes(q)
+      );
+      if (filtered.length === 0 && search) return null;
+
+      return (
+        <div key={key} className="day">
+          <div className="date black">{date.getDate()}</div>
+          <div className="info">
+            {DAYS_OF_WEEK[date.getDay()]}, {MONTHS[date.getMonth()]} {date.getDate()}, {date.getFullYear()}
+          </div>
+          <ul>
+            {filtered.map((item, idx) => {
+              const checkInId = item.check_in_id;
+              const isCompleting = completingId === checkInId;
+              const { color, bg, symbol } = item.cfg;
+
+              return (
+                <li key={`${item.service_user_id}-${item.check_in}-${idx}`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flex: 1 }}
+                    onClick={() => handlePatientClick(item)}
+                  >
+                    {/* Symbol + color dot — both cues for colorblind users */}
+                    <span aria-hidden="true" style={{
+                      width: '18px', height: '18px', borderRadius: '50%',
+                      background: bg, color, fontSize: '11px', fontWeight: 700,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      border: `1.5px solid ${color}`, flexShrink: 0,
+                    }}>
+                      {symbol}
+                    </span>
+                    Follow-up Wellness Check-in w/ {item.name || item.service_user_name}
+                  </span>
+
+                  <button
+                    onClick={(e) => handleCompleteCheckIn(checkInId, e)}
+                    disabled={isCompleting || checkInId == null}
+                    title={checkInId == null ? 'No check-in ID — refresh page' : 'Mark complete & remove'}
+                    style={{
+                      fontSize: '11px', padding: '2px 8px', borderRadius: '4px',
+                      border: '1px solid #2563EB', background: '#EFF6FF', color: '#2563EB',
+                      cursor: checkInId == null ? 'not-allowed' : 'pointer',
+                      opacity: checkInId == null ? 0.5 : 1,
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                    }}
+                  >
+                    {isCompleting ? '...' : '✓ Complete'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      );
+    }).filter(Boolean);
+  }, [outreachByDate, search, completingId, handleCompleteCheckIn, handlePatientClick]);
 
   return (
     <div className="container">
       <div className={`main-content ${hasSidebar ? 'shifted' : ''}`}>
         <div className="header">
-          <h2 style={{ paddingRight: '20px' }}>{currentMonth} {currentYear}</h2>
-
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {[['Active', '#79C981'], ['Inactive', '#E57C7E'], ['Pending', '#FFBC2A'], ['Closed', '#AAAAAA']].map(([label, color]) => (
-              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block' }} />
-                {label}
-              </span>
-            ))}
-          </div>
-
-          <input
-            type="text"
-            placeholder="Search by member name..."
-            className="search-box"
-            value={search}
-            onChange={handleSearchChange}
-            aria-label="Search members"
-          />
+          <h2 style={{ paddingRight: '20px' }}>
+            {MONTHS[new Date().getMonth()]} {new Date().getFullYear()}
+          </h2>
+          <StatusLegend />
+          <input type="text" placeholder="Search by member name..." className="search-box"
+            value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search members" />
         </div>
 
         <div className="table-wrapper">
           <div className="schedule">
             {isLoading && <div className="loading-message">Loading outreach data...</div>}
-            {error && (
-              <div className="error-message">
-                Error: {error}
-                <button onClick={fetchOutreach}>Retry</button>
-              </div>
-            )}
+            {error && <div className="error-message">Error: {error} <button onClick={fetchOutreach}>Retry</button></div>}
             {!isLoading && !error && dateComponents.length === 0 && (
-              <div className="empty-message">
-                {search ? `No results found for "${search}"` : 'No outreach scheduled'}
-              </div>
+              <div className="empty-message">{search ? `No results for "${search}"` : 'No outreach scheduled'}</div>
             )}
             {!isLoading && !error && dateComponents}
           </div>
         </div>
       </div>
 
-      <Sidebar
-        isOpen={hasSidebar}
-        content={
-          hasSidebar && currentPatient ? (
-            <SidebarInformation
-              checkIns={checkIns}
-              patient={currentPatient}
-              isEditable={false}
-              isSubmitting={isSubmitting}
-              onSubmit={() => {}}
-              onUpdatePatient={handleUpdatePatient}
-              onSaveAllCheckIns={handleSaveAllCheckIns}
-              onClose={handleCloseSidebar}
-            />
-          ) : null
-        }
-      />
+      <Sidebar isOpen={hasSidebar} content={
+        hasSidebar && currentPatient ? (
+          <SidebarInformation
+            checkIns={checkIns} patient={currentPatient}
+            isEditable={false} isSubmitting={isSubmitting}
+            onSubmit={() => {}} onUpdatePatient={handleUpdatePatient}
+            onSaveAllCheckIns={handleSaveAllCheckIns} onClose={handleCloseSidebar}
+          />
+        ) : null
+      } />
     </div>
   );
 };
