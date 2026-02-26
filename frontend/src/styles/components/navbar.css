@@ -4,6 +4,7 @@
 
 .navbar {
   background-color: var(--bg-tertiary);
+  border-right: 1px solid var(--color-border-light);
   width: var(--navbar-width);
   display: flex;
   flex-direction: column;
@@ -28,11 +29,13 @@
 }
 
 .navbar-button {
+  border-radius: var(--radius-lg);
+  font-size: var(--font-sm);  /* slightly smaller, more refined */
+  font-weight: 500;
   text-decoration: none;
   color: var(--color-text);
   background-color: transparent;
   padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
   width: 100%;
   text-align: left;
   display: flex;
@@ -44,6 +47,8 @@
 .navbar-button:hover,
 .navbar-button.active {
   background-color: var(--bg-hover);
+  font-weight: 600;
+  color: var(--color-primary);  /* active item gets brand color */
 }
 
 .navbar-icon {

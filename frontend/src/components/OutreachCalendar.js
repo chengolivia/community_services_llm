@@ -184,7 +184,7 @@ const OutreachCalendar = () => {
                       whiteSpace: 'nowrap', flexShrink: 0,
                     }}
                   >
-                    {isCompleting ? '...' : '✓ Complete'}
+                    {isCompleting ? '...' : '✓ Complete Check-In'}
                   </button>
                 </li>
               );
