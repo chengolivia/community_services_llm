@@ -24,7 +24,8 @@ from app.utils import (
 openai.api_key = os.environ.get("SECRET_KEY")
 # NOTE: This eagerly loads embedding models and indices on import which can be
 # expensive; consider lazy-loading in production to reduce startup time.
-embedding_model, saved_resources, documents_resources, metadata_resources, saved_articles, documents_articles = get_model_and_indices()
+embedding_model, saved_resources, documents_resources, metadata_resources, \
+    geo_trees, geo_indices, saved_articles, documents_articles = get_model_and_indices()
 internal_prompts, external_prompts = get_all_prompts()
 
 
@@ -677,11 +678,13 @@ def _construct_response_new(
                 output = resources_tool(
                     query=args.get("query", ""),
                     organization=organization,
-                    location=args.get("location"),  # NEW: Pass location parameter
+                    location=args.get("location"),
                     k=args.get("k", 5),
                     saved_indices=saved_resources,
                     documents=documents_resources,
-                    metadata=metadata_resources,  # NEW: Pass metadata
+                    metadata=metadata_resources,
+                    geo_trees=geo_trees,
+                    geo_indices=geo_indices,
                     embedding_model=embedding_model
                 )
 
@@ -790,3 +793,4 @@ def _construct_response_vanilla(
             yield f"data: {formatted_content}\n\n"
     
     yield "[DONE]\n\n"
+

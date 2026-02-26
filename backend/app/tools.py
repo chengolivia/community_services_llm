@@ -4,6 +4,7 @@ import os
 import requests
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
+from geopy.distance import geodesic
 import time
 
 geolocator = Nominatim(user_agent="peercopilot_app")
@@ -12,7 +13,7 @@ gmaps = googlemaps.Client(key=google_maps_api)
 
 _GEOCODE_CACHE = {}
 
-def geocode_location(location: str):
+def geocode_location(location: str,organization='cspnj'):
     """
     Geocode a location using free Nominatim service.
     
@@ -33,9 +34,14 @@ def geocode_location(location: str):
     try:
         # Add NJ context if just a city/zip
         search_term = location
-        if not any(state in location.lower() for state in ['nj', 'new jersey']):
-            search_term = f"{location}, New Jersey, USA"
-        
+
+        if organization == 'cspnj':
+            if not any(state in location.lower() for state in ['nj', 'new jersey']):
+                search_term = f"{location}, New Jersey, USA"
+        elif organization == 'georgia':
+            if not any(state in location.lower() for state in ['ga', 'Georgia']):
+                search_term = f"{location}, Georgia, USA"
+
         # Respect Nominatim's 1 req/sec limit
         time.sleep(1)
         
@@ -52,40 +58,6 @@ def geocode_location(location: str):
     
     return None, None
 
-def calculate_geographic_score(user_lat, user_lon, resource_lat, resource_lon, 
-                               is_virtual=False, max_distance_km=50):
-    """
-    Calculate geographic proximity score (0-1, higher is closer).
-    
-    Args:
-        user_lat, user_lon: User's location
-        resource_lat, resource_lon: Resource location
-        is_virtual: If True, resource is available anywhere
-        max_distance_km: Maximum distance to consider
-        
-    Returns:
-        Score from 0-1
-    """
-    # Virtual resources are "everywhere"
-    if is_virtual:
-        return 1.0
-    
-    # No location data - neutral score
-    if resource_lat is None or resource_lon is None:
-        return 0.5
-    
-    try:
-        distance = geodesic(
-            (user_lat, user_lon),
-            (resource_lat, resource_lon)
-        ).kilometers
-        
-        # Normalize to 0-1 (closer = higher score)
-        score = max(0, 1 - (distance / max_distance_km))
-        return score
-    except:
-        return 0.5
-
 def query_resources_geo_aware(
     query: str,
     org_key: str,
@@ -94,105 +66,105 @@ def query_resources_geo_aware(
     saved_indices={},
     documents={},
     metadata={},
+    geo_trees={},
+    geo_indices={},
     embedding_model=None,
-    semantic_weight=0.85,
-    geographic_weight=0.15
 ):
-    """
-    Geographic-aware resource search combining semantic + location similarity.
-    
-    Args:
-        query: What to search for (e.g., "food banks")
-        org_key: Organization ID
-        location: Where to search (city, zip, address) - optional
-        k: Number of results
-        semantic_weight: Weight for semantic similarity (default 0.85)
-        geographic_weight: Weight for geographic proximity (default 0.15)
-    """
     doc_key = f'resource_{org_key}'
     
     if doc_key not in saved_indices:
         print(f"[Warning] No resources loaded for {org_key}")
         return []
-    
-    # 1. Get semantic scores from FAISS
+
+    # --- Path 1: Semantic RAG ---
     query_emb = embedding_model.encode(query, convert_to_numpy=True).reshape(1, -1)
-    D, I = saved_indices[doc_key].search(query_emb, k=k*3)  # Get extra candidates
+    D, I = saved_indices[doc_key].search(query_emb, k=k)
     
-    # 2. Geocode location if provided
-    user_lat, user_lon = None, None
-    if location:
-        user_lat, user_lon = geocode_location(location)
-        if user_lat is None:
-            print(f"[Warning] Could not geocode location: {location}")
-    
-    # 3. Combine scores
-    results = []
+    semantic_results = {}
     for semantic_distance, idx in zip(D[0], I[0]):
         if idx >= len(documents[doc_key]):
             continue
-        
-        # Convert FAISS distance to similarity score
-        semantic_score = 1 / (1 + semantic_distance)
-        
-        meta = metadata[doc_key][idx]
-        
-        # Calculate geographic score
-        if user_lat and user_lon:
-            geo_score = calculate_geographic_score(
-                user_lat, user_lon,
-                meta.get('latitude'),
-                meta.get('longitude'),
-                is_virtual=meta.get('is_virtual', False)
-            )
-        else:
-            # No location in query - virtual resources get slight boost
-            geo_score = 1.0 if meta.get('is_virtual') else 0.5
-        
-        # Hybrid final score
-        final_score = (semantic_weight * semantic_score) + (geographic_weight * geo_score)
-        
-        # Calculate distance (None for virtual resources)
-        distance_km = None
-        if user_lat and not meta.get('is_virtual'):
-            if meta.get('latitude') and meta.get('longitude'):
-                try:
-                    distance_km = geodesic(
-                        (user_lat, user_lon),
-                        (meta.get('latitude'), meta.get('longitude'))
-                    ).kilometers
-                except:
-                    pass
-        
-        results.append({
+        semantic_results[idx] = {
             "resource_text": documents[doc_key][idx],
-            "metadata": meta,
-            "semantic_score": float(semantic_score),
-            "geographic_score": float(geo_score),
-            "final_score": float(final_score),
-            "distance_km": distance_km,
-            "is_virtual": meta.get('is_virtual', False)
-        })
+            "metadata": metadata[doc_key][idx],
+            "semantic_score": float(1 / (1 + semantic_distance)),
+            "distance_km": None,
+            "source": "semantic"
+        }
+
+    # --- Path 2: Geographic nearest neighbors ---
+    geo_results = {}
+    user_lat, user_lon = None, None
     
-    # Sort by final score
-    results.sort(key=lambda x: x['final_score'], reverse=True)
-    return results[:k]
+    if location:
+        user_lat, user_lon = geocode_location(location,organization=org_key)
+        
+        print("Found lat lon {} {}".format(user_lat, user_lon))
+
+        if user_lat and user_lon:
+            tree = geo_trees.get(doc_key)
+            idx_map = geo_indices.get(doc_key, [])
+            
+            if tree is not None:
+                # Query tree for k nearest
+                distances, tree_positions = tree.query([user_lat, user_lon], k=min(k, len(idx_map)))
+
+                # tree.query returns scalar when k=1, normalize to arrays
+                if k == 1:
+                    distances = [distances]
+                    tree_positions = [tree_positions]
+                
+                for tree_pos, _ in zip(tree_positions, distances):
+                    doc_idx = idx_map[tree_pos]
+                    meta = metadata[doc_key][doc_idx]
+                    
+                    dist_km = geodesic(
+                        (user_lat, user_lon),
+                        (meta['latitude'], meta['longitude'])
+                    ).kilometers
+                    
+                    geo_results[doc_idx] = {
+                        "resource_text": documents[doc_key][doc_idx],
+                        "metadata": meta,
+                        "semantic_score": None,
+                        "distance_km": dist_km,
+                        "source": "geo"
+                    }
+    # --- Merge, deduplicate, rank ---
+    merged = {}
+    
+    for idx, r in semantic_results.items():
+        merged[idx] = r
+        # If this doc also appears in geo results, enrich it
+        if idx in geo_results:
+            merged[idx]["distance_km"] = geo_results[idx]["distance_km"]
+            merged[idx]["source"] = "both"
+    
+    for idx, r in geo_results.items():
+        if idx not in merged:
+            # Compute semantic score for geo-only results
+            doc_emb = embedding_model.encode(documents[doc_key][idx], convert_to_numpy=True).reshape(1, -1)
+            D_single, _ = saved_indices[doc_key].search(doc_emb, k=1)
+            r["semantic_score"] = float(1 / (1 + D_single[0][0]))
+            merged[idx] = r
+
+    # Sort: prioritize "both", then by distance if available, then semantic
+    def sort_key(item):
+        idx, r = item
+        source_priority = {"both": 0, "geo": 1, "semantic": 2}[r["source"]]
+        dist = r["distance_km"] if r["distance_km"] is not None else 9999
+        sem = -(r["semantic_score"] or 0)
+        return (source_priority, dist, sem)
+    
+    sorted_results = sorted(merged.items(), key=sort_key)
+    return [r for _, r in sorted_results[:k]]
+
 
 def resources_tool(query: str, organization: str, location: str = None, k: int = 5,
-                   saved_indices={}, documents={}, metadata={}, embedding_model=None):
-    """
-    Search for community resources with optional geographic filtering.
+                   saved_indices={}, documents={}, metadata={},
+                   geo_trees={}, geo_indices={}, embedding_model=None):
     
-    Args:
-        query: What to search for (e.g., "food banks", "legal aid")
-        organization: Organization ID (e.g., "cspnj")
-        location: Where to search near (city, zip code, address) - optional
-        k: Number of results to return
-    
-    Returns:
-        Formatted string with top resources
-    """
-    top_resources = query_resources_geo_aware(
+    results = query_resources_geo_aware(
         query=query,
         org_key=organization.lower(),
         location=location,
@@ -200,25 +172,26 @@ def resources_tool(query: str, organization: str, location: str = None, k: int =
         saved_indices=saved_indices,
         documents=documents,
         metadata=metadata,
+        geo_trees=geo_trees,
+        geo_indices=geo_indices,
         embedding_model=embedding_model
     )
     
-    if not top_resources:
+    if not results:
         return "No relevant resources found."
     
     lines = []
-    for r in top_resources:
-        # Different display for virtual vs physical resources
-        if r['is_virtual']:
-            availability = " [Available Statewide/Online]"
+    for r in results:
+        if r['metadata'].get('is_virtual'):
+            tag = "[Statewide/Online]"
         elif r['distance_km'] is not None:
-            availability = f" [{r['distance_km']:.1f}km away]"
+            tag = f"[{r['distance_km']:.1f}km away]"
         else:
-            availability = ""
-        
-        lines.append(f"- {r['resource_text']}{availability}")
+            tag = ""
+        lines.append(f"- {r['resource_text']} {tag}".strip())
     
     return "\n".join(lines)
+
 
 def library_tool(query: str, category: str, k: int = 3,saved_indices_peer={},documents_peer={},embedding_model=None):
     """

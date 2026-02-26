@@ -16,6 +16,8 @@ import googlemaps
 import json 
 import openai 
 import time
+from scipy.spatial import cKDTree
+import math 
 
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
@@ -41,7 +43,9 @@ _CACHE = {
     "model": None,
     "saved_resources": {},
     "documents_resources": {},
-    "metadata_resources": {},  # NEW
+    "metadata_resources": {},
+    "geo_trees": {},         
+    "geo_indices": {}, 
     "saved_articles": {},
     "documents_articles": {}
 }
@@ -252,7 +256,36 @@ def fetch_data_from_db(table_name: str, org_list: list):
                 documents[key] = docs_list
                 metadata[key] = meta_list
                 indices[key] = create_faiss_index(emb_matrix)
-            
+                coords = []
+                coord_to_doc_idx = []
+                for idx, meta in enumerate(meta_list):
+                    lat = meta.get('latitude')
+                    lon = meta.get('longitude')
+                    if (not meta.get('is_virtual') and 
+                        lat is not None and lon is not None and
+                        not math.isnan(float(lat)) and not math.isnan(float(lon))):
+                        coords.append([float(lat), float(lon)])
+                        coord_to_doc_idx.append(idx)
+
+                print("We have {} coordinates for {}".format(len(coords),org_list))
+                for x,y in coords:
+                    from geopy.distance import geodesic
+                    dist = geodesic(
+                        (33.5841835,-83.8609535),
+                        (x, y)
+                    ).kilometers
+                    if dist < 100:
+                        print("Distance {}".format(dist))
+
+
+                if coords:
+                    _CACHE["geo_trees"][key] = cKDTree(np.array(coords))
+                    _CACHE["geo_indices"][key] = coord_to_doc_idx
+                else:
+                    _CACHE["geo_trees"][key] = None
+                    _CACHE["geo_indices"][key] = []
+
+
             elif table_name == "pages":
                 for cat in df['category'].unique():
                     cat_df = df[df['category'] == cat]
@@ -320,6 +353,8 @@ def get_model_and_indices():
             _CACHE["saved_resources"], 
             _CACHE["documents_resources"],
             _CACHE["metadata_resources"],
+            _CACHE["geo_trees"],  
+            _CACHE["geo_indices"],
             _CACHE["saved_articles"], 
             _CACHE["documents_articles"])
 
