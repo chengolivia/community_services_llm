@@ -141,7 +141,7 @@ function Home() {
         <div className="tiles-container">
           <Link to="/wellness-goals" className="tile">
             <span>Tool 1</span>
-            <h2>Wellness Planner</h2>
+            <h2>Planner</h2>
           </Link>
         </div>
         <div className="tiles-container">

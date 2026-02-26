@@ -101,7 +101,7 @@ const SidebarInformation = ({
             <div className="form-group">
               <label className="section-label" htmlFor="patientName">
                 <img src={ProfileIcon} alt="Profile Icon" className="icon" />
-                Patient Name
+                Member Name
               </label>
               <input 
                 type="text" 

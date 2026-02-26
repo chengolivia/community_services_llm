@@ -238,11 +238,11 @@ const OutreachCalendar = () => {
           </h2>
           <input
             type="text"
-            placeholder="Search by patient name..."
+            placeholder="Search by member name..."
             className="search-box"
             value={search}
             onChange={handleSearchChange}
-            aria-label="Search patients"
+            aria-label="Search members"
           />
         </div>
 
