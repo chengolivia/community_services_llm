@@ -56,7 +56,7 @@ function Navbar() {
           }`}
         >
           <img src={WellnessGoalsIcon} alt="Wellness Goals Icon" className="navbar-icon" />
-          Wellness Planner
+          Planner
         </Link>
         <Link
           to="/profile-manager"

@@ -12,16 +12,17 @@
 }
 
 .message-blurb {
+  margin-bottom: 2px;
   max-width: 80%;
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-2xl);
   font-size: var(--font-base);
   line-height: var(--line-height-normal);
   word-wrap: break-word;
-  margin-bottom: var(--spacing-xs);
 }
 
 .message-blurb.user {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
   background-color: var(--bg-message-user);
   color: var(--color-text);
   align-self: flex-end;
@@ -30,12 +31,18 @@
 }
 
 .message-blurb.bot {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  color: var(--color-text); 
   background-color: var(--bg-message-bot);
-  color: var(--color-text-light);
   align-self: flex-start;
   text-align: left;
   border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-2xl) 0;
 }
+
+.message-blurb.bot strong {
+  font-weight: 600;  /* default browser bold is 700, this is subtler */
+}
+
 
 .bot-heading {
   font-weight: bold;

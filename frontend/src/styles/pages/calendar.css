@@ -19,9 +19,11 @@
 }
 
 .black {
-  background: black;
-  color: var(--color-text-inverse);
+  background: var(--color-primary);  /* brand color instead of pure black */
+  color: white;
+  font-size: var(--font-sm);
 }
+
 
 .gray {
   background: var(--color-border);

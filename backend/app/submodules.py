@@ -24,7 +24,8 @@ from app.utils import (
 openai.api_key = os.environ.get("SECRET_KEY")
 # NOTE: This eagerly loads embedding models and indices on import which can be
 # expensive; consider lazy-loading in production to reduce startup time.
-embedding_model, saved_resources, documents_resources, saved_articles, documents_articles = get_model_and_indices()
+embedding_model, saved_resources, documents_resources, metadata_resources, \
+    geo_trees, geo_indices, saved_articles, documents_articles = get_model_and_indices()
 internal_prompts, external_prompts = get_all_prompts()
 
 
@@ -484,13 +485,24 @@ def _construct_response_new(
                 "name": "resources_tool",
                 "description": (
                     "Find nearby local resources such as food banks, shelters, or clinics. "
-                    "Always use the user's location when searching."
+                    "Use the location parameter to find resources near a specific place."
                 ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string"},
-                        "k": {"type": "integer", "default": 5}
+                        "query": {
+                            "type": "string",
+                            "description": "What to search for (e.g., 'food banks', 'legal aid')"
+                        },
+                        "location": {
+                            "type": "string",
+                            "description": "Where to search near. Can be city name, zip code, or address (e.g., 'Vineland', '07102', 'Newark, NJ'). Optional - omit for statewide results."
+                        },
+                        "k": {
+                            "type": "integer", 
+                            "default": 5,
+                            "description": "Number of results to return"
+                        }
                     },
                     "required": ["query"]
                 }
@@ -568,13 +580,14 @@ def _construct_response_new(
             "type": "function",
             "function": {
                 "name": "check_eligibility",
-                "description": "Check eligibility for benefits such as SNAP.",
+                "description": "Check eligibility for benefits: SNAP, TANF, Medicaid, SSDI (SGA), SSI, or Section 8",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "program": {"type": "string", "enum": ["snap"]},
+                        "program": {"type": "string", "enum": ["snap", "tanf", "medicaid", "ssdi", "ssi", "section 8"]},
                         "household_size": {"type": "integer"},
-                        "monthly_income": {"type": "number"}
+                        "monthly_income": {"type": "number"},
+                        "location": {"type": "string", "description": "City, zip code, or county in NJ. Required for Section 8 to determine correct AMI limits. If not provided for Section 8, ask the user for their location first."}
                     },
                     "required": ["program", "household_size", "monthly_income"]
                 }
@@ -598,7 +611,27 @@ def _construct_response_new(
     messages.append({"role": "user", "content": situation})
 
     # ---- TOOL LOOP ----
+    MAX_TOOL_CALLS = 100  # Safety limit (buffer before OpenAI's 128 limit)
+    MAX_ITERATIONS = 25   # Max loop iterations to prevent runaway loops
+    total_tool_calls = 0
+    iteration_count = 0
+    
     while True:
+        iteration_count += 1
+        
+        # Safety check: prevent infinite loops
+        if iteration_count > MAX_ITERATIONS:
+            # Silently force final response - no user notification
+            response = openai.chat.completions.create(
+                model="gpt-5.2",
+                messages=messages + [{"role": "user", "content": "You have gathered sufficient information. Please provide your final comprehensive answer now."}],
+                stream=True
+            )
+            for event in response:
+                if event.choices[0].delta.content:
+                    yield f"data: {event.choices[0].delta.content.replace(chr(10), '<br/>')}\n\n"
+            break
+        
         response = openai.chat.completions.create(
             model="gpt-5.2",
             messages=messages,
@@ -615,6 +648,23 @@ def _construct_response_new(
                 yield f"data: {chunk}<br/>\n\n"
             break
 
+        # Check tool call count before processing
+        num_tool_calls = len(choice.message.tool_calls) if choice.message.tool_calls else 0
+        total_tool_calls += num_tool_calls
+        
+        # Safety check: prevent exceeding OpenAI's limit
+        if total_tool_calls >= MAX_TOOL_CALLS:
+            # Silently force final response - no user notification
+            response = openai.chat.completions.create(
+                model="gpt-5.2",
+                messages=messages + [{"role": "user", "content": "You have gathered sufficient information. Please provide your final comprehensive answer now."}],
+                stream=True
+            )
+            for event in response:
+                if event.choices[0].delta.content:
+                    yield f"data: {event.choices[0].delta.content.replace(chr(10), '<br/>')}\n\n"
+            break
+
         # ASSISTANT REQUESTED TOOLS
         messages.append(choice.message)
 
@@ -628,8 +678,13 @@ def _construct_response_new(
                 output = resources_tool(
                     query=args.get("query", ""),
                     organization=organization,
+                    location=args.get("location"),
+                    k=args.get("k", 5),
                     saved_indices=saved_resources,
                     documents=documents_resources,
+                    metadata=metadata_resources,
+                    geo_trees=geo_trees,
+                    geo_indices=geo_indices,
                     embedding_model=embedding_model
                 )
 
@@ -663,7 +718,8 @@ def _construct_response_new(
                 output = check_eligibility(
                     program=args.get("program", ""),
                     household_size=args.get("household_size", 1),
-                    monthly_income=args.get("monthly_income", 0)
+                    monthly_income=args.get("monthly_income", 0),
+                    location=args.get("location")
                 )
 
             else:
@@ -737,3 +793,4 @@ def _construct_response_vanilla(
             yield f"data: {formatted_content}\n\n"
     
     yield "[DONE]\n\n"
+

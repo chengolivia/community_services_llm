@@ -1,17 +1,6 @@
-// AppStateContextProvider.js - Central React context for sharing app state
-// Provides values used by chat and profile components (input text, conversation, user, etc.)
+// AppStateContextProvider.js
 import React, { createContext, useState } from 'react';
 
-/**
- * Create a context provider wrapper for the given Context.
- * Exposes a stable object of state and setter functions used across components.
- *
- * Provided values include:
- * - inputText, setInputText
- * - conversation, setConversation
- * - chatConvo, setChatConvo
- * - user, setUser
- */
 const createContextProvider = (Context) => ({ children }) => {
   const [inputText, setInputText] = useState('');
   const [modelSelect, setModel] = useState('copilot');
@@ -20,17 +9,24 @@ const createContextProvider = (Context) => ({ children }) => {
   const [submitted] = useState(false);
   const [chatConvo, setChatConvo] = useState([]);
   const [inputLocationText, setInputLocationText] = useState('');
+
+  // Both the selected user ID AND the full service users list live in context.
+  // This means:
+  //   1. The dropdown selection survives tab switches (selectedServiceUser persists)
+  //   2. The dropdown options survive tab switches (serviceUsers persists)
+  //      so the select never briefly renders empty and "forget" the selected value.
+  const [selectedServiceUser, setSelectedServiceUser] = useState('');
+  const [serviceUsers, setServiceUsers] = useState([]);
+  const [conversationID, setConversationID] = useState('');
+
   const [organization, setOrganization] = useState(() => {
-    // Try to get the saved organization, fallback to 'cspnj' if not found
     return localStorage.getItem('organization') || 'cspnj';
-  });  
-  // Initialize user state from localStorage if available
+  });
+
   const [user, setUser] = useState(() => {
-    // This runs only once during initial render
     const storedToken = localStorage.getItem('accessToken');
     const storedRole = localStorage.getItem('userRole');
     const storedUsername = localStorage.getItem('username');
-
     if (storedToken && storedRole && storedUsername) {
       return {
         isAuthenticated: true,
@@ -39,13 +35,7 @@ const createContextProvider = (Context) => ({ children }) => {
         token: storedToken,
       };
     }
-
-    return {
-      username: '', 
-      isAuthenticated: false,
-      token: null,
-      role: null,
-    };
+    return { username: '', isAuthenticated: false, token: null, role: null };
   });
 
   const resetContext = () => {
@@ -54,27 +44,24 @@ const createContextProvider = (Context) => ({ children }) => {
     setConversation([]);
     setChatConvo([]);
     setInputLocationText('');
+    // Intentionally NOT resetting selectedServiceUser or serviceUsers —
+    // those should survive both tab switches and new sessions.
   };
 
   const contextValue = {
-    inputText,
-    setInputText,
-    modelSelect,
-    setModel,
-    inputLocationText,
-    setInputLocationText,
-    newMessage,
-    setNewMessage,
-    conversation,
-    setConversation,
+    inputText, setInputText,
+    modelSelect, setModel,
+    inputLocationText, setInputLocationText,
+    newMessage, setNewMessage,
+    conversation, setConversation,
     submitted,
-    chatConvo,
-    setChatConvo,
-    organization,
-    setOrganization,
-    user,
-    setUser,
+    chatConvo, setChatConvo,
+    organization, setOrganization,
+    user, setUser,
     resetContext,
+    selectedServiceUser, setSelectedServiceUser,
+    serviceUsers, setServiceUsers,
+    conversationID, setConversationID,
   };
 
   return <Context.Provider value={contextValue}>{children}</Context.Provider>;

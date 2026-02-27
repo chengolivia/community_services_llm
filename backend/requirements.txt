@@ -25,3 +25,4 @@ googlemaps
 scrubadub
 pyotp
 qrcode
+geopy

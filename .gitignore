@@ -12,6 +12,8 @@ backend/uploads
 backend/saved_embeddings/
 backend/saved_embeddings_backup/
 backend/nbs/saved_embeddings/
+backend/library_resources
+backend/vector_storage
 node_modules/
 backend/library_resources/
 backend/vector_storage/
