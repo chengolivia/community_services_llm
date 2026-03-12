@@ -19,6 +19,7 @@ from app.utils import (
     stream_process_chatgpt_response,
     get_all_prompts,
 )
+from app.georgia_snap import GEORGIA_SNAP_CONTEXT
 
 # Initialize
 openai.api_key = os.environ.get("SECRET_KEY")
@@ -595,16 +596,28 @@ def _construct_response_new(
         },
     ]
 
-    system_prompt = f"""
-    You are PeerCoPilot, a supportive AI assistant for peer providers at {organization}.
+    if organization == "georgia":
+        system_prompt = """
+        You are PeerCoPilot, a supportive AI assistant for people living in Georgia.
+        Your goal is to assist them with filling out and filing SNAP applications, along with finding local food resources. 
 
-    Use peer-friendly, non-clinical language grounded in CSPNJ values.
-    Prioritize accuracy and safety. Never invent facts or resources.
+        IMPORTANT TOOL RULES:
+        - You may call multiple tools in sequence.
+        - Do not answer from general knowledge alone when local resources are requested.
 
-    IMPORTANT TOOL RULES:
-    - You may call multiple tools in sequence.
-    - Do not answer from general knowledge alone when local resources are requested.
-    """
+        Here is some information on SNAP programs in Georgia {}
+        """.format(GEORGIA_SNAP_CONTEXT)
+    else:
+        system_prompt = f"""
+        You are PeerCoPilot, a supportive AI assistant for peer providers at {organization}.
+
+        Use peer-friendly, non-clinical language grounded in CSPNJ values.
+        Prioritize accuracy and safety. Never invent facts or resources.
+
+        IMPORTANT TOOL RULES:
+        - You may call multiple tools in sequence.
+        - Do not answer from general knowledge alone when local resources are requested.
+        """
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += all_messages
