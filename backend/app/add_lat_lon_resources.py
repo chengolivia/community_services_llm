@@ -64,6 +64,7 @@ def populate_coordinates():
     cur.execute("""
         SELECT id, description, organization
         FROM resources 
+        WHERE ID >= 6371
         ORDER BY ID
     """)
     resources = cur.fetchall()

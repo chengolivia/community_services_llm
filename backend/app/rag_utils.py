@@ -267,17 +267,6 @@ def fetch_data_from_db(table_name: str, org_list: list):
                         coords.append([float(lat), float(lon)])
                         coord_to_doc_idx.append(idx)
 
-                print("We have {} coordinates for {}".format(len(coords),org_list))
-                for x,y in coords:
-                    from geopy.distance import geodesic
-                    dist = geodesic(
-                        (33.5841835,-83.8609535),
-                        (x, y)
-                    ).kilometers
-                    if dist < 100:
-                        print("Distance {}".format(dist))
-
-
                 if coords:
                     _CACHE["geo_trees"][key] = cKDTree(np.array(coords))
                     _CACHE["geo_indices"][key] = coord_to_doc_idx

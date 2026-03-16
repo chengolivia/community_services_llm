@@ -26,4 +26,4 @@ def test(query, location=None, k=5, org="cspnj"):
     )
     print(result)
 
-test("food banks", location="30014",org="georgia")
+test("food banks", location="swartswood",org="cspnj")
